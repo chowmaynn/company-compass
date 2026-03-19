@@ -3,7 +3,7 @@ import { StatusBadge } from "./StatusBadge";
 import { EditableCell } from "./EditableCell";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 import { Info } from "lucide-react";
-import { formatValue } from "@/lib/formatNumber";
+import React from "react";
 
 interface MetricTableProps {
   metrics: Metric[];
@@ -35,14 +35,14 @@ export function MetricTable({ metrics, onMetricChange }: MetricTableProps) {
           {/* Sub-headers: Actual / Proj */}
           <tr className="border-b border-border bg-muted/30">
             {weekLabels.map((label) => (
-              <th key={`${label}-sub`} className="contents">
+              <React.Fragment key={`${label}-sub`}>
                 <th className="px-2 py-1.5 text-right text-xs font-medium text-foreground/70 whitespace-nowrap">
                   Actual
                 </th>
                 <th className="px-2 py-1.5 text-right text-xs font-medium text-muted-foreground/60 whitespace-nowrap bg-muted/40 border-r border-border/30">
                   Proj
                 </th>
-              </th>
+              </React.Fragment>
             ))}
           </tr>
         </thead>
@@ -54,8 +54,10 @@ export function MetricTable({ metrics, onMetricChange }: MetricTableProps) {
                   {metric.name}
                   {metric.description && (
                     <Tooltip>
-                      <TooltipTrigger>
-                        <Info className="h-3.5 w-3.5 text-muted-foreground/60 hover:text-muted-foreground transition-colors" />
+                      <TooltipTrigger asChild>
+                        <button type="button" className="inline-flex">
+                          <Info className="h-3.5 w-3.5 text-muted-foreground/60 hover:text-muted-foreground transition-colors" />
+                        </button>
                       </TooltipTrigger>
                       <TooltipContent side="right" className="max-w-xs">
                         <p className="text-xs">{metric.description}</p>
@@ -65,7 +67,7 @@ export function MetricTable({ metrics, onMetricChange }: MetricTableProps) {
                 </div>
               </td>
               {metric.weeks.map((w, wi) => (
-                <td key={`${wi}-group`} className="contents">
+                <React.Fragment key={wi}>
                   <td className="px-1 py-2 text-right">
                     <EditableCell
                       value={w.actual}
@@ -79,15 +81,15 @@ export function MetricTable({ metrics, onMetricChange }: MetricTableProps) {
                       onChange={(val) => onMetricChange?.(metric.name, `weeks.${wi}.projection`, val)}
                     />
                   </td>
-                </td>
+                </React.Fragment>
               ))}
-              <td className="px-3 py-3 text-right font-mono text-sm font-semibold text-foreground">
+              <td className="px-3 py-3 text-right">
                 <EditableCell
                   value={metric.monthlyActual}
                   onChange={(val) => onMetricChange?.(metric.name, "monthlyActual", val)}
                 />
               </td>
-              <td className="px-3 py-3 text-right font-mono text-sm text-muted-foreground">
+              <td className="px-3 py-3 text-right">
                 <EditableCell
                   value={metric.monthlyTarget}
                   isProjection
