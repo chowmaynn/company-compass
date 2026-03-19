@@ -1,19 +1,43 @@
 import { useState } from "react";
-import { scorecardData, departments, type Department } from "@/data/scorecardData";
+import { scorecardData as initialData, departments, type Department, type Metric } from "@/data/scorecardData";
 import { SummaryCards } from "@/components/SummaryCards";
 import { DepartmentSection } from "@/components/DepartmentSection";
 import { BarChart3 } from "lucide-react";
 
 const Index = () => {
   const [activeDepartment, setActiveDepartment] = useState<Department | "all">("all");
+  const [metrics, setMetrics] = useState<Metric[]>(initialData);
 
   const filteredMetrics = activeDepartment === "all"
-    ? scorecardData
-    : scorecardData.filter((m) => m.department === activeDepartment);
+    ? metrics
+    : metrics.filter((m) => m.department === activeDepartment);
 
   const visibleDepartments = activeDepartment === "all"
     ? departments
     : [activeDepartment];
+
+  const handleMetricChange = (metricName: string, field: string, value: number | string) => {
+    setMetrics((prev) =>
+      prev.map((m) => {
+        if (m.name !== metricName) return m;
+        const updated = { ...m };
+
+        if (field === "monthlyActual") {
+          updated.monthlyActual = value;
+        } else if (field === "monthlyTarget") {
+          updated.monthlyTarget = value;
+        } else if (field.startsWith("weeks.")) {
+          const parts = field.split(".");
+          const weekIndex = parseInt(parts[1]);
+          const subField = parts[2] as "actual" | "projection";
+          updated.weeks = updated.weeks.map((w, i) =>
+            i === weekIndex ? { ...w, [subField]: value } : w
+          );
+        }
+        return updated;
+      })
+    );
+  };
 
   return (
     <div className="min-h-screen bg-background">
@@ -69,7 +93,8 @@ const Index = () => {
             <DepartmentSection
               key={dept}
               department={dept}
-              metrics={scorecardData.filter((m) => m.department === dept)}
+              metrics={metrics.filter((m) => m.department === dept)}
+              onMetricChange={handleMetricChange}
             />
           ))}
         </div>

@@ -21,9 +21,10 @@ const departmentColors: Record<Department, string> = {
 interface DepartmentSectionProps {
   department: Department;
   metrics: Metric[];
+  onMetricChange?: (metricName: string, field: string, value: number | string) => void;
 }
 
-export function DepartmentSection({ department, metrics }: DepartmentSectionProps) {
+export function DepartmentSection({ department, metrics, onMetricChange }: DepartmentSectionProps) {
   const Icon = departmentIcons[department];
   const colorClass = departmentColors[department];
 
@@ -58,7 +59,7 @@ export function DepartmentSection({ department, metrics }: DepartmentSectionProp
           ) : null}
         </div>
       </div>
-      <MetricTable metrics={metrics} />
+      <MetricTable metrics={metrics} onMetricChange={onMetricChange} />
     </div>
   );
 }
