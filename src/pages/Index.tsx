@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { scorecardData as initialData, departments, type Department, type Metric } from "@/data/scorecardData";
+import { scorecardData as initialData, departments, scorecardMonth, type Department, type Metric, type StatusColor } from "@/data/scorecardData";
 import { SummaryCards } from "@/components/SummaryCards";
 import { DepartmentSection } from "@/components/DepartmentSection";
 import { BarChart3 } from "lucide-react";
@@ -16,12 +16,13 @@ const Index = () => {
     ? departments
     : [activeDepartment];
 
+  const showCharts = activeDepartment !== "all";
+
   const handleMetricChange = (metricName: string, field: string, value: number | string) => {
     setMetrics((prev) =>
       prev.map((m) => {
         if (m.name !== metricName) return m;
         const updated = { ...m };
-
         if (field === "monthlyActual") {
           updated.monthlyActual = value;
         } else if (field === "monthlyTarget") {
@@ -39,9 +40,14 @@ const Index = () => {
     );
   };
 
+  const handleStatusChange = (metricName: string, newStatus: StatusColor) => {
+    setMetrics((prev) =>
+      prev.map((m) => m.name === metricName ? { ...m, status: newStatus } : m)
+    );
+  };
+
   return (
     <div className="min-h-screen bg-background">
-      {/* Header */}
       <header className="sticky top-0 z-20 border-b border-border bg-background/80 backdrop-blur-xl">
         <div className="mx-auto flex max-w-7xl items-center gap-3 px-6 py-4">
           <div className="flex items-center gap-3">
@@ -50,17 +56,15 @@ const Index = () => {
             </div>
             <div>
               <h1 className="text-xl font-bold tracking-tight text-foreground">Company Scorecard</h1>
-              <p className="text-xs text-muted-foreground">January 2025 · Week 4</p>
+              <p className="text-xs text-muted-foreground">{scorecardMonth}</p>
             </div>
           </div>
         </div>
       </header>
 
       <main className="mx-auto max-w-7xl space-y-8 px-6 py-8">
-        {/* Summary */}
         <SummaryCards metrics={filteredMetrics} />
 
-        {/* Department filter tabs */}
         <div className="flex flex-wrap items-center gap-2">
           <button
             onClick={() => setActiveDepartment("all")}
@@ -87,7 +91,6 @@ const Index = () => {
           ))}
         </div>
 
-        {/* Department sections */}
         <div className="space-y-8">
           {visibleDepartments.map((dept) => (
             <DepartmentSection
@@ -95,6 +98,8 @@ const Index = () => {
               department={dept}
               metrics={metrics.filter((m) => m.department === dept)}
               onMetricChange={handleMetricChange}
+              onStatusChange={handleStatusChange}
+              showCharts={showCharts}
             />
           ))}
         </div>

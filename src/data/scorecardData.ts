@@ -7,6 +7,11 @@ export interface WeekData {
   projection: number | string;
 }
 
+export interface WeekConfig {
+  label: string;
+  dateLabel: string; // dd/mm format
+}
+
 export interface Metric {
   name: string;
   department: Department;
@@ -19,6 +24,23 @@ export interface Metric {
   source: string;
   description: string;
 }
+
+export const weekConfigs: WeekConfig[] = [
+  { label: "W1", dateLabel: "06/01" },
+  { label: "W2", dateLabel: "13/01" },
+  { label: "W3", dateLabel: "20/01" },
+  { label: "W4", dateLabel: "27/01" },
+];
+
+export const scorecardMonth = "January 2025";
+
+export const statusOptions: { value: StatusColor; label: string }[] = [
+  { value: "green", label: "On Track" },
+  { value: "light-green", label: "Ahead" },
+  { value: "yellow", label: "At Risk" },
+  { value: "light-red", label: "Behind" },
+  { value: "red", label: "Off Track" },
+];
 
 export const scorecardData: Metric[] = [
   // EVERGREEN METRICS

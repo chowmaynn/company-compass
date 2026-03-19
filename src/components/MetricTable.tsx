@@ -1,4 +1,4 @@
-import { type Metric } from "@/data/scorecardData";
+import { type Metric, type StatusColor, weekConfigs } from "@/data/scorecardData";
 import { StatusBadge } from "./StatusBadge";
 import { EditableCell } from "./EditableCell";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
@@ -8,11 +8,10 @@ import React from "react";
 interface MetricTableProps {
   metrics: Metric[];
   onMetricChange?: (metricName: string, field: string, value: number | string) => void;
+  onStatusChange?: (metricName: string, status: StatusColor) => void;
 }
 
-export function MetricTable({ metrics, onMetricChange }: MetricTableProps) {
-  const weekLabels = ["W1", "W2", "W3", "W4"];
-
+export function MetricTable({ metrics, onMetricChange, onStatusChange }: MetricTableProps) {
   return (
     <div className="overflow-x-auto rounded-lg border border-border">
       <table className="w-full text-sm">
@@ -22,9 +21,12 @@ export function MetricTable({ metrics, onMetricChange }: MetricTableProps) {
             <th rowSpan={2} className="sticky left-0 z-10 bg-muted/90 backdrop-blur-sm px-4 py-2 text-left font-semibold text-foreground min-w-[200px] border-r border-border/50">
               Metric
             </th>
-            {weekLabels.map((label) => (
-              <th key={label} colSpan={2} className="px-1 py-2 text-center font-semibold text-foreground border-r border-border/30">
-                {label}
+            {weekConfigs.map((wc) => (
+              <th key={wc.label} colSpan={2} className="px-1 py-2 text-center font-semibold text-foreground border-r border-border/30">
+                <div className="flex flex-col items-center">
+                  <span>{wc.label}</span>
+                  <span className="text-[10px] font-normal text-muted-foreground">{wc.dateLabel}</span>
+                </div>
               </th>
             ))}
             <th rowSpan={2} className="px-3 py-2 text-right font-medium text-muted-foreground whitespace-nowrap">Monthly</th>
@@ -34,8 +36,8 @@ export function MetricTable({ metrics, onMetricChange }: MetricTableProps) {
           </tr>
           {/* Sub-headers: Actual / Proj */}
           <tr className="border-b border-border bg-muted/30">
-            {weekLabels.map((label) => (
-              <React.Fragment key={`${label}-sub`}>
+            {weekConfigs.map((wc) => (
+              <React.Fragment key={`${wc.label}-sub`}>
                 <th className="px-2 py-1.5 text-right text-xs font-medium text-foreground/70 whitespace-nowrap">
                   Actual
                 </th>
@@ -97,7 +99,11 @@ export function MetricTable({ metrics, onMetricChange }: MetricTableProps) {
                 />
               </td>
               <td className="px-3 py-3 text-center">
-                <StatusBadge status={metric.status} />
+                <StatusBadge
+                  status={metric.status}
+                  editable
+                  onChange={(newStatus) => onStatusChange?.(metric.name, newStatus)}
+                />
               </td>
               <td className="px-3 py-3 text-sm text-muted-foreground">
                 {metric.owner}
