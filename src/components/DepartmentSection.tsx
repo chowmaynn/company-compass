@@ -1,5 +1,6 @@
-import { type Department, type Metric } from "@/data/scorecardData";
+import { type Department, type Metric, type StatusColor } from "@/data/scorecardData";
 import { MetricTable } from "./MetricTable";
+import { DepartmentCharts } from "./DepartmentCharts";
 import { BarChart3, Video, Megaphone, Phone, Users } from "lucide-react";
 
 const departmentIcons: Record<Department, React.ElementType> = {
@@ -22,9 +23,11 @@ interface DepartmentSectionProps {
   department: Department;
   metrics: Metric[];
   onMetricChange?: (metricName: string, field: string, value: number | string) => void;
+  onStatusChange?: (metricName: string, status: StatusColor) => void;
+  showCharts?: boolean;
 }
 
-export function DepartmentSection({ department, metrics, onMetricChange }: DepartmentSectionProps) {
+export function DepartmentSection({ department, metrics, onMetricChange, onStatusChange, showCharts }: DepartmentSectionProps) {
   const Icon = departmentIcons[department];
   const colorClass = departmentColors[department];
 
@@ -59,7 +62,8 @@ export function DepartmentSection({ department, metrics, onMetricChange }: Depar
           ) : null}
         </div>
       </div>
-      <MetricTable metrics={metrics} onMetricChange={onMetricChange} />
+      {showCharts && <DepartmentCharts metrics={metrics} />}
+      <MetricTable metrics={metrics} onMetricChange={onMetricChange} onStatusChange={onStatusChange} />
     </div>
   );
 }
