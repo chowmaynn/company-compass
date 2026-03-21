@@ -8,21 +8,22 @@ interface SummaryCardsProps {
 export function SummaryCards({ metrics }: SummaryCardsProps) {
   const statusCounts = metrics.reduce(
     (acc, m) => {
-      if (m.status === "green" || m.status === "light-green") acc.onTrack++;
-      else if (m.status === "yellow") acc.atRisk++;
-      else acc.offTrack++;
+      if (m.status === "light-green") acc.ahead++;
+      else if (m.status === "green") acc.onTrack++;
+      else if (m.status === "yellow") acc.behind++;
+      else acc.atRisk++;
       return acc;
     },
-    { onTrack: 0, atRisk: 0, offTrack: 0 }
+    { ahead: 0, onTrack: 0, behind: 0, atRisk: 0 }
   );
 
   const cards = [
     {
-      label: "Total Metrics",
-      value: metrics.length,
+      label: "Ahead",
+      value: statusCounts.ahead,
       icon: TrendingUp,
-      accent: "text-primary",
-      bg: "bg-primary/10",
+      accent: "text-status-light-green",
+      bg: "bg-status-light-green/10",
     },
     {
       label: "On Track",
@@ -32,15 +33,15 @@ export function SummaryCards({ metrics }: SummaryCardsProps) {
       bg: "bg-status-green/10",
     },
     {
-      label: "At Risk",
-      value: statusCounts.atRisk,
+      label: "Behind",
+      value: statusCounts.behind,
       icon: AlertTriangle,
       accent: "text-status-yellow",
       bg: "bg-status-yellow/10",
     },
     {
-      label: "Off Track",
-      value: statusCounts.offTrack,
+      label: "At Risk",
+      value: statusCounts.atRisk,
       icon: XCircle,
       accent: "text-status-red",
       bg: "bg-status-red/10",

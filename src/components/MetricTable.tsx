@@ -1,6 +1,7 @@
-import { type Metric, type StatusColor, weekConfigs } from "@/data/scorecardData";
+import { type Metric, weekConfigs } from "@/data/scorecardData";
 import { StatusBadge } from "./StatusBadge";
 import { EditableCell } from "./EditableCell";
+import { formatValue } from "@/lib/formatNumber";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 import { Info } from "lucide-react";
 import React from "react";
@@ -8,10 +9,21 @@ import React from "react";
 interface MetricTableProps {
   metrics: Metric[];
   onMetricChange?: (metricName: string, field: string, value: number | string) => void;
-  onStatusChange?: (metricName: string, status: StatusColor) => void;
+  readOnlyMetrics?: Set<string>;
+  /** When set, multiplies all numeric values by this rate (NZD→USD conversion) */
+  currencyRate?: number;
 }
 
-export function MetricTable({ metrics, onMetricChange, onStatusChange }: MetricTableProps) {
+export function MetricTable({ metrics, onMetricChange, readOnlyMetrics, currencyRate }: MetricTableProps) {
+  const convert = (val: number | string | ""): number | string | "" => {
+    if (!currencyRate || val === "" || val === "—") return val;
+    if (typeof val === "number") return Math.round(val * currencyRate);
+    // Try to parse string numbers (e.g. "676889" or "$3,675,000")
+    const cleaned = String(val).replace(/[$,]/g, "");
+    const num = parseFloat(cleaned);
+    if (!isNaN(num)) return Math.round(num * currencyRate);
+    return val;
+  };
   return (
     <div className="overflow-x-auto rounded-lg border border-border">
       <table className="w-full text-sm">
@@ -68,42 +80,53 @@ export function MetricTable({ metrics, onMetricChange, onStatusChange }: MetricT
                   )}
                 </div>
               </td>
-              {metric.weeks.map((w, wi) => (
-                <React.Fragment key={wi}>
-                  <td className="px-1 py-2 text-right">
-                    <EditableCell
-                      value={w.actual}
-                      onChange={(val) => onMetricChange?.(metric.name, `weeks.${wi}.actual`, val)}
-                    />
-                  </td>
-                  <td className="px-1 py-2 text-right bg-muted/20 border-r border-border/20">
-                    <EditableCell
-                      value={w.projection}
-                      isProjection
-                      onChange={(val) => onMetricChange?.(metric.name, `weeks.${wi}.projection`, val)}
-                    />
-                  </td>
-                </React.Fragment>
-              ))}
-              <td className="px-3 py-3 text-right">
-                <EditableCell
-                  value={metric.monthlyActual}
-                  onChange={(val) => onMetricChange?.(metric.name, "monthlyActual", val)}
-                />
+              {metric.weeks.map((w, wi) => {
+                const isReadOnly = readOnlyMetrics?.has(metric.name);
+                return (
+                  <React.Fragment key={wi}>
+                    <td className="px-1 py-2 text-right min-w-[70px]">
+                      {isReadOnly ? (
+                        <span className="block px-1.5 py-0.5 font-mono text-sm text-foreground/80">
+                          {formatValue(convert(w.actual))}
+                        </span>
+                      ) : (
+                        <EditableCell
+                          value={convert(w.actual)}
+                          onChange={currencyRate ? undefined : (val) => onMetricChange?.(metric.name, `weeks.${wi}.actual`, val)}
+                        />
+                      )}
+                    </td>
+                    <td className="px-1 py-2 text-right bg-muted/20 border-r border-border/20 min-w-[70px]">
+                      <EditableCell
+                        value={convert(w.projection)}
+                        isProjection
+                        onChange={currencyRate ? undefined : (val) => onMetricChange?.(metric.name, `weeks.${wi}.projection`, val)}
+                      />
+                    </td>
+                  </React.Fragment>
+                );
+              })}
+              <td className="px-3 py-3 text-right min-w-[80px]">
+                {readOnlyMetrics?.has(metric.name) ? (
+                  <span className="block px-1.5 py-0.5 font-mono text-sm text-foreground/80">
+                    {formatValue(convert(metric.monthlyActual))}
+                  </span>
+                ) : (
+                  <EditableCell
+                    value={convert(metric.monthlyActual)}
+                    onChange={currencyRate ? undefined : (val) => onMetricChange?.(metric.name, "monthlyActual", val)}
+                  />
+                )}
               </td>
-              <td className="px-3 py-3 text-right">
+              <td className="px-3 py-3 text-right min-w-[80px]">
                 <EditableCell
-                  value={metric.monthlyTarget}
+                  value={convert(metric.monthlyTarget)}
                   isProjection
-                  onChange={(val) => onMetricChange?.(metric.name, "monthlyTarget", val)}
+                  onChange={currencyRate ? undefined : (val) => onMetricChange?.(metric.name, "monthlyTarget", val)}
                 />
               </td>
               <td className="px-3 py-3 text-center">
-                <StatusBadge
-                  status={metric.status}
-                  editable
-                  onChange={(newStatus) => onStatusChange?.(metric.name, newStatus)}
-                />
+                <StatusBadge status={metric.status} />
               </td>
               <td className="px-3 py-3 text-sm text-muted-foreground">
                 {metric.owner}

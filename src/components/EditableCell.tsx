@@ -4,7 +4,7 @@ import { cn } from "@/lib/utils";
 
 interface EditableCellProps {
   value: number | string;
-  onChange: (value: number | string) => void;
+  onChange?: (value: number | string) => void;
   className?: string;
   isProjection?: boolean;
 }
@@ -29,9 +29,9 @@ export function EditableCell({ value, onChange, className, isProjection }: Edita
     // Try to parse as number
     const parsed = Number(trimmed.replace(/,/g, ""));
     if (!isNaN(parsed) && /^[\d,]+(\.\d+)?$/.test(trimmed.replace(/,/g, ""))) {
-      onChange(parsed);
+      onChange?.(parsed);
     } else {
-      onChange(trimmed);
+      onChange?.(trimmed);
     }
   };
 
@@ -56,16 +56,17 @@ export function EditableCell({ value, onChange, className, isProjection }: Edita
 
   return (
     <span
-      onClick={() => {
+      onClick={onChange ? () => {
         setEditValue(String(value));
         setEditing(true);
-      }}
+      } : undefined}
       className={cn(
-        "block cursor-pointer rounded px-1.5 py-0.5 font-mono text-sm transition-colors hover:bg-primary/10",
+        "block rounded px-1.5 py-0.5 font-mono text-sm transition-colors",
+        onChange ? "cursor-pointer hover:bg-primary/10" : "",
         isProjection ? "text-muted-foreground" : "text-foreground/80",
         className
       )}
-      title="Click to edit"
+      title={onChange ? "Click to edit" : undefined}
     >
       {formatValue(value)}
     </span>

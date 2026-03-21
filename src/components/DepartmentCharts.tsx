@@ -120,7 +120,7 @@ export function DepartmentCharts({ metrics }: DepartmentChartsProps) {
                     <Tooltip {...sharedAxisProps.tooltip} formatter={(value: number) => formatValue(value)} />
                     <Legend wrapperStyle={{ fontSize: "12px" }} />
                     <Bar dataKey="Actual" fill="hsl(var(--primary))" radius={[4, 4, 0, 0]} />
-                    <Bar dataKey="Projection" fill="hsl(var(--muted-foreground) / 0.4)" radius={[4, 4, 0, 0]} />
+                    <Bar dataKey="Projection" fill="hsl(var(--muted-foreground))" radius={[4, 4, 0, 0]} />
                   </BarChart>
                 ) : (
                   <LineChart data={data}>

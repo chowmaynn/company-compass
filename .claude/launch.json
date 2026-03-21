@@ -1,0 +1,18 @@
+{
+  "version": "0.0.1",
+  "configurations": [
+    {
+      "name": "Vite Dev Server",
+      "runtimeExecutable": "npx",
+      "runtimeArgs": ["vite", "--port", "8080"],
+      "port": 8080,
+      "autoPort": false
+    },
+    {
+      "name": "Vite Preview Server",
+      "runtimeExecutable": "npx",
+      "runtimeArgs": ["vite", "preview"],
+      "port": 4173
+    }
+  ]
+}

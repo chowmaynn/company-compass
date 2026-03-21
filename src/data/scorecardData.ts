@@ -1,6 +1,6 @@
-export type StatusColor = "green" | "yellow" | "red" | "light-red" | "light-green";
+export type StatusColor = "green" | "light-green" | "yellow" | "red";
 
-export type Department = "Evergreen Metrics" | "Content" | "Marketing" | "Sales" | "Community Management";
+export type Department = "Finance" | "Content" | "Marketing" | "Sales" | "Product";
 
 export interface WeekData {
   actual: number | string;
@@ -10,6 +10,8 @@ export interface WeekData {
 export interface WeekConfig {
   label: string;
   dateLabel: string; // dd/mm format
+  start: string; // ISO date string (start of week, NZ time)
+  end: string;   // ISO date string (end of week, NZ time)
 }
 
 export interface Metric {
@@ -25,28 +27,28 @@ export interface Metric {
   description: string;
 }
 
+// March 2026 weeks (Monday–Sunday), NZ timezone (Pacific/Auckland, NZDT UTC+13)
 export const weekConfigs: WeekConfig[] = [
-  { label: "W1", dateLabel: "06/01" },
-  { label: "W2", dateLabel: "13/01" },
-  { label: "W3", dateLabel: "20/01" },
-  { label: "W4", dateLabel: "27/01" },
+  { label: "W1", dateLabel: "02/03", start: "2026-03-01T11:00:00Z", end: "2026-03-08T11:00:00Z" },
+  { label: "W2", dateLabel: "09/03", start: "2026-03-08T11:00:00Z", end: "2026-03-15T11:00:00Z" },
+  { label: "W3", dateLabel: "16/03", start: "2026-03-15T11:00:00Z", end: "2026-03-22T11:00:00Z" },
+  { label: "W4", dateLabel: "23/03", start: "2026-03-22T11:00:00Z", end: "2026-03-29T11:00:00Z" },
 ];
 
-export const scorecardMonth = "January 2025";
+export const scorecardMonth = "March 2026";
 
 export const statusOptions: { value: StatusColor; label: string }[] = [
-  { value: "green", label: "On Track" },
   { value: "light-green", label: "Ahead" },
-  { value: "yellow", label: "At Risk" },
-  { value: "light-red", label: "Behind" },
-  { value: "red", label: "Off Track" },
+  { value: "green", label: "On Track" },
+  { value: "yellow", label: "Behind" },
+  { value: "red", label: "At Risk" },
 ];
 
 export const scorecardData: Metric[] = [
   // EVERGREEN METRICS
   {
     name: "Revenue",
-    department: "Evergreen Metrics",
+    department: "Finance",
     catchUp: { actual: 36672, projection: 474194 },
     weeks: [
       { actual: 136151, projection: 829839 },
@@ -63,7 +65,7 @@ export const scorecardData: Metric[] = [
   },
   {
     name: "Cash Collected",
-    department: "Evergreen Metrics",
+    department: "Finance",
     catchUp: { actual: 34596, projection: 451613 },
     weeks: [
       { actual: 129668, projection: 790323 },
@@ -82,14 +84,14 @@ export const scorecardData: Metric[] = [
   {
     name: "Videos posted last week",
     department: "Content",
-    catchUp: { actual: 1, projection: 3 },
+    catchUp: { actual: "—", projection: 3 },
     weeks: [
-      { actual: 2, projection: 3 },
-      { actual: 3, projection: 3 },
-      { actual: 3, projection: 3 },
-      { actual: 3, projection: 3 },
+      { actual: "—", projection: 3 },
+      { actual: "—", projection: 3 },
+      { actual: "—", projection: 3 },
+      { actual: "—", projection: 3 },
     ],
-    monthlyActual: 12,
+    monthlyActual: "—",
     monthlyTarget: 12,
     status: "green",
     owner: "Adam Jahr",
@@ -99,14 +101,14 @@ export const scorecardData: Metric[] = [
   {
     name: "Videos in the backlog",
     department: "Content",
-    catchUp: { actual: 3, projection: 2 },
+    catchUp: { actual: "—", projection: 2 },
     weeks: [
-      { actual: 3, projection: 2 },
-      { actual: 2, projection: 2 },
-      { actual: 4, projection: 2 },
-      { actual: 3, projection: 2 },
+      { actual: "—", projection: 2 },
+      { actual: "—", projection: 2 },
+      { actual: "—", projection: 2 },
+      { actual: "—", projection: 2 },
     ],
-    monthlyActual: "3 avg",
+    monthlyActual: "—",
     monthlyTarget: "2 per week",
     status: "green",
     owner: "Adam Jahr",
@@ -121,7 +123,7 @@ export const scorecardData: Metric[] = [
       { actual: "217.4k", projection: "250k" },
       { actual: "206.9k", projection: "250k" },
       { actual: "225k", projection: "250k" },
-      { actual: "265.3", projection: "250k" },
+      { actual: "265.3k", projection: "250k" },
     ],
     monthlyActual: "1.02m",
     monthlyTarget: "1m",
@@ -135,13 +137,13 @@ export const scorecardData: Metric[] = [
     department: "Content",
     catchUp: { actual: "1.9k", projection: "1.5k" },
     weeks: [
-      { actual: "3.7k", projection: "3.5k" },
+      { actual: "3.7k", projection: "4k" },
       { actual: "3.8k", projection: "4k" },
-      { actual: "3.5k", projection: "5k" },
-      { actual: "3.4k", projection: "6k" },
+      { actual: "3.5k", projection: "4k" },
+      { actual: "3.4k", projection: "4k" },
     ],
     monthlyActual: "16.3k",
-    monthlyTarget: "20k",
+    monthlyTarget: "16k",
     status: "yellow",
     owner: "Adam Jahr",
     source: "YouTube",
@@ -198,7 +200,42 @@ export const scorecardData: Metric[] = [
     source: "",
     description: "",
   },
-  // MARKETING
+  // MARKETING — Email (Kit)
+  {
+    name: "Emails Sent",
+    department: "Marketing",
+    catchUp: { actual: "—", projection: "—" },
+    weeks: [
+      { actual: "—", projection: "—" },
+      { actual: "—", projection: "—" },
+      { actual: "—", projection: "—" },
+      { actual: "—", projection: "—" },
+    ],
+    monthlyActual: "—",
+    monthlyTarget: "—",
+    status: "green",
+    owner: "Casey",
+    source: "Kit",
+    description: "Total broadcast emails delivered per week",
+  },
+  {
+    name: "Email Clicks",
+    department: "Marketing",
+    catchUp: { actual: "—", projection: "—" },
+    weeks: [
+      { actual: "—", projection: "—" },
+      { actual: "—", projection: "—" },
+      { actual: "—", projection: "—" },
+      { actual: "—", projection: "—" },
+    ],
+    monthlyActual: "—",
+    monthlyTarget: "—",
+    status: "green",
+    owner: "Casey",
+    source: "Kit",
+    description: "Total broadcast email clicks per week",
+  },
+  // MARKETING — Bookings
   {
     name: "Total Bookings",
     department: "Marketing",
@@ -211,7 +248,24 @@ export const scorecardData: Metric[] = [
     ],
     monthlyActual: 1179,
     monthlyTarget: 2480,
-    status: "light-red",
+    status: "yellow",
+    owner: "Casey",
+    source: "Booking Sheet",
+    description: "",
+  },
+  {
+    name: "Email Bookings",
+    department: "Marketing",
+    catchUp: { actual: 17, projection: 80 },
+    weeks: [
+      { actual: 319, projection: 140 },
+      { actual: 74, projection: 140 },
+      { actual: 34, projection: 140 },
+      { actual: 120, projection: 120 },
+    ],
+    monthlyActual: "",
+    monthlyTarget: 620,
+    status: "light-green",
     owner: "Casey",
     source: "Booking Sheet",
     description: "",
@@ -284,23 +338,6 @@ export const scorecardData: Metric[] = [
     source: "Booking Sheet",
     description: "The number of bookings made through out Skool setter",
   },
-  {
-    name: "Email Bookings",
-    department: "Marketing",
-    catchUp: { actual: 17, projection: 80 },
-    weeks: [
-      { actual: 319, projection: 140 },
-      { actual: 74, projection: 140 },
-      { actual: 34, projection: 140 },
-      { actual: 120, projection: 120 },
-    ],
-    monthlyActual: "",
-    monthlyTarget: 620,
-    status: "light-green",
-    owner: "Casey",
-    source: "Booking Sheet",
-    description: "",
-  },
   // SALES
   {
     name: "Triage Calls Booked",
@@ -331,7 +368,7 @@ export const scorecardData: Metric[] = [
     ],
     monthlyActual: "70%",
     monthlyTarget: "",
-    status: "light-red",
+    status: "yellow",
     owner: "AJ",
     source: "Booking Sheet",
     description: "",
@@ -365,7 +402,7 @@ export const scorecardData: Metric[] = [
     ],
     monthlyActual: "",
     monthlyTarget: 1188,
-    status: "light-red",
+    status: "yellow",
     owner: "AJ",
     source: "Booking Sheet",
     description: "",
@@ -399,7 +436,7 @@ export const scorecardData: Metric[] = [
     ],
     monthlyActual: "",
     monthlyTarget: 950,
-    status: "light-red",
+    status: "yellow",
     owner: "AJ",
     source: "Booking Sheet",
     description: "",
@@ -424,7 +461,7 @@ export const scorecardData: Metric[] = [
   // COMMUNITY MANAGEMENT
   {
     name: "Customer support complaints",
-    department: "Community Management",
+    department: "Product",
     catchUp: { actual: 0, projection: 3 },
     weeks: [
       { actual: 1, projection: 3 },
@@ -441,7 +478,7 @@ export const scorecardData: Metric[] = [
   },
   {
     name: "NPS Score - 2 months",
-    department: "Community Management",
+    department: "Product",
     catchUp: { actual: 10, projection: 15 },
     weeks: [
       { actual: 10, projection: 15 },
@@ -458,7 +495,7 @@ export const scorecardData: Metric[] = [
   },
   {
     name: "NPS Score - 6 Months",
-    department: "Community Management",
+    department: "Product",
     catchUp: { actual: 8, projection: 10 },
     weeks: [
       { actual: 8, projection: 10 },
@@ -476,9 +513,9 @@ export const scorecardData: Metric[] = [
 ];
 
 export const departments: Department[] = [
-  "Evergreen Metrics",
+  "Finance",
   "Content",
   "Marketing",
   "Sales",
-  "Community Management",
+  "Product",
 ];

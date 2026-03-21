@@ -7,6 +7,7 @@ import { AppLayout } from "./components/AppLayout";
 import Dashboard from "./pages/Dashboard";
 import Scorecard from "./pages/Scorecard";
 import DepartmentPage from "./pages/DepartmentPage";
+import OAuthCallback from "./pages/OAuthCallback.tsx";
 import NotFound from "./pages/NotFound";
 
 const queryClient = new QueryClient();
@@ -23,6 +24,7 @@ const App = () => (
             <Route path="/scorecard" element={<Scorecard />} />
             <Route path="/departments/:slug" element={<DepartmentPage />} />
           </Route>
+          <Route path="/oauth/callback" element={<OAuthCallback />} />
           <Route path="*" element={<NotFound />} />
         </Routes>
       </BrowserRouter>
