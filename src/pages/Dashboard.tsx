@@ -1,264 +1,610 @@
-import { useState } from "react";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { scorecardData, departments, type Department } from "@/data/scorecardData";
+import { useMemo } from "react";
+import { Card, CardContent } from "@/components/ui/card";
+import { scorecardData, departments, weekConfigs, type Department, type Metric } from "@/data/scorecardData";
+import { formatValue } from "@/lib/formatNumber";
 import {
   DollarSign,
   TrendingUp,
+  TrendingDown,
   Users,
-  Video,
   Eye,
   UserPlus,
   Phone,
   Mail,
-  GripVertical,
   BarChart3,
   ArrowUpRight,
   ArrowDownRight,
+  Activity,
+  Target,
+  Zap,
+  Globe,
+  Video,
+  Megaphone,
+  ShieldCheck,
+  AlertTriangle,
+  XCircle,
+  CheckCircle2,
 } from "lucide-react";
+import {
+  AreaChart,
+  Area,
+  BarChart,
+  Bar,
+  XAxis,
+  YAxis,
+  CartesianGrid,
+  Tooltip,
+  ResponsiveContainer,
+  Cell,
+  PieChart,
+  Pie,
+} from "recharts";
 
-interface Widget {
-  id: string;
-  title: string;
-  icon: React.ElementType;
-  value: string | number;
-  subtitle: string;
-  trend?: "up" | "down";
-  trendValue?: string;
-  category: "revenue" | "content" | "marketing" | "sales" | "community";
+// ── Helpers ──────────────────────────────────────────────────
+
+function parseNum(val: number | string): number | null {
+  if (typeof val === "number") return val;
+  const cleaned = String(val).replace(/,/g, "").replace(/\$/g, "").trim();
+  if (cleaned === "—" || cleaned === "") return null;
+  if (cleaned.endsWith("%")) return parseFloat(cleaned) || null;
+  if (cleaned.endsWith("k")) { const n = parseFloat(cleaned); return isNaN(n) ? null : n * 1000; }
+  if (cleaned.endsWith("m")) { const n = parseFloat(cleaned); return isNaN(n) ? null : n * 1000000; }
+  const n = parseFloat(cleaned);
+  return isNaN(n) ? null : n;
 }
 
-const generateWidgets = (): Widget[] => {
-  const metrics = scorecardData;
-  const revenue = metrics.find((m) => m.name === "Revenue");
-  const cash = metrics.find((m) => m.name === "Cash Collected");
-  const ytViews = metrics.find((m) => m.name === "YouTube views");
-  const ytSubs = metrics.find((m) => m.name === "New YouTube subscribers");
-  const bookings = metrics.find((m) => m.name === "Total Bookings");
-  const emailBookings = metrics.find((m) => m.name === "Email Bookings");
-  const triageCalls = metrics.find((m) => m.name === "Triage Calls Booked");
-  const complaints = metrics.find((m) => m.name === "Customer support complaints");
+function compactNumber(n: number): string {
+  if (n >= 1_000_000) return `${(n / 1_000_000).toFixed(2)}M`;
+  if (n >= 1_000) return `${(n / 1_000).toFixed(1)}K`;
+  return n.toLocaleString();
+}
 
-  return [
-    {
-      id: "revenue",
-      title: "Revenue",
-      icon: DollarSign,
-      value: typeof revenue?.monthlyActual === "number" ? `$${revenue.monthlyActual.toLocaleString()}` : String(revenue?.monthlyActual || "—"),
-      subtitle: `Target: ${revenue?.monthlyTarget}`,
-      trend: "down",
-      trendValue: "18.4%",
-      category: "revenue",
-    },
-    {
-      id: "cash",
-      title: "Cash Collected",
-      icon: TrendingUp,
-      value: typeof cash?.monthlyActual === "number" ? `$${cash.monthlyActual.toLocaleString()}` : String(cash?.monthlyActual || "—"),
-      subtitle: `Target: ${cash?.monthlyTarget}`,
-      trend: "down",
-      trendValue: "18.4%",
-      category: "revenue",
-    },
-    {
-      id: "yt-views",
-      title: "YouTube Views",
-      icon: Eye,
-      value: String(ytViews?.monthlyActual || "—"),
-      subtitle: `Target: ${ytViews?.monthlyTarget}`,
-      trend: "up",
-      trendValue: "2.0%",
-      category: "content",
-    },
-    {
-      id: "yt-subs",
-      title: "New Subscribers",
-      icon: UserPlus,
-      value: String(ytSubs?.monthlyActual || "—"),
-      subtitle: `Target: ${ytSubs?.monthlyTarget}`,
-      trend: "down",
-      trendValue: "18.5%",
-      category: "content",
-    },
-    {
-      id: "bookings",
-      title: "Total Bookings",
-      icon: Phone,
-      value: String(bookings?.monthlyActual || "—"),
-      subtitle: `Target: ${bookings?.monthlyTarget}`,
-      trend: "down",
-      trendValue: "52.5%",
-      category: "marketing",
-    },
-    {
-      id: "email-bookings",
-      title: "Email Bookings",
-      icon: Mail,
-      value: String(emailBookings?.monthlyActual || "—"),
-      subtitle: `Target: ${emailBookings?.monthlyTarget}`,
-      category: "marketing",
-    },
-    {
-      id: "triage",
-      title: "Triage Calls Booked",
-      icon: Phone,
-      value: String(triageCalls?.monthlyActual || "—"),
-      subtitle: `Target: ${triageCalls?.monthlyTarget}`,
-      category: "sales",
-    },
-    {
-      id: "complaints",
-      title: "Support Complaints",
-      icon: Users,
-      value: String(complaints?.monthlyActual || "—"),
-      subtitle: `Target: ${complaints?.monthlyTarget}`,
-      trend: "up",
-      trendValue: "93.3%",
-      category: "community",
-    },
-  ];
+function pctOfTarget(actual: number | string, target: number | string): number | null {
+  const a = parseNum(actual);
+  const t = parseNum(target);
+  if (a === null || t === null || t === 0) return null;
+  return Math.round((a / t) * 100);
+}
+
+const deptIcons: Record<Department, React.ElementType> = {
+  Finance: DollarSign,
+  Content: Video,
+  Marketing: Megaphone,
+  Sales: Phone,
+  Product: Users,
 };
 
-const categoryColors: Record<string, string> = {
-  revenue: "border-l-primary",
-  content: "border-l-status-green",
-  marketing: "border-l-status-yellow",
-  sales: "border-l-status-red",
-  community: "border-l-primary",
+const deptColors: Record<Department, string> = {
+  Finance: "from-pink-500/20 to-pink-500/5",
+  Content: "from-blue-500/20 to-blue-500/5",
+  Marketing: "from-amber-500/20 to-amber-500/5",
+  Sales: "from-emerald-500/20 to-emerald-500/5",
+  Product: "from-violet-500/20 to-violet-500/5",
 };
+
+const deptBorderColors: Record<Department, string> = {
+  Finance: "border-pink-500/30",
+  Content: "border-blue-500/30",
+  Marketing: "border-amber-500/30",
+  Sales: "border-emerald-500/30",
+  Product: "border-violet-500/30",
+};
+
+// ── Component ────────────────────────────────────────────────
 
 export default function Dashboard() {
-  const widgets = generateWidgets();
-
-  const statusSummary = scorecardData.reduce(
-    (acc, m) => {
-      if (m.status === "green" || m.status === "light-green") acc.onTrack++;
-      else if (m.status === "yellow") acc.atRisk++;
-      else acc.offTrack++;
-      return acc;
-    },
-    { onTrack: 0, atRisk: 0, offTrack: 0 }
+  const statusSummary = useMemo(() =>
+    scorecardData.reduce(
+      (acc, m) => {
+        if (m.status === "green" || m.status === "light-green") acc.onTrack++;
+        else if (m.status === "yellow") acc.atRisk++;
+        else acc.offTrack++;
+        acc.total++;
+        return acc;
+      },
+      { onTrack: 0, atRisk: 0, offTrack: 0, total: 0 }
+    ), []
   );
 
+  const revenue = scorecardData.find((m) => m.name === "Revenue");
+  const cash = scorecardData.find((m) => m.name === "Cash Collected");
+  const ytViews = scorecardData.find((m) => m.name === "YouTube views");
+  const ytSubs = scorecardData.find((m) => m.name === "New YouTube subscribers");
+  const totalBookings = scorecardData.find((m) => m.name === "Total Bookings");
+  const closingRate = scorecardData.find((m) => m.name === "Closing Call Close Rate");
+  const complaints = scorecardData.find((m) => m.name === "Customer support complaints");
+  const websiteViews = scorecardData.find((m) => m.name === "Website Views");
+
+  // Revenue weekly trend data
+  const revenueWeekly = revenue?.weeks.map((w, i) => ({
+    week: weekConfigs[i].label,
+    actual: parseNum(w.actual) ?? 0,
+    projection: parseNum(w.projection) ?? 0,
+  })) ?? [];
+
+  // Pie chart data for status distribution
+  const pieData = [
+    { name: "On Track", value: statusSummary.onTrack, fill: "hsl(160, 72%, 42%)" },
+    { name: "At Risk", value: statusSummary.atRisk, fill: "hsl(42, 95%, 55%)" },
+    { name: "Off Track", value: statusSummary.offTrack, fill: "hsl(0, 75%, 55%)" },
+  ];
+
+  const revPct = pctOfTarget(revenue?.monthlyActual ?? 0, revenue?.monthlyTarget ?? 0);
+  const cashPct = pctOfTarget(cash?.monthlyActual ?? 0, cash?.monthlyTarget ?? 0);
+
   return (
-    <div className="p-6 space-y-8 max-w-7xl mx-auto">
-      <div>
-        <h1 className="text-2xl font-bold tracking-tight text-foreground">Dashboard</h1>
-        <p className="text-sm text-muted-foreground mt-1">
-          Company-wide metrics overview — January 2025
-        </p>
-      </div>
-
-      {/* Health overview */}
-      <div className="grid grid-cols-3 gap-4">
-        <Card className="border-l-4 border-l-status-green">
-          <CardContent className="p-5">
-            <p className="text-sm font-medium text-muted-foreground">On Track</p>
-            <p className="text-3xl font-bold text-status-green mt-1">{statusSummary.onTrack}</p>
-            <p className="text-xs text-muted-foreground mt-1">metrics performing well</p>
-          </CardContent>
-        </Card>
-        <Card className="border-l-4 border-l-status-yellow">
-          <CardContent className="p-5">
-            <p className="text-sm font-medium text-muted-foreground">At Risk</p>
-            <p className="text-3xl font-bold text-status-yellow mt-1">{statusSummary.atRisk}</p>
-            <p className="text-xs text-muted-foreground mt-1">metrics need attention</p>
-          </CardContent>
-        </Card>
-        <Card className="border-l-4 border-l-status-red">
-          <CardContent className="p-5">
-            <p className="text-sm font-medium text-muted-foreground">Off Track</p>
-            <p className="text-3xl font-bold text-status-red mt-1">{statusSummary.offTrack}</p>
-            <p className="text-xs text-muted-foreground mt-1">metrics behind target</p>
-          </CardContent>
-        </Card>
-      </div>
-
-      {/* Widget grid */}
-      <div>
-        <div className="flex items-center justify-between mb-4">
-          <h2 className="text-lg font-semibold text-foreground">Key Metrics</h2>
-          <p className="text-xs text-muted-foreground flex items-center gap-1">
-            <GripVertical className="h-3 w-3" /> Customizable widgets coming soon
-          </p>
+    <div className="p-6 space-y-6 max-w-[1440px] mx-auto">
+      {/* ── Header ─────────────────────────────────────────── */}
+      <div className="flex items-center justify-between">
+        <div>
+          <div className="flex items-center gap-3">
+            <div className="h-10 w-10 rounded-xl gradient-pink-blue flex items-center justify-center">
+              <Activity className="h-5 w-5 text-white" />
+            </div>
+            <div>
+              <h1 className="text-2xl font-bold tracking-tight gradient-text">Mission Terminal</h1>
+              <p className="text-xs text-muted-foreground font-mono">
+                COMPANY OVERVIEW — MARCH 2026
+              </p>
+            </div>
+          </div>
         </div>
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
-          {widgets.map((widget) => (
-            <Card
-              key={widget.id}
-              className={`border-l-4 ${categoryColors[widget.category]} transition-all hover:border-primary/30 hover:glow-primary`}
-            >
-              <CardContent className="p-5">
-                <div className="flex items-center justify-between mb-3">
-                  <p className="text-sm font-medium text-muted-foreground">{widget.title}</p>
-                  <div className="rounded-lg bg-muted p-2">
-                    <widget.icon className="h-4 w-4 text-muted-foreground" />
+        <div className="flex items-center gap-2">
+          <span className="inline-flex items-center gap-1.5 rounded-full bg-status-green/15 px-3 py-1 text-xs font-medium text-status-green">
+            <span className="h-1.5 w-1.5 rounded-full bg-status-green animate-pulse" />
+            Live
+          </span>
+        </div>
+      </div>
+
+      {/* ── Status Overview Row ─────────────────────────────── */}
+      <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+        <Card className="border-status-green/30 bg-status-green/5">
+          <CardContent className="p-4 flex items-center gap-3">
+            <div className="h-10 w-10 rounded-xl bg-status-green/15 flex items-center justify-center">
+              <CheckCircle2 className="h-5 w-5 text-status-green" />
+            </div>
+            <div>
+              <p className="text-2xl font-bold text-status-green">{statusSummary.onTrack}</p>
+              <p className="text-[11px] text-muted-foreground font-medium uppercase tracking-wider">On Track</p>
+            </div>
+          </CardContent>
+        </Card>
+        <Card className="border-status-yellow/30 bg-status-yellow/5">
+          <CardContent className="p-4 flex items-center gap-3">
+            <div className="h-10 w-10 rounded-xl bg-status-yellow/15 flex items-center justify-center">
+              <AlertTriangle className="h-5 w-5 text-status-yellow" />
+            </div>
+            <div>
+              <p className="text-2xl font-bold text-status-yellow">{statusSummary.atRisk}</p>
+              <p className="text-[11px] text-muted-foreground font-medium uppercase tracking-wider">At Risk</p>
+            </div>
+          </CardContent>
+        </Card>
+        <Card className="border-status-red/30 bg-status-red/5">
+          <CardContent className="p-4 flex items-center gap-3">
+            <div className="h-10 w-10 rounded-xl bg-status-red/15 flex items-center justify-center">
+              <XCircle className="h-5 w-5 text-status-red" />
+            </div>
+            <div>
+              <p className="text-2xl font-bold text-status-red">{statusSummary.offTrack}</p>
+              <p className="text-[11px] text-muted-foreground font-medium uppercase tracking-wider">Off Track</p>
+            </div>
+          </CardContent>
+        </Card>
+        <Card className="border-primary/30 bg-primary/5">
+          <CardContent className="p-4 flex items-center gap-3">
+            <div className="h-10 w-10 rounded-xl bg-primary/15 flex items-center justify-center">
+              <Target className="h-5 w-5 text-primary" />
+            </div>
+            <div>
+              <p className="text-2xl font-bold text-foreground">{statusSummary.total}</p>
+              <p className="text-[11px] text-muted-foreground font-medium uppercase tracking-wider">Total KPIs</p>
+            </div>
+          </CardContent>
+        </Card>
+      </div>
+
+      {/* ── Financial Overview + Revenue Chart ──────────────── */}
+      <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
+        {/* Revenue Card */}
+        <Card className="lg:col-span-1 border-primary/20 overflow-hidden">
+          <CardContent className="p-0">
+            <div className="p-5 pb-3">
+              <div className="flex items-center gap-2 mb-4">
+                <div className="h-8 w-8 rounded-lg bg-primary/15 flex items-center justify-center">
+                  <DollarSign className="h-4 w-4 text-primary" />
+                </div>
+                <span className="text-sm font-medium text-muted-foreground">Revenue</span>
+              </div>
+              <p className="text-3xl font-bold tracking-tight text-foreground">
+                ${typeof revenue?.monthlyActual === "number" ? compactNumber(revenue.monthlyActual) : revenue?.monthlyActual}
+              </p>
+              <p className="text-xs text-muted-foreground mt-1">Target: {revenue?.monthlyTarget}</p>
+              {revPct !== null && (
+                <div className="mt-3">
+                  <div className="flex justify-between text-xs mb-1.5">
+                    <span className="text-muted-foreground">Progress</span>
+                    <span className={`font-mono font-semibold ${revPct >= 80 ? "text-status-green" : revPct >= 50 ? "text-status-yellow" : "text-status-red"}`}>{revPct}%</span>
+                  </div>
+                  <div className="h-2 rounded-full bg-muted overflow-hidden">
+                    <div
+                      className={`h-full rounded-full transition-all ${revPct >= 80 ? "bg-status-green" : revPct >= 50 ? "bg-status-yellow" : "bg-status-red"}`}
+                      style={{ width: `${Math.min(revPct, 100)}%` }}
+                    />
                   </div>
                 </div>
-                <p className="text-2xl font-bold tracking-tight text-foreground">{widget.value}</p>
-                <div className="flex items-center justify-between mt-2">
-                  <p className="text-xs text-muted-foreground">{widget.subtitle}</p>
-                  {widget.trend && (
-                    <span className={`flex items-center gap-0.5 text-xs font-medium ${widget.trend === "up" ? "text-status-green" : "text-status-red"}`}>
-                      {widget.trend === "up" ? <ArrowUpRight className="h-3 w-3" /> : <ArrowDownRight className="h-3 w-3" />}
-                      {widget.trendValue}
-                    </span>
-                  )}
+              )}
+            </div>
+            <div className="border-t border-border/50 p-5 pt-3">
+              <div className="flex items-center gap-2 mb-3">
+                <div className="h-8 w-8 rounded-lg bg-accent/15 flex items-center justify-center">
+                  <TrendingUp className="h-4 w-4 text-accent" />
                 </div>
-              </CardContent>
-            </Card>
-          ))}
-        </div>
+                <span className="text-sm font-medium text-muted-foreground">Cash Collected</span>
+              </div>
+              <p className="text-3xl font-bold tracking-tight text-foreground">
+                ${typeof cash?.monthlyActual === "number" ? compactNumber(cash.monthlyActual) : cash?.monthlyActual}
+              </p>
+              <p className="text-xs text-muted-foreground mt-1">Target: {cash?.monthlyTarget}</p>
+              {cashPct !== null && (
+                <div className="mt-3">
+                  <div className="flex justify-between text-xs mb-1.5">
+                    <span className="text-muted-foreground">Progress</span>
+                    <span className={`font-mono font-semibold ${cashPct >= 80 ? "text-status-green" : cashPct >= 50 ? "text-status-yellow" : "text-status-red"}`}>{cashPct}%</span>
+                  </div>
+                  <div className="h-2 rounded-full bg-muted overflow-hidden">
+                    <div
+                      className={`h-full rounded-full transition-all ${cashPct >= 80 ? "bg-status-green" : cashPct >= 50 ? "bg-status-yellow" : "bg-status-red"}`}
+                      style={{ width: `${Math.min(cashPct, 100)}%` }}
+                    />
+                  </div>
+                </div>
+              )}
+            </div>
+          </CardContent>
+        </Card>
+
+        {/* Revenue Weekly Trend */}
+        <Card className="lg:col-span-2 border-border/50">
+          <CardContent className="p-5">
+            <div className="flex items-center justify-between mb-4">
+              <div className="flex items-center gap-2">
+                <BarChart3 className="h-4 w-4 text-primary" />
+                <h3 className="text-sm font-semibold text-foreground">Weekly Revenue Trend</h3>
+              </div>
+              <div className="flex items-center gap-4 text-xs text-muted-foreground">
+                <span className="flex items-center gap-1.5">
+                  <span className="h-2 w-2 rounded-full bg-primary" /> Actual
+                </span>
+                <span className="flex items-center gap-1.5">
+                  <span className="h-2 w-2 rounded-full bg-muted-foreground" /> Projection
+                </span>
+              </div>
+            </div>
+            <ResponsiveContainer width="100%" height={240}>
+              <AreaChart data={revenueWeekly}>
+                <defs>
+                  <linearGradient id="revGradient" x1="0" y1="0" x2="0" y2="1">
+                    <stop offset="5%" stopColor="hsl(327, 100%, 65%)" stopOpacity={0.3} />
+                    <stop offset="95%" stopColor="hsl(327, 100%, 65%)" stopOpacity={0} />
+                  </linearGradient>
+                </defs>
+                <CartesianGrid strokeDasharray="3 3" stroke="hsl(0, 0%, 16%)" vertical={false} />
+                <XAxis
+                  dataKey="week"
+                  tick={{ fontSize: 11, fill: "hsl(24, 8%, 50%)" }}
+                  axisLine={{ stroke: "hsl(0, 0%, 16%)" }}
+                  tickLine={false}
+                />
+                <YAxis
+                  tick={{ fontSize: 11, fill: "hsl(24, 8%, 50%)" }}
+                  axisLine={false}
+                  tickLine={false}
+                  tickFormatter={(v) => `$${compactNumber(v)}`}
+                />
+                <Tooltip
+                  contentStyle={{
+                    backgroundColor: "hsl(0, 0%, 11%)",
+                    border: "1px solid hsl(0, 0%, 16%)",
+                    borderRadius: "8px",
+                    color: "hsl(24, 36%, 95%)",
+                    fontSize: "12px",
+                  }}
+                  formatter={(value: number) => [`$${compactNumber(value)}`, undefined]}
+                />
+                <Area
+                  type="monotone"
+                  dataKey="actual"
+                  name="Actual"
+                  stroke="hsl(327, 100%, 65%)"
+                  strokeWidth={2.5}
+                  fill="url(#revGradient)"
+                  dot={{ r: 4, fill: "hsl(327, 100%, 65%)", strokeWidth: 0 }}
+                  activeDot={{ r: 6 }}
+                />
+                <Area
+                  type="monotone"
+                  dataKey="projection"
+                  name="Projection"
+                  stroke="hsl(24, 8%, 50%)"
+                  strokeWidth={1.5}
+                  strokeDasharray="6 3"
+                  fill="transparent"
+                  dot={{ r: 3, fill: "hsl(24, 8%, 50%)", strokeWidth: 0 }}
+                />
+              </AreaChart>
+            </ResponsiveContainer>
+          </CardContent>
+        </Card>
       </div>
 
-      {/* Department summary */}
+      {/* ── Key Metrics Grid ───────────────────────────────── */}
       <div>
-        <h2 className="text-lg font-semibold text-foreground mb-4">Departments</h2>
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-          {departments.map((dept) => {
-            const deptMetrics = scorecardData.filter((m) => m.department === dept);
-            const green = deptMetrics.filter((m) => m.status === "green" || m.status === "light-green").length;
-            const yellow = deptMetrics.filter((m) => m.status === "yellow").length;
-            const red = deptMetrics.filter((m) => m.status === "red" || m.status === "light-red").length;
-
-            return (
-              <Card key={dept} className="hover:border-primary/30 transition-all">
-                <CardContent className="p-5">
-                  <div className="flex items-center justify-between mb-3">
-                    <h3 className="font-semibold text-foreground">{dept}</h3>
-                    <span className="text-xs text-muted-foreground">{deptMetrics.length} metrics</span>
-                  </div>
-                  <div className="flex gap-3">
-                    {green > 0 && (
-                      <span className="flex items-center gap-1 text-xs font-medium text-status-green">
-                        <span className="h-2 w-2 rounded-full bg-status-green" />
-                        {green}
-                      </span>
-                    )}
-                    {yellow > 0 && (
-                      <span className="flex items-center gap-1 text-xs font-medium text-status-yellow">
-                        <span className="h-2 w-2 rounded-full bg-status-yellow" />
-                        {yellow}
-                      </span>
-                    )}
-                    {red > 0 && (
-                      <span className="flex items-center gap-1 text-xs font-medium text-status-red">
-                        <span className="h-2 w-2 rounded-full bg-status-red" />
-                        {red}
-                      </span>
-                    )}
-                  </div>
-                  {/* Simple progress bar */}
-                  <div className="flex h-2 rounded-full overflow-hidden bg-muted mt-3">
-                    {green > 0 && <div className="bg-status-green" style={{ width: `${(green / deptMetrics.length) * 100}%` }} />}
-                    {yellow > 0 && <div className="bg-status-yellow" style={{ width: `${(yellow / deptMetrics.length) * 100}%` }} />}
-                    {red > 0 && <div className="bg-status-red" style={{ width: `${(red / deptMetrics.length) * 100}%` }} />}
-                  </div>
-                </CardContent>
-              </Card>
-            );
-          })}
+        <div className="flex items-center gap-2 mb-4">
+          <Zap className="h-4 w-4 text-accent" />
+          <h2 className="text-sm font-semibold text-foreground uppercase tracking-wider">Key Performance Indicators</h2>
+        </div>
+        <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-3">
+          <KPICard
+            icon={Eye}
+            label="YouTube Views"
+            value={String(ytViews?.monthlyActual ?? "—")}
+            target={`Target: ${ytViews?.monthlyTarget}`}
+            status={ytViews?.status ?? "green"}
+          />
+          <KPICard
+            icon={UserPlus}
+            label="New Subscribers"
+            value={String(ytSubs?.monthlyActual ?? "—")}
+            target={`Target: ${ytSubs?.monthlyTarget}`}
+            status={ytSubs?.status ?? "green"}
+          />
+          <KPICard
+            icon={Phone}
+            label="Total Bookings"
+            value={String(totalBookings?.monthlyActual ?? "—")}
+            target={`Target: ${totalBookings?.monthlyTarget}`}
+            status={totalBookings?.status ?? "green"}
+          />
+          <KPICard
+            icon={Globe}
+            label="Website Views"
+            value={String(websiteViews?.monthlyActual || "—")}
+            target={`Target: ${websiteViews?.monthlyTarget}`}
+            status={websiteViews?.status ?? "green"}
+          />
+          <KPICard
+            icon={Target}
+            label="Close Rate"
+            value={String(closingRate?.monthlyActual ?? "—")}
+            target={`Target: 30%`}
+            status={closingRate?.status ?? "green"}
+          />
+          <KPICard
+            icon={ShieldCheck}
+            label="Complaints"
+            value={String(complaints?.monthlyActual ?? "—")}
+            target={`Target: <${complaints?.monthlyTarget}`}
+            status={complaints?.status ?? "green"}
+            invertTrend
+          />
         </div>
       </div>
+
+      {/* ── Department Performance + Status Pie ─────────────── */}
+      <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
+        <div className="lg:col-span-2">
+          <div className="flex items-center gap-2 mb-4">
+            <BarChart3 className="h-4 w-4 text-primary" />
+            <h2 className="text-sm font-semibold text-foreground uppercase tracking-wider">Department Performance</h2>
+          </div>
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+            {departments.map((dept) => {
+              const deptMetrics = scorecardData.filter((m) => m.department === dept);
+              const green = deptMetrics.filter((m) => m.status === "green" || m.status === "light-green").length;
+              const yellow = deptMetrics.filter((m) => m.status === "yellow").length;
+              const red = deptMetrics.filter((m) => m.status === "red" || m.status === "light-red").length;
+              const Icon = deptIcons[dept];
+              const healthPct = Math.round((green / deptMetrics.length) * 100);
+
+              return (
+                <Card key={dept} className={`${deptBorderColors[dept]} hover:glow-primary transition-all overflow-hidden`}>
+                  <CardContent className="p-0">
+                    <div className={`bg-gradient-to-br ${deptColors[dept]} p-4`}>
+                      <div className="flex items-center justify-between mb-3">
+                        <div className="flex items-center gap-2">
+                          <Icon className="h-4 w-4 text-foreground/70" />
+                          <h3 className="font-semibold text-sm text-foreground">{dept}</h3>
+                        </div>
+                        <span className="text-[11px] font-mono text-muted-foreground">{deptMetrics.length} KPIs</span>
+                      </div>
+                      <div className="flex items-center gap-4 mb-3">
+                        {green > 0 && (
+                          <span className="flex items-center gap-1 text-xs font-medium text-status-green">
+                            <span className="h-2 w-2 rounded-full bg-status-green" /> {green}
+                          </span>
+                        )}
+                        {yellow > 0 && (
+                          <span className="flex items-center gap-1 text-xs font-medium text-status-yellow">
+                            <span className="h-2 w-2 rounded-full bg-status-yellow" /> {yellow}
+                          </span>
+                        )}
+                        {red > 0 && (
+                          <span className="flex items-center gap-1 text-xs font-medium text-status-red">
+                            <span className="h-2 w-2 rounded-full bg-status-red" /> {red}
+                          </span>
+                        )}
+                      </div>
+                      <div className="flex items-center gap-2">
+                        <div className="flex-1 h-1.5 rounded-full bg-background/50 overflow-hidden">
+                          {green > 0 && <div className="h-full bg-status-green inline-block" style={{ width: `${(green / deptMetrics.length) * 100}%` }} />}
+                          {yellow > 0 && <div className="h-full bg-status-yellow inline-block" style={{ width: `${(yellow / deptMetrics.length) * 100}%` }} />}
+                          {red > 0 && <div className="h-full bg-status-red inline-block" style={{ width: `${(red / deptMetrics.length) * 100}%` }} />}
+                        </div>
+                        <span className="text-[11px] font-mono font-semibold text-foreground/70">{healthPct}%</span>
+                      </div>
+                    </div>
+                  </CardContent>
+                </Card>
+              );
+            })}
+          </div>
+        </div>
+
+        {/* Status Distribution Pie */}
+        <Card className="border-border/50">
+          <CardContent className="p-5 flex flex-col items-center justify-center h-full">
+            <h3 className="text-sm font-semibold text-foreground mb-2 self-start">Status Distribution</h3>
+            <ResponsiveContainer width="100%" height={200}>
+              <PieChart>
+                <Pie
+                  data={pieData}
+                  cx="50%"
+                  cy="50%"
+                  innerRadius={55}
+                  outerRadius={80}
+                  paddingAngle={4}
+                  dataKey="value"
+                  strokeWidth={0}
+                >
+                  {pieData.map((entry, index) => (
+                    <Cell key={`cell-${index}`} fill={entry.fill} />
+                  ))}
+                </Pie>
+                <Tooltip
+                  contentStyle={{
+                    backgroundColor: "hsl(0, 0%, 11%)",
+                    border: "1px solid hsl(0, 0%, 16%)",
+                    borderRadius: "8px",
+                    color: "hsl(24, 36%, 95%)",
+                    fontSize: "12px",
+                  }}
+                />
+              </PieChart>
+            </ResponsiveContainer>
+            <div className="flex items-center gap-4 mt-2">
+              {pieData.map((d) => (
+                <span key={d.name} className="flex items-center gap-1.5 text-xs text-muted-foreground">
+                  <span className="h-2 w-2 rounded-full" style={{ backgroundColor: d.fill }} />
+                  {d.name} ({d.value})
+                </span>
+              ))}
+            </div>
+          </CardContent>
+        </Card>
+      </div>
+
+      {/* ── Sales Funnel ───────────────────────────────────── */}
+      <Card className="border-border/50">
+        <CardContent className="p-5">
+          <div className="flex items-center gap-2 mb-5">
+            <Phone className="h-4 w-4 text-accent" />
+            <h3 className="text-sm font-semibold text-foreground uppercase tracking-wider">Sales Funnel — March 2026</h3>
+          </div>
+          <SalesFunnel />
+        </CardContent>
+      </Card>
+    </div>
+  );
+}
+
+// ── Sub-components ──────────────────────────────────────────
+
+function KPICard({
+  icon: Icon,
+  label,
+  value,
+  target,
+  status,
+  invertTrend,
+}: {
+  icon: React.ElementType;
+  label: string;
+  value: string;
+  target: string;
+  status: string;
+  invertTrend?: boolean;
+}) {
+  const statusColor =
+    status === "green" || status === "light-green"
+      ? "text-status-green"
+      : status === "yellow"
+      ? "text-status-yellow"
+      : "text-status-red";
+
+  const borderColor =
+    status === "green" || status === "light-green"
+      ? "border-status-green/20"
+      : status === "yellow"
+      ? "border-status-yellow/20"
+      : "border-status-red/20";
+
+  return (
+    <Card className={`${borderColor} hover:glow-primary transition-all`}>
+      <CardContent className="p-4">
+        <div className="flex items-center justify-between mb-2">
+          <Icon className="h-4 w-4 text-muted-foreground" />
+          <span className={`h-2 w-2 rounded-full ${
+            status === "green" || status === "light-green"
+              ? "bg-status-green"
+              : status === "yellow"
+              ? "bg-status-yellow"
+              : "bg-status-red"
+          }`} />
+        </div>
+        <p className="text-xl font-bold tracking-tight text-foreground">{value}</p>
+        <p className="text-[10px] text-muted-foreground mt-0.5 font-medium">{label}</p>
+        <p className="text-[10px] text-muted-foreground/70 mt-1">{target}</p>
+      </CardContent>
+    </Card>
+  );
+}
+
+function SalesFunnel() {
+  const triageCalls = scorecardData.find((m) => m.name === "Triage Calls Booked");
+  const triageShowRate = scorecardData.find((m) => m.name === "Triage Show Rate");
+  const triageQualRate = scorecardData.find((m) => m.name === "Triage Qualification Rate");
+  const closingCalls = scorecardData.find((m) => m.name === "Closing Calls Booked");
+  const closingShowRate = scorecardData.find((m) => m.name === "Closing Call Show Rate");
+  const closingCallsTaken = scorecardData.find((m) => m.name === "Closing Calls Taken");
+  const closeRate = scorecardData.find((m) => m.name === "Closing Call Close Rate");
+
+  const funnelSteps = [
+    { label: "Triage Calls Booked", value: triageCalls?.monthlyActual || "—", target: triageCalls?.monthlyTarget, status: triageCalls?.status },
+    { label: "Triage Show Rate", value: triageShowRate?.monthlyActual || "—", target: triageShowRate?.monthlyTarget || "70%", status: triageShowRate?.status },
+    { label: "Qualification Rate", value: triageQualRate?.monthlyActual || "—", target: triageQualRate?.monthlyTarget || "50%", status: triageQualRate?.status },
+    { label: "Closing Calls Booked", value: closingCalls?.monthlyActual || "—", target: closingCalls?.monthlyTarget, status: closingCalls?.status },
+    { label: "Closing Show Rate", value: closingShowRate?.monthlyActual || "—", target: closingShowRate?.monthlyTarget || "80%", status: closingShowRate?.status },
+    { label: "Calls Taken", value: closingCallsTaken?.monthlyActual || "—", target: closingCallsTaken?.monthlyTarget, status: closingCallsTaken?.status },
+    { label: "Close Rate", value: closeRate?.monthlyActual || "—", target: closeRate?.monthlyTarget || "30%", status: closeRate?.status },
+  ];
+
+  return (
+    <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-7 gap-3">
+      {funnelSteps.map((step, i) => {
+        const statusBg =
+          step.status === "green" || step.status === "light-green"
+            ? "bg-status-green/10 border-status-green/20"
+            : step.status === "yellow"
+            ? "bg-status-yellow/10 border-status-yellow/20"
+            : "bg-status-red/10 border-status-red/20";
+
+        return (
+          <div key={step.label} className="flex items-center gap-2">
+            <div className={`flex-1 rounded-xl border p-3 text-center ${statusBg}`}>
+              <p className="text-lg font-bold text-foreground">{formatValue(step.value)}</p>
+              <p className="text-[10px] font-medium text-muted-foreground mt-1 leading-tight">{step.label}</p>
+              {step.target && (
+                <p className="text-[9px] text-muted-foreground/60 mt-0.5">Target: {formatValue(step.target)}</p>
+              )}
+            </div>
+            {i < funnelSteps.length - 1 && (
+              <ArrowUpRight className="h-3 w-3 text-muted-foreground/40 shrink-0 hidden lg:block" />
+            )}
+          </div>
+        );
+      })}
     </div>
   );
 }

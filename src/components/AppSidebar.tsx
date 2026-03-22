@@ -49,18 +49,18 @@ export function AppSidebar() {
         <div className="px-4 py-5">
           {!collapsed ? (
             <div className="flex items-center gap-2.5">
-              <div className="rounded-lg bg-primary/15 p-1.5">
-                <BarChart3 className="h-5 w-5 text-primary" />
+              <div className="rounded-lg gradient-pink-blue p-1.5">
+                <BarChart3 className="h-5 w-5 text-white" />
               </div>
               <div>
-                <h1 className="text-sm font-bold tracking-tight text-foreground">Ops Hub</h1>
-                <p className="text-[10px] text-muted-foreground">Company Metrics</p>
+                <h1 className="text-sm font-bold tracking-tight gradient-text">Ops Hub</h1>
+                <p className="text-[10px] text-muted-foreground">Mission Terminal</p>
               </div>
             </div>
           ) : (
             <div className="flex justify-center">
-              <div className="rounded-lg bg-primary/15 p-1.5">
-                <BarChart3 className="h-5 w-5 text-primary" />
+              <div className="rounded-lg gradient-pink-blue p-1.5">
+                <BarChart3 className="h-5 w-5 text-white" />
               </div>
             </div>
           )}
