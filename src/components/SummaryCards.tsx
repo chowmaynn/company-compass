@@ -53,7 +53,7 @@ export function SummaryCards({ metrics }: SummaryCardsProps) {
       {cards.map((card) => (
         <div
           key={card.label}
-          className="rounded-xl border border-border bg-card p-5 transition-all hover:border-primary/30 hover:glow-primary"
+          className="rounded-xl border border-border bg-card p-5 card-shadow transition-all hover:border-primary/30"
         >
           <div className="flex items-center justify-between">
             <p className="text-sm font-medium text-muted-foreground">{card.label}</p>

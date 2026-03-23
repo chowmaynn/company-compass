@@ -9,7 +9,6 @@ import {
   TrendingUp,
 } from "lucide-react";
 import { NavLink } from "@/components/NavLink";
-import { useLocation } from "react-router-dom";
 import {
   Sidebar,
   SidebarContent,
@@ -32,42 +31,37 @@ const departmentItems = [
   { title: "Content", url: "/departments/content", icon: Video },
   { title: "Marketing", url: "/departments/marketing", icon: Megaphone },
   { title: "Sales", url: "/departments/sales", icon: Phone },
-  { title: "Community", url: "/departments/community-management", icon: Users },
+  { title: "Product", url: "/departments/community-management", icon: Users },
 ];
 
 export function AppSidebar() {
   const { state } = useSidebar();
   const collapsed = state === "collapsed";
-  const location = useLocation();
-  const currentPath = location.pathname;
-
-  const isActive = (path: string) => currentPath === path;
-
   return (
-    <Sidebar collapsible="icon">
+    <Sidebar collapsible="icon" className="border-r border-border bg-white">
       <SidebarContent>
-        <div className="px-4 py-5">
+        <div className="px-4 py-5 border-b border-border">
           {!collapsed ? (
             <div className="flex items-center gap-2.5">
-              <div className="rounded-lg gradient-pink-blue p-1.5">
+              <div className="rounded-lg bg-primary p-1.5">
                 <BarChart3 className="h-5 w-5 text-white" />
               </div>
               <div>
-                <h1 className="text-sm font-bold tracking-tight gradient-text">Ops Hub</h1>
-                <p className="text-[10px] text-muted-foreground">Mission Terminal</p>
+                <h1 className="text-sm font-bold tracking-tight text-foreground">Company Compass</h1>
+                <p className="text-[10px] text-muted-foreground">Operations Hub</p>
               </div>
             </div>
           ) : (
             <div className="flex justify-center">
-              <div className="rounded-lg gradient-pink-blue p-1.5">
+              <div className="rounded-lg bg-primary p-1.5">
                 <BarChart3 className="h-5 w-5 text-white" />
               </div>
             </div>
           )}
         </div>
 
-        <SidebarGroup>
-          <SidebarGroupLabel>Main</SidebarGroupLabel>
+        <SidebarGroup className="pt-4">
+          <SidebarGroupLabel className="text-[10px] font-semibold text-muted-foreground uppercase tracking-widest px-4 mb-1">Main</SidebarGroupLabel>
           <SidebarGroupContent>
             <SidebarMenu>
               {mainItems.map((item) => (
@@ -76,10 +70,10 @@ export function AppSidebar() {
                     <NavLink
                       to={item.url}
                       end
-                      className="hover:bg-muted/50"
-                      activeClassName="bg-primary/10 text-primary font-medium"
+                      className="flex items-center gap-2.5 px-3 py-2 rounded-lg text-sm text-muted-foreground hover:bg-muted hover:text-foreground transition-colors"
+                      activeClassName="bg-primary/10 text-primary font-medium hover:bg-primary/10 hover:text-primary"
                     >
-                      <item.icon className="mr-2 h-4 w-4" />
+                      <item.icon className="h-4 w-4 shrink-0" />
                       {!collapsed && <span>{item.title}</span>}
                     </NavLink>
                   </SidebarMenuButton>
@@ -89,8 +83,8 @@ export function AppSidebar() {
           </SidebarGroupContent>
         </SidebarGroup>
 
-        <SidebarGroup>
-          <SidebarGroupLabel>Departments</SidebarGroupLabel>
+        <SidebarGroup className="pt-4">
+          <SidebarGroupLabel className="text-[10px] font-semibold text-muted-foreground uppercase tracking-widest px-4 mb-1">Departments</SidebarGroupLabel>
           <SidebarGroupContent>
             <SidebarMenu>
               {departmentItems.map((item) => (
@@ -98,10 +92,10 @@ export function AppSidebar() {
                   <SidebarMenuButton asChild>
                     <NavLink
                       to={item.url}
-                      className="hover:bg-muted/50"
-                      activeClassName="bg-primary/10 text-primary font-medium"
+                      className="flex items-center gap-2.5 px-3 py-2 rounded-lg text-sm text-muted-foreground hover:bg-muted hover:text-foreground transition-colors"
+                      activeClassName="bg-primary/10 text-primary font-medium hover:bg-primary/10 hover:text-primary"
                     >
-                      <item.icon className="mr-2 h-4 w-4" />
+                      <item.icon className="h-4 w-4 shrink-0" />
                       {!collapsed && <span>{item.title}</span>}
                     </NavLink>
                   </SidebarMenuButton>

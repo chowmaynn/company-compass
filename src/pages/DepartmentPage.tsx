@@ -1,21 +1,45 @@
 import { useState } from "react";
 import { useParams, Navigate } from "react-router-dom";
-import { scorecardData as initialData, departments, type Department, type Metric, type StatusColor } from "@/data/scorecardData";
+import { scorecardData as initialData, type Department, type Metric } from "@/data/scorecardData";
 import { DepartmentSection } from "@/components/DepartmentSection";
 import { SummaryCards } from "@/components/SummaryCards";
+import { ProductDashboard } from "@/components/ProductDashboard";
+import { SalesDashboard } from "@/components/SalesDashboard";
+import { RepMetrics } from "@/components/RepMetrics";
+import { CircleCharts } from "@/components/CircleCharts";
+import { DepartmentCharts } from "@/components/DepartmentCharts";
+import { MetricTable } from "@/components/MetricTable";
+import { LayoutDashboard, ClipboardList, BarChart3, Table2, Users } from "lucide-react";
 
 const slugToDepartment: Record<string, Department> = {
-  "evergreen-metrics": "Evergreen Metrics",
+  "evergreen-metrics": "Product",
   "content": "Content",
   "marketing": "Marketing",
   "sales": "Sales",
-  "community-management": "Community Management",
+  "community-management": "Product",
 };
+
+type Tab = "dashboard" | "scorecard" | "charts" | "rep-metrics";
+type ScorecardView = "table" | "charts";
+
+const tabs: { id: Tab; label: string; icon: React.ElementType }[] = [
+  { id: "dashboard",   label: "Dashboard",   icon: LayoutDashboard },
+  { id: "scorecard",   label: "Scorecard",   icon: ClipboardList },
+  { id: "charts",      label: "Charts",      icon: BarChart3 },
+];
+
+const salesTabs: { id: Tab; label: string; icon: React.ElementType }[] = [
+  { id: "dashboard",   label: "Dashboard",   icon: LayoutDashboard },
+  { id: "scorecard",   label: "Scorecard",   icon: ClipboardList },
+  { id: "rep-metrics", label: "Rep Metrics", icon: Users },
+];
 
 export default function DepartmentPage() {
   const { slug } = useParams<{ slug: string }>();
   const department = slug ? slugToDepartment[slug] : undefined;
 
+  const [activeTab, setActiveTab] = useState<Tab>("dashboard");
+  const [scorecardView, setScorecardView] = useState<ScorecardView>("table");
   const [metrics, setMetrics] = useState<Metric[]>(initialData);
 
   if (!department) return <Navigate to="/" replace />;
@@ -42,28 +66,101 @@ export default function DepartmentPage() {
     );
   };
 
-  const handleStatusChange = (metricName: string, newStatus: StatusColor) => {
-    setMetrics((prev) =>
-      prev.map((m) => m.name === metricName ? { ...m, status: newStatus } : m)
-    );
-  };
+  const isProduct = department === "Product";
+  const isSales = department === "Sales";
 
   return (
-    <div className="p-6 space-y-8 max-w-7xl mx-auto">
+    <div className="p-6 max-w-7xl mx-auto space-y-6">
+
+      {/* ── Header ────────────────────────────────────────── */}
       <div>
         <h1 className="text-2xl font-bold tracking-tight text-foreground">{department}</h1>
-        <p className="text-sm text-muted-foreground mt-1">Department metrics & performance</p>
+        <p className="text-sm text-muted-foreground mt-0.5">Department metrics & performance</p>
       </div>
 
-      <SummaryCards metrics={deptMetrics} />
+      {/* ── Tab Toggle ────────────────────────────────────── */}
+      <div className="flex items-center gap-1 bg-muted rounded-lg p-1 w-fit">
+        {(isSales ? salesTabs : tabs).map((tab) => {
+          const Icon = tab.icon;
+          return (
+            <button
+              key={tab.id}
+              onClick={() => setActiveTab(tab.id)}
+              className={`flex items-center gap-2 px-4 py-2 rounded-md text-sm font-medium transition-all ${
+                activeTab === tab.id
+                  ? "bg-white text-foreground shadow-sm"
+                  : "text-muted-foreground hover:text-foreground"
+              }`}
+            >
+              <Icon className="h-4 w-4" />
+              {tab.label}
+            </button>
+          );
+        })}
+      </div>
 
-      <DepartmentSection
-        department={department}
-        metrics={deptMetrics}
-        onMetricChange={handleMetricChange}
-        onStatusChange={handleStatusChange}
-        showCharts
-      />
+      {/* ── Tab Content ───────────────────────────────────── */}
+      {activeTab === "dashboard" && (
+        isProduct ? (
+          <ProductDashboard />
+        ) : isSales ? (
+          <SalesDashboard />
+        ) : (
+          <DepartmentSection
+            department={department}
+            metrics={deptMetrics}
+            onMetricChange={handleMetricChange}
+          />
+        )
+      )}
+
+      {activeTab === "scorecard" && (
+        <div className="space-y-4">
+          <SummaryCards metrics={deptMetrics} />
+          {/* Table / Chart sub-toggle */}
+          <div className="flex items-center gap-1 bg-muted rounded-lg p-1 w-fit">
+            <button
+              onClick={() => setScorecardView("table")}
+              className={`flex items-center gap-2 px-3 py-1.5 rounded-md text-sm font-medium transition-all ${
+                scorecardView === "table"
+                  ? "bg-white text-foreground shadow-sm"
+                  : "text-muted-foreground hover:text-foreground"
+              }`}
+            >
+              <Table2 className="h-3.5 w-3.5" />
+              Table
+            </button>
+            <button
+              onClick={() => setScorecardView("charts")}
+              className={`flex items-center gap-2 px-3 py-1.5 rounded-md text-sm font-medium transition-all ${
+                scorecardView === "charts"
+                  ? "bg-white text-foreground shadow-sm"
+                  : "text-muted-foreground hover:text-foreground"
+              }`}
+            >
+              <BarChart3 className="h-3.5 w-3.5" />
+              Charts
+            </button>
+          </div>
+
+          {scorecardView === "table" ? (
+            <MetricTable metrics={deptMetrics} onMetricChange={handleMetricChange} />
+          ) : (
+            <DepartmentCharts metrics={deptMetrics} />
+          )}
+        </div>
+      )}
+
+      {activeTab === "charts" && (
+        isProduct ? (
+          <CircleCharts />
+        ) : (
+          <DepartmentCharts metrics={deptMetrics} />
+        )
+      )}
+
+      {activeTab === "rep-metrics" && <RepMetrics />}
+
     </div>
   );
 }

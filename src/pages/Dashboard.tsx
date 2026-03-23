@@ -1,19 +1,16 @@
 import { useMemo } from "react";
 import { Card, CardContent } from "@/components/ui/card";
-import { scorecardData, departments, weekConfigs, type Department, type Metric } from "@/data/scorecardData";
+import { scorecardData, departments, weekConfigs, type Department } from "@/data/scorecardData";
 import { formatValue } from "@/lib/formatNumber";
 import {
   DollarSign,
   TrendingUp,
-  TrendingDown,
   Users,
   Eye,
   UserPlus,
   Phone,
-  Mail,
   BarChart3,
   ArrowUpRight,
-  ArrowDownRight,
   Activity,
   Target,
   Zap,
@@ -28,8 +25,6 @@ import {
 import {
   AreaChart,
   Area,
-  BarChart,
-  Bar,
   XAxis,
   YAxis,
   CartesianGrid,
@@ -75,20 +70,13 @@ const deptIcons: Record<Department, React.ElementType> = {
 };
 
 const deptColors: Record<Department, string> = {
-  Finance: "from-pink-500/20 to-pink-500/5",
-  Content: "from-blue-500/20 to-blue-500/5",
-  Marketing: "from-amber-500/20 to-amber-500/5",
-  Sales: "from-emerald-500/20 to-emerald-500/5",
-  Product: "from-violet-500/20 to-violet-500/5",
+  Finance: "bg-blue-50",
+  Content: "bg-indigo-50",
+  Marketing: "bg-amber-50",
+  Sales: "bg-emerald-50",
+  Product: "bg-violet-50",
 };
 
-const deptBorderColors: Record<Department, string> = {
-  Finance: "border-pink-500/30",
-  Content: "border-blue-500/30",
-  Marketing: "border-amber-500/30",
-  Sales: "border-emerald-500/30",
-  Product: "border-violet-500/30",
-};
 
 // ── Component ────────────────────────────────────────────────
 
@@ -286,30 +274,31 @@ export default function Dashboard() {
               <AreaChart data={revenueWeekly}>
                 <defs>
                   <linearGradient id="revGradient" x1="0" y1="0" x2="0" y2="1">
-                    <stop offset="5%" stopColor="hsl(327, 100%, 65%)" stopOpacity={0.3} />
-                    <stop offset="95%" stopColor="hsl(327, 100%, 65%)" stopOpacity={0} />
+                    <stop offset="5%" stopColor="hsl(221, 83%, 53%)" stopOpacity={0.15} />
+                    <stop offset="95%" stopColor="hsl(221, 83%, 53%)" stopOpacity={0} />
                   </linearGradient>
                 </defs>
-                <CartesianGrid strokeDasharray="3 3" stroke="hsl(0, 0%, 16%)" vertical={false} />
+                <CartesianGrid strokeDasharray="3 3" stroke="hsl(220, 13%, 91%)" vertical={false} />
                 <XAxis
                   dataKey="week"
-                  tick={{ fontSize: 11, fill: "hsl(24, 8%, 50%)" }}
-                  axisLine={{ stroke: "hsl(0, 0%, 16%)" }}
+                  tick={{ fontSize: 11, fill: "hsl(220, 9%, 46%)" }}
+                  axisLine={{ stroke: "hsl(220, 13%, 91%)" }}
                   tickLine={false}
                 />
                 <YAxis
-                  tick={{ fontSize: 11, fill: "hsl(24, 8%, 50%)" }}
+                  tick={{ fontSize: 11, fill: "hsl(220, 9%, 46%)" }}
                   axisLine={false}
                   tickLine={false}
                   tickFormatter={(v) => `$${compactNumber(v)}`}
                 />
                 <Tooltip
                   contentStyle={{
-                    backgroundColor: "hsl(0, 0%, 11%)",
-                    border: "1px solid hsl(0, 0%, 16%)",
+                    backgroundColor: "#ffffff",
+                    border: "1px solid hsl(220, 13%, 91%)",
                     borderRadius: "8px",
-                    color: "hsl(24, 36%, 95%)",
+                    color: "hsl(224, 71%, 4%)",
                     fontSize: "12px",
+                    boxShadow: "0 4px 6px -1px rgb(0 0 0 / 0.07)",
                   }}
                   formatter={(value: number) => [`$${compactNumber(value)}`, undefined]}
                 />
@@ -317,21 +306,21 @@ export default function Dashboard() {
                   type="monotone"
                   dataKey="actual"
                   name="Actual"
-                  stroke="hsl(327, 100%, 65%)"
+                  stroke="hsl(221, 83%, 53%)"
                   strokeWidth={2.5}
                   fill="url(#revGradient)"
-                  dot={{ r: 4, fill: "hsl(327, 100%, 65%)", strokeWidth: 0 }}
+                  dot={{ r: 4, fill: "hsl(221, 83%, 53%)", strokeWidth: 0 }}
                   activeDot={{ r: 6 }}
                 />
                 <Area
                   type="monotone"
                   dataKey="projection"
                   name="Projection"
-                  stroke="hsl(24, 8%, 50%)"
+                  stroke="hsl(220, 9%, 70%)"
                   strokeWidth={1.5}
                   strokeDasharray="6 3"
                   fill="transparent"
-                  dot={{ r: 3, fill: "hsl(24, 8%, 50%)", strokeWidth: 0 }}
+                  dot={{ r: 3, fill: "hsl(220, 9%, 70%)", strokeWidth: 0 }}
                 />
               </AreaChart>
             </ResponsiveContainer>
@@ -404,14 +393,14 @@ export default function Dashboard() {
               const deptMetrics = scorecardData.filter((m) => m.department === dept);
               const green = deptMetrics.filter((m) => m.status === "green" || m.status === "light-green").length;
               const yellow = deptMetrics.filter((m) => m.status === "yellow").length;
-              const red = deptMetrics.filter((m) => m.status === "red" || m.status === "light-red").length;
+              const red = deptMetrics.filter((m) => m.status === "red").length;
               const Icon = deptIcons[dept];
               const healthPct = Math.round((green / deptMetrics.length) * 100);
 
               return (
-                <Card key={dept} className={`${deptBorderColors[dept]} hover:glow-primary transition-all overflow-hidden`}>
+                <Card key={dept} className="border-border overflow-hidden card-shadow">
                   <CardContent className="p-0">
-                    <div className={`bg-gradient-to-br ${deptColors[dept]} p-4`}>
+                    <div className={`${deptColors[dept]} p-4`}>
                       <div className="flex items-center justify-between mb-3">
                         <div className="flex items-center gap-2">
                           <Icon className="h-4 w-4 text-foreground/70" />
@@ -474,11 +463,12 @@ export default function Dashboard() {
                 </Pie>
                 <Tooltip
                   contentStyle={{
-                    backgroundColor: "hsl(0, 0%, 11%)",
-                    border: "1px solid hsl(0, 0%, 16%)",
+                    backgroundColor: "#ffffff",
+                    border: "1px solid hsl(220, 13%, 91%)",
                     borderRadius: "8px",
-                    color: "hsl(24, 36%, 95%)",
+                    color: "hsl(224, 71%, 4%)",
                     fontSize: "12px",
+                    boxShadow: "0 4px 6px -1px rgb(0 0 0 / 0.07)",
                   }}
                 />
               </PieChart>
@@ -517,7 +507,7 @@ function KPICard({
   value,
   target,
   status,
-  invertTrend,
+  invertTrend: _invertTrend,
 }: {
   icon: React.ElementType;
   label: string;
@@ -526,22 +516,15 @@ function KPICard({
   status: string;
   invertTrend?: boolean;
 }) {
-  const statusColor =
-    status === "green" || status === "light-green"
-      ? "text-status-green"
-      : status === "yellow"
-      ? "text-status-yellow"
-      : "text-status-red";
-
   const borderColor =
     status === "green" || status === "light-green"
-      ? "border-status-green/20"
+      ? "border-status-green/25"
       : status === "yellow"
-      ? "border-status-yellow/20"
-      : "border-status-red/20";
+      ? "border-status-yellow/25"
+      : "border-status-red/25";
 
   return (
-    <Card className={`${borderColor} hover:glow-primary transition-all`}>
+    <Card className={`${borderColor} card-shadow transition-shadow hover:card-shadow-md`}>
       <CardContent className="p-4">
         <div className="flex items-center justify-between mb-2">
           <Icon className="h-4 w-4 text-muted-foreground" />
