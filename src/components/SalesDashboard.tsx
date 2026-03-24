@@ -57,7 +57,7 @@ function StatPanel({ items, loading }: {
   loading?: boolean;
 }) {
   return (
-    <div className="grid divide-x divide-border bg-white rounded-2xl border border-border overflow-hidden"
+    <div className="grid divide-x divide-border bg-card rounded-2xl border border-border overflow-hidden"
       style={{ gridTemplateColumns: `repeat(${items.length}, minmax(0, 1fr))` }}>
       {items.map((item) => (
         <div key={item.label} className="px-6 py-5">
@@ -96,7 +96,7 @@ function DateFilter({ preset, from, to, onPreset, onFrom, onTo }: {
         {(["month", "30d", "60d", "custom"] as Preset[]).map((p) => (
           <button key={p} onClick={() => onPreset(p)}
             className={`px-3 py-1.5 rounded-md text-xs font-medium transition-all ${
-              preset === p ? "bg-white text-foreground shadow-sm" : "text-muted-foreground hover:text-foreground"
+              preset === p ? "bg-card text-foreground shadow-sm" : "text-muted-foreground hover:text-foreground"
             }`}>
             {p === "month" ? "This Month" : p === "30d" ? "Last 30d" : p === "60d" ? "Last 60d" : "Custom"}
           </button>
@@ -105,10 +105,10 @@ function DateFilter({ preset, from, to, onPreset, onFrom, onTo }: {
       {preset === "custom" && (
         <div className="flex items-center gap-2">
           <input type="date" value={from} onChange={(e) => onFrom(e.target.value)}
-            className="text-xs border border-border rounded-lg px-3 py-1.5 bg-white text-foreground focus:outline-none focus:ring-2 focus:ring-primary/30" />
+            className="text-xs border border-border rounded-lg px-3 py-1.5 bg-card text-foreground focus:outline-none focus:ring-2 focus:ring-primary/30" />
           <span className="text-xs text-muted-foreground">→</span>
           <input type="date" value={to} onChange={(e) => onTo(e.target.value)}
-            className="text-xs border border-border rounded-lg px-3 py-1.5 bg-white text-foreground focus:outline-none focus:ring-2 focus:ring-primary/30" />
+            className="text-xs border border-border rounded-lg px-3 py-1.5 bg-card text-foreground focus:outline-none focus:ring-2 focus:ring-primary/30" />
         </div>
       )}
     </div>

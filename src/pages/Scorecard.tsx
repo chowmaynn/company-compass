@@ -1,94 +1,82 @@
-import { useState } from "react";
-import { scorecardData as initialData, departments, scorecardMonth, type Department, type Metric, type StatusColor } from "@/data/scorecardData";
+import { useState, useEffect } from "react";
+import { departments, type StatusColor } from "@/data/scorecardData";
 import { SummaryCards } from "@/components/SummaryCards";
 import { DepartmentSection } from "@/components/DepartmentSection";
+import { useScorecard } from "@/hooks/use-scorecard";
+import { fetchAvailableMonths } from "@/lib/supabase-scorecard";
+import { Loader2, ChevronDown } from "lucide-react";
+
+function formatMonth(m: string): string {
+  const [year, month] = m.split("-");
+  const names = ["", "January", "February", "March", "April", "May", "June", "July", "August", "September", "October", "November", "December"];
+  return `${names[parseInt(month)]} ${year}`;
+}
 
 export default function Scorecard() {
-  const [activeDepartment, setActiveDepartment] = useState<Department | "all">("all");
-  const [metrics, setMetrics] = useState<Metric[]>(initialData);
+  const [availableMonths, setAvailableMonths] = useState<string[]>([]);
+  const [selectedMonth, setSelectedMonth] = useState("2026-03");
+  const { metrics, loading, error, updateMetric } = useScorecard(selectedMonth);
 
-  const filteredMetrics = activeDepartment === "all"
-    ? metrics
-    : metrics.filter((m) => m.department === activeDepartment);
-
-  const visibleDepartments = activeDepartment === "all"
-    ? departments
-    : [activeDepartment];
-
-  const showCharts = activeDepartment !== "all";
-
-  const handleMetricChange = (metricName: string, field: string, value: number | string) => {
-    setMetrics((prev) =>
-      prev.map((m) => {
-        if (m.name !== metricName) return m;
-        const updated = { ...m };
-        if (field === "monthlyActual") {
-          updated.monthlyActual = value;
-        } else if (field === "monthlyTarget") {
-          updated.monthlyTarget = value;
-        } else if (field.startsWith("weeks.")) {
-          const parts = field.split(".");
-          const weekIndex = parseInt(parts[1]);
-          const subField = parts[2] as "actual" | "projection";
-          updated.weeks = updated.weeks.map((w, i) =>
-            i === weekIndex ? { ...w, [subField]: value } : w
-          );
-        }
-        return updated;
-      })
-    );
-  };
+  useEffect(() => {
+    fetchAvailableMonths().then((months) => {
+      if (months.length > 0) {
+        setAvailableMonths(months);
+        setSelectedMonth(months[0]); // most recent
+      }
+    });
+  }, []);
 
   const handleStatusChange = (metricName: string, newStatus: StatusColor) => {
-    setMetrics((prev) =>
-      prev.map((m) => m.name === metricName ? { ...m, status: newStatus } : m)
-    );
+    updateMetric(metricName, "status", newStatus);
   };
 
+  if (loading) {
+    return (
+      <div className="flex items-center justify-center py-20">
+        <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
+        <span className="ml-2 text-sm text-muted-foreground">Loading scorecard…</span>
+      </div>
+    );
+  }
+
+  if (error) {
+    return (
+      <div className="p-6 text-sm text-status-red">
+        Failed to load scorecard: {error}
+      </div>
+    );
+  }
+
   return (
-    <div className="p-6 space-y-8 max-w-7xl mx-auto">
-      <div>
-        <h1 className="text-2xl font-bold tracking-tight text-foreground">Scorecard</h1>
-        <p className="text-sm text-muted-foreground mt-1">{scorecardMonth}</p>
+    <div className="p-6 space-y-6 max-w-[1440px] mx-auto">
+      <div className="flex items-center justify-between">
+        <div>
+          <div className="relative">
+            <select
+              value={selectedMonth}
+              onChange={(e) => setSelectedMonth(e.target.value)}
+              className="appearance-none bg-transparent text-sm text-muted-foreground font-medium pr-6 cursor-pointer hover:text-foreground transition-colors focus:outline-none"
+            >
+              {availableMonths.map((m) => (
+                <option key={m} value={m}>{formatMonth(m)}</option>
+              ))}
+            </select>
+            <ChevronDown className="absolute right-0 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-muted-foreground pointer-events-none" />
+          </div>
+        </div>
       </div>
 
-      <SummaryCards metrics={filteredMetrics} />
-
-      <div className="flex flex-wrap items-center gap-2">
-        <button
-          onClick={() => setActiveDepartment("all")}
-          className={`rounded-lg px-4 py-2 text-sm font-medium transition-all ${
-            activeDepartment === "all"
-              ? "bg-primary text-primary-foreground"
-              : "bg-muted text-muted-foreground hover:bg-accent hover:text-accent-foreground"
-          }`}
-        >
-          All Departments
-        </button>
-        {departments.map((dept) => (
-          <button
-            key={dept}
-            onClick={() => setActiveDepartment(dept)}
-            className={`rounded-lg px-4 py-2 text-sm font-medium transition-all ${
-              activeDepartment === dept
-                ? "bg-primary text-primary-foreground"
-                : "bg-muted text-muted-foreground hover:bg-accent hover:text-accent-foreground"
-            }`}
-          >
-            {dept}
-          </button>
-        ))}
-      </div>
+      <SummaryCards metrics={metrics} />
 
       <div className="space-y-8">
-        {visibleDepartments.map((dept) => (
+        {departments.map((dept) => (
           <DepartmentSection
             key={dept}
             department={dept}
             metrics={metrics.filter((m) => m.department === dept)}
-            onMetricChange={handleMetricChange}
+            onMetricChange={updateMetric}
             onStatusChange={handleStatusChange}
-            showCharts={showCharts}
+            showCharts={false}
           />
         ))}
       </div>

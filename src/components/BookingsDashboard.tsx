@@ -57,7 +57,7 @@ export function BookingsDashboard({ from, to, showRate }: {
     <div className="space-y-5">
 
       {/* ── Stat panel ──────────────────────────────────── */}
-      <div className="grid divide-x divide-border bg-white rounded-2xl border border-border overflow-hidden"
+      <div className="grid divide-x divide-border bg-card rounded-2xl border border-border overflow-hidden"
         style={{ gridTemplateColumns: `repeat(${stats.length}, minmax(0, 1fr))` }}>
         {stats.map((s) => (
           <div key={s.label} className="px-5 py-5">

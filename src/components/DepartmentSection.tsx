@@ -1,10 +1,9 @@
-import { useState } from "react";
 import { type Department, type Metric } from "@/data/scorecardData";
 import { MetricTable } from "./MetricTable";
 import { DailyTrackingTable } from "./DailyTrackingTable";
 import { DepartmentCharts } from "./DepartmentCharts";
 import { getAuthUrl } from "@/lib/youtube-auth";
-import { useExchangeRate } from "@/hooks/use-exchange-rate";
+import { useCurrency } from "@/components/AppLayout";
 import { BarChart3, Video, Megaphone, Phone, Users, LogIn } from "lucide-react";
 
 const departmentIcons: Record<Department, React.ElementType> = {
@@ -35,8 +34,7 @@ interface DepartmentSectionProps {
 export function DepartmentSection({ department, metrics, onMetricChange, showCharts, readOnlyMetrics, needsAuth }: DepartmentSectionProps) {
   const Icon = departmentIcons[department];
   const colorClass = departmentColors[department];
-  const [showUSD, setShowUSD] = useState(false);
-  const { rate: nzdToUsd } = useExchangeRate();
+  const { currency, rate } = useCurrency();
   const isFinance = department === "Finance";
 
   const statusSummary = metrics.reduce(
@@ -53,14 +51,6 @@ export function DepartmentSection({ department, metrics, onMetricChange, showCha
         <Icon className="h-5 w-5 text-foreground" />
         <h2 className="text-lg font-bold tracking-tight text-foreground">{department}</h2>
         <div className="ml-auto flex items-center gap-2">
-          {isFinance && nzdToUsd && (
-            <button
-              onClick={() => setShowUSD((v) => !v)}
-              className="flex items-center gap-1.5 rounded-full bg-background/50 px-3 py-1 text-xs font-medium text-foreground/80 transition-colors hover:bg-background/80"
-            >
-              {showUSD ? "🇺🇸 USD" : "🇳🇿 NZD"}
-            </button>
-          )}
           {needsAuth && (
             <a
               href={getAuthUrl()}
@@ -97,7 +87,7 @@ export function DepartmentSection({ department, metrics, onMetricChange, showCha
       {department === "Marketing" && showCharts && (
         <p className="text-sm font-medium text-muted-foreground">Weekly Tracking</p>
       )}
-      <MetricTable metrics={metrics} onMetricChange={onMetricChange} readOnlyMetrics={readOnlyMetrics} currencyRate={isFinance && showUSD && nzdToUsd ? nzdToUsd : undefined} />
+      <MetricTable metrics={metrics} onMetricChange={onMetricChange} readOnlyMetrics={readOnlyMetrics} currencyRate={isFinance && currency === "USD" && rate ? rate : undefined} />
     </div>
   );
 }

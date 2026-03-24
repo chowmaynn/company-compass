@@ -1,4 +1,5 @@
 import {
+  Compass,
   BarChart3,
   LayoutDashboard,
   ClipboardList,
@@ -6,6 +7,7 @@ import {
   Megaphone,
   Phone,
   Users,
+  DollarSign,
 } from "lucide-react";
 import { NavLink } from "@/components/NavLink";
 import {
@@ -26,7 +28,8 @@ const mainItems = [
 ];
 
 const departmentItems = [
-{ title: "Content", url: "/departments/content", icon: Video },
+  { title: "Finance", url: "/departments/finance", icon: DollarSign },
+  { title: "Content", url: "/departments/content", icon: Video },
   { title: "Marketing", url: "/departments/marketing", icon: Megaphone },
   { title: "Sales", url: "/departments/sales", icon: Phone },
   { title: "Product", url: "/departments/community-management", icon: Users },
@@ -36,23 +39,20 @@ export function AppSidebar() {
   const { state } = useSidebar();
   const collapsed = state === "collapsed";
   return (
-    <Sidebar collapsible="icon" className="border-r border-border bg-white">
+    <Sidebar collapsible="icon" className="border-r border-border bg-card">
       <SidebarContent>
-        <div className="px-4 py-5 border-b border-border">
+        <div className="px-4 h-[76px] flex items-center border-b border-border">
           {!collapsed ? (
             <div className="flex items-center gap-2.5">
               <div className="rounded-lg bg-primary p-1.5">
-                <BarChart3 className="h-5 w-5 text-white" />
+                <Compass className="h-5 w-5 text-white" />
               </div>
-              <div>
-                <h1 className="text-sm font-bold tracking-tight text-foreground">Company Compass</h1>
-                <p className="text-[10px] text-muted-foreground">Operations Hub</p>
-              </div>
+              <h1 className="text-sm font-bold tracking-tight text-foreground">Company Compass</h1>
             </div>
           ) : (
             <div className="flex justify-center">
               <div className="rounded-lg bg-primary p-1.5">
-                <BarChart3 className="h-5 w-5 text-white" />
+                <Compass className="h-5 w-5 text-white" />
               </div>
             </div>
           )}
