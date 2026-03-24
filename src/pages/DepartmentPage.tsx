@@ -10,7 +10,8 @@ import { CircleCharts } from "@/components/CircleCharts";
 import { DepartmentCharts } from "@/components/DepartmentCharts";
 import CoachesDashboard from "@/pages/CoachesDashboard";
 import SuccessTrackingDashboard from "@/pages/SuccessTrackingDashboard";
-import { LayoutDashboard, BarChart3, Users, Shield, Trophy } from "lucide-react";
+import SupportDashboard from "@/pages/SupportDashboard";
+import { LayoutDashboard, BarChart3, Users, Shield, Trophy, HeadphonesIcon } from "lucide-react";
 
 const slugToDepartment: Record<string, Department> = {
   "evergreen-metrics": "Product",
@@ -20,7 +21,7 @@ const slugToDepartment: Record<string, Department> = {
   "community-management": "Product",
 };
 
-type Tab = "dashboard" | "charts" | "rep-metrics" | "coaches" | "success";
+type Tab = "dashboard" | "charts" | "rep-metrics" | "coaches" | "success" | "support";
 
 const tabs: { id: Tab; label: string; icon: React.ElementType }[] = [
   { id: "dashboard", label: "Overview", icon: LayoutDashboard },
@@ -31,6 +32,7 @@ const productTabs: { id: Tab; label: string; icon: React.ElementType }[] = [
   { id: "dashboard", label: "Overview",        icon: LayoutDashboard },
   { id: "coaches",   label: "Coaches",         icon: Shield },
   { id: "success",   label: "Success Tracker", icon: Trophy },
+  { id: "support",   label: "Support",         icon: HeadphonesIcon },
 ];
 
 const salesTabs: { id: Tab; label: string; icon: React.ElementType }[] = [
@@ -130,6 +132,8 @@ export default function DepartmentPage() {
       {activeTab === "coaches" && <CoachesDashboard />}
 
       {activeTab === "success" && <SuccessTrackingDashboard />}
+
+      {activeTab === "support" && <SupportDashboard />}
 
     </div>
   );

@@ -68,6 +68,15 @@ export default defineConfig(({ mode }) => {
             "Authorization": `Bearer ${env.TALLY_TOKEN}`,
           },
         },
+        "/api/intercom": {
+          target: "https://api.intercom.io",
+          changeOrigin: true,
+          rewrite: (path) => path.replace(/^\/api\/intercom/, ""),
+          headers: {
+            "Authorization": `Bearer ${env.INTERCOM_TOKEN}`,
+            "Accept": "application/json",
+          },
+        },
         "/api/supabase": {
           target: "https://unelmbldddpwzguttluq.supabase.co",
           changeOrigin: true,
