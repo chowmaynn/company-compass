@@ -3,6 +3,7 @@ import { departments, type StatusColor } from "@/data/scorecardData";
 import { DepartmentSection } from "@/components/DepartmentSection";
 import { useScorecard } from "@/hooks/use-scorecard";
 import { fetchAvailableMonths } from "@/lib/supabase-scorecard";
+import { useSelectedMonth } from "@/components/AppLayout";
 import { Loader2, ChevronDown } from "lucide-react";
 
 function formatMonth(m: string): string {
@@ -13,14 +14,16 @@ function formatMonth(m: string): string {
 
 export default function Scorecard() {
   const [availableMonths, setAvailableMonths] = useState<string[]>([]);
-  const [selectedMonth, setSelectedMonth] = useState("2026-03");
+  const { selectedMonth, setSelectedMonth } = useSelectedMonth();
   const { metrics, loading, error, updateMetric } = useScorecard(selectedMonth);
 
   useEffect(() => {
     fetchAvailableMonths().then((months) => {
       if (months.length > 0) {
         setAvailableMonths(months);
-        setSelectedMonth(months[0]); // most recent
+        if (!months.includes(selectedMonth)) {
+          setSelectedMonth(months[0]);
+        }
       }
     });
   }, []);

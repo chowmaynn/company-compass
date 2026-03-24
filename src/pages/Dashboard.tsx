@@ -2,7 +2,7 @@ import { useMemo, useState } from "react";
 import { Card, CardContent } from "@/components/ui/card";
 import { weekConfigs, type Metric } from "@/data/scorecardData";
 import { useScorecard } from "@/hooks/use-scorecard";
-import { useCurrency, useStatusModal } from "@/components/AppLayout";
+import { useCurrency, useStatusModal, useSelectedMonth } from "@/components/AppLayout";
 import {
   DollarSign,
   TrendingUp,
@@ -60,7 +60,8 @@ type ModalFilter = "ahead" | "onTrack" | "behind" | "offTrack" | null;
 // Modal state is now shared via useStatusModal() from AppLayout
 
 export default function Dashboard() {
-  const { metrics: scorecardData, loading } = useScorecard();
+  const { selectedMonth } = useSelectedMonth();
+  const { metrics: scorecardData, loading } = useScorecard(selectedMonth);
   const { convert, symbol } = useCurrency();
   const { activeFilter: activeModal, setActiveFilter: setActiveModal } = useStatusModal();
 
