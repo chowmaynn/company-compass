@@ -2,8 +2,7 @@ import { useMemo, useState } from "react";
 import { Card, CardContent } from "@/components/ui/card";
 import { weekConfigs, type Metric } from "@/data/scorecardData";
 import { useScorecard } from "@/hooks/use-scorecard";
-import { useCurrency } from "@/components/AppLayout";
-import { SummaryCards } from "@/components/SummaryCards";
+import { useCurrency, useStatusModal } from "@/components/AppLayout";
 import {
   DollarSign,
   TrendingUp,
@@ -57,12 +56,13 @@ function pctOfTarget(actual: number | string, target: number | string): number |
 
 // ── Component ────────────────────────────────────────────────
 
-type ModalFilter = "ahead" | "onTrack" | "atRisk" | "offTrack" | null;
+type ModalFilter = "ahead" | "onTrack" | "behind" | "offTrack" | null;
+// Modal state is now shared via useStatusModal() from AppLayout
 
 export default function Dashboard() {
   const { metrics: scorecardData, loading } = useScorecard();
   const { convert, symbol } = useCurrency();
-  const [activeModal, setActiveModal] = useState<ModalFilter>(null);
+  const { activeFilter: activeModal, setActiveFilter: setActiveModal } = useStatusModal();
 
   // Helper for currency display
   const formatCurrency = (val: number | string | undefined) => {
@@ -76,20 +76,20 @@ export default function Dashboard() {
     if (!activeModal) return [];
     if (activeModal === "ahead") return scorecardData.filter((m) => m.status === "light-green");
     if (activeModal === "onTrack") return scorecardData.filter((m) => m.status === "green");
-    if (activeModal === "atRisk") return scorecardData.filter((m) => m.status === "yellow");
+    if (activeModal === "behind") return scorecardData.filter((m) => m.status === "yellow");
     if (activeModal === "offTrack") return scorecardData.filter((m) => m.status === "red");
     return scorecardData;
   }, [activeModal, scorecardData]);
 
   const modalTitle = activeModal === "ahead" ? "Ahead"
     : activeModal === "onTrack" ? "On Track"
-    : activeModal === "atRisk" ? "Behind"
+    : activeModal === "behind" ? "Behind"
     : activeModal === "offTrack" ? "Off Track"
     : "";
 
   const modalAccent = activeModal === "ahead" ? { text: "text-status-light-green", bg: "bg-status-light-green/10", dot: "bg-status-light-green" }
     : activeModal === "onTrack" ? { text: "text-status-green", bg: "bg-status-green/10", dot: "bg-status-green" }
-    : activeModal === "atRisk" ? { text: "text-status-yellow", bg: "bg-status-yellow/10", dot: "bg-status-yellow" }
+    : activeModal === "behind" ? { text: "text-status-yellow", bg: "bg-status-yellow/10", dot: "bg-status-yellow" }
     : activeModal === "offTrack" ? { text: "text-status-red", bg: "bg-status-red/10", dot: "bg-status-red" }
     : { text: "text-primary", bg: "bg-primary/10", dot: "bg-primary" };
 
@@ -116,7 +116,7 @@ const revPct = pctOfTarget(revenue?.monthlyActual ?? 0, revenue?.monthlyTarget ?
     <div className="p-6 space-y-6 max-w-[1440px] mx-auto">
       {/* ── Status Overview Row ─────────────────────────────── */}
 
-      <SummaryCards metrics={scorecardData} />
+      {/* Status cards moved to navbar */}
 
       {/* ── Financial Overview + Revenue Chart ──────────────── */}
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">

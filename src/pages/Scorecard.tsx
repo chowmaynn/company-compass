@@ -1,6 +1,5 @@
 import { useState, useEffect } from "react";
 import { departments, type StatusColor } from "@/data/scorecardData";
-import { SummaryCards } from "@/components/SummaryCards";
 import { DepartmentSection } from "@/components/DepartmentSection";
 import { useScorecard } from "@/hooks/use-scorecard";
 import { fetchAvailableMonths } from "@/lib/supabase-scorecard";
@@ -66,7 +65,7 @@ export default function Scorecard() {
         </div>
       </div>
 
-      <SummaryCards metrics={metrics} />
+      {/* Status cards in navbar */}
 
       <div className="space-y-8">
         {departments.map((dept) => (

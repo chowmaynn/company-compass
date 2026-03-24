@@ -2,9 +2,11 @@ import { SidebarProvider, SidebarTrigger } from "@/components/ui/sidebar";
 import { AppSidebar } from "@/components/AppSidebar";
 import { Outlet, useLocation } from "react-router-dom";
 import { isAuthorized, getAuthUrl, clearTokens } from "@/lib/youtube-auth";
-import { LogIn, LogOut, Sun, Moon } from "lucide-react";
+import { LogIn, LogOut, Sun, Moon, TrendingUp, CheckCircle2, AlertTriangle, XCircle } from "lucide-react";
 import { useState, useEffect, createContext, useContext } from "react";
 import { useExchangeRate } from "@/hooks/use-exchange-rate";
+import { useScorecard } from "@/hooks/use-scorecard";
+import type { StatusFilter } from "@/components/SummaryCards";
 
 // --- Currency context (global) ---
 interface CurrencyCtx {
@@ -37,6 +39,58 @@ function CurrencyToggle({ currency, setCurrency }: { currency: "NZD" | "USD"; se
       <span>{currency === "NZD" ? "🇳🇿" : "🇺🇸"}</span>
       <span>{currency}</span>
     </button>
+  );
+}
+
+// --- Status modal context (so navbar cards can trigger Dashboard modal) ---
+interface StatusModalCtx {
+  activeFilter: StatusFilter | null;
+  setActiveFilter: (f: StatusFilter | null) => void;
+}
+const StatusModalContext = createContext<StatusModalCtx>({
+  activeFilter: null,
+  setActiveFilter: () => {},
+});
+export function useStatusModal() {
+  return useContext(StatusModalContext);
+}
+
+function NavStatusCards({ onCardClick }: { onCardClick: (f: StatusFilter) => void }) {
+  const { metrics } = useScorecard();
+  const counts = metrics.reduce(
+    (acc, m) => {
+      if (m.status === "light-green") acc.ahead++;
+      else if (m.status === "green") acc.onTrack++;
+      else if (m.status === "yellow") acc.behind++;
+      else acc.offTrack++;
+      return acc;
+    },
+    { ahead: 0, onTrack: 0, behind: 0, offTrack: 0 }
+  );
+
+  const cards = [
+    { filter: "ahead" as StatusFilter, count: counts.ahead, icon: TrendingUp, color: "text-status-light-green", bg: "bg-status-light-green/10 border-status-light-green/20", label: "Ahead" },
+    { filter: "onTrack" as StatusFilter, count: counts.onTrack, icon: CheckCircle2, color: "text-status-green", bg: "bg-status-green/10 border-status-green/20", label: "On Track" },
+    { filter: "behind" as StatusFilter, count: counts.behind, icon: AlertTriangle, color: "text-status-yellow", bg: "bg-status-yellow/10 border-status-yellow/20", label: "Behind" },
+    { filter: "offTrack" as StatusFilter, count: counts.offTrack, icon: XCircle, color: "text-status-red", bg: "bg-status-red/10 border-status-red/20", label: "Off Track" },
+  ];
+
+  if (metrics.length === 0) return null;
+
+  return (
+    <div className="flex items-center gap-2">
+      {cards.map((c) => (
+        <button
+          key={c.filter}
+          onClick={() => onCardClick(c.filter)}
+          className={`flex items-center gap-2 rounded-lg border px-3 py-1.5 transition-all hover:scale-[1.03] cursor-pointer ${c.bg}`}
+        >
+          <c.icon className={`h-3.5 w-3.5 ${c.color}`} />
+          <span className={`text-sm font-bold ${c.color}`}>{c.count}</span>
+          <span className="text-[10px] font-medium text-muted-foreground uppercase tracking-wider">{c.label}</span>
+        </button>
+      ))}
+    </div>
   );
 }
 
@@ -114,6 +168,7 @@ export function AppLayout() {
     (localStorage.getItem("currency") as "NZD" | "USD") || "NZD"
   );
   const { rate } = useExchangeRate();
+  const [statusFilter, setStatusFilter] = useState<StatusFilter | null>(null);
 
   useEffect(() => {
     localStorage.setItem("currency", currency);
@@ -129,6 +184,7 @@ export function AppLayout() {
 
   return (
     <CurrencyContext.Provider value={currencyCtx}>
+    <StatusModalContext.Provider value={{ activeFilter: statusFilter, setActiveFilter: setStatusFilter }}>
     <SidebarProvider>
       <div className="min-h-screen flex w-full bg-background">
         <AppSidebar />
@@ -138,10 +194,14 @@ export function AppLayout() {
               <SidebarTrigger />
               <h2 className="text-xl font-semibold text-foreground">{title}</h2>
             </div>
-            <div className="flex items-center gap-2">
-              <CurrencyToggle currency={currency} setCurrency={setCurrency} />
-              <ThemeToggle />
-              <GoogleAuthButton />
+            <div className="flex items-center gap-3">
+              <NavStatusCards onCardClick={(f) => setStatusFilter(f)} />
+              <div className="h-6 w-px bg-border" />
+              <div className="flex items-center gap-2">
+                <CurrencyToggle currency={currency} setCurrency={setCurrency} />
+                <ThemeToggle />
+                <GoogleAuthButton />
+              </div>
             </div>
           </header>
           <main className="flex-1 overflow-auto">
@@ -150,6 +210,7 @@ export function AppLayout() {
         </div>
       </div>
     </SidebarProvider>
+    </StatusModalContext.Provider>
     </CurrencyContext.Provider>
   );
 }
