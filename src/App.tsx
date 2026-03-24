@@ -23,7 +23,7 @@ const App = () => (
             <Route path="/" element={<Dashboard />} />
             <Route path="/scorecard" element={<Scorecard />} />
             <Route path="/departments/:slug" element={<DepartmentPage />} />
-          </Route>
+    </Route>
           <Route path="/oauth/callback" element={<OAuthCallback />} />
           <Route path="*" element={<NotFound />} />
         </Routes>

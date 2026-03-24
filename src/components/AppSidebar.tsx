@@ -6,7 +6,6 @@ import {
   Megaphone,
   Phone,
   Users,
-  TrendingUp,
 } from "lucide-react";
 import { NavLink } from "@/components/NavLink";
 import {
@@ -27,8 +26,7 @@ const mainItems = [
 ];
 
 const departmentItems = [
-  { title: "Evergreen Metrics", url: "/departments/evergreen-metrics", icon: TrendingUp },
-  { title: "Content", url: "/departments/content", icon: Video },
+{ title: "Content", url: "/departments/content", icon: Video },
   { title: "Marketing", url: "/departments/marketing", icon: Megaphone },
   { title: "Sales", url: "/departments/sales", icon: Phone },
   { title: "Product", url: "/departments/community-management", icon: Users },

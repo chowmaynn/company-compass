@@ -1,15 +1,16 @@
 import { useState } from "react";
 import { useParams, Navigate } from "react-router-dom";
 import { scorecardData as initialData, type Department, type Metric } from "@/data/scorecardData";
+
 import { DepartmentSection } from "@/components/DepartmentSection";
-import { SummaryCards } from "@/components/SummaryCards";
 import { ProductDashboard } from "@/components/ProductDashboard";
 import { SalesDashboard } from "@/components/SalesDashboard";
 import { RepMetrics } from "@/components/RepMetrics";
 import { CircleCharts } from "@/components/CircleCharts";
 import { DepartmentCharts } from "@/components/DepartmentCharts";
-import { MetricTable } from "@/components/MetricTable";
-import { LayoutDashboard, ClipboardList, BarChart3, Table2, Users } from "lucide-react";
+import CoachesDashboard from "@/pages/CoachesDashboard";
+import SuccessTrackingDashboard from "@/pages/SuccessTrackingDashboard";
+import { LayoutDashboard, BarChart3, Users, Shield, Trophy } from "lucide-react";
 
 const slugToDepartment: Record<string, Department> = {
   "evergreen-metrics": "Product",
@@ -19,18 +20,21 @@ const slugToDepartment: Record<string, Department> = {
   "community-management": "Product",
 };
 
-type Tab = "dashboard" | "scorecard" | "charts" | "rep-metrics";
-type ScorecardView = "table" | "charts";
+type Tab = "dashboard" | "charts" | "rep-metrics" | "coaches" | "success";
 
 const tabs: { id: Tab; label: string; icon: React.ElementType }[] = [
-  { id: "dashboard",   label: "Dashboard",   icon: LayoutDashboard },
-  { id: "scorecard",   label: "Scorecard",   icon: ClipboardList },
-  { id: "charts",      label: "Charts",      icon: BarChart3 },
+  { id: "dashboard", label: "Overview", icon: LayoutDashboard },
+  { id: "charts",    label: "Charts",   icon: BarChart3 },
+];
+
+const productTabs: { id: Tab; label: string; icon: React.ElementType }[] = [
+  { id: "dashboard", label: "Overview",        icon: LayoutDashboard },
+  { id: "coaches",   label: "Coaches",         icon: Shield },
+  { id: "success",   label: "Success Tracker", icon: Trophy },
 ];
 
 const salesTabs: { id: Tab; label: string; icon: React.ElementType }[] = [
   { id: "dashboard",   label: "Dashboard",   icon: LayoutDashboard },
-  { id: "scorecard",   label: "Scorecard",   icon: ClipboardList },
   { id: "rep-metrics", label: "Rep Metrics", icon: Users },
 ];
 
@@ -39,7 +43,6 @@ export default function DepartmentPage() {
   const department = slug ? slugToDepartment[slug] : undefined;
 
   const [activeTab, setActiveTab] = useState<Tab>("dashboard");
-  const [scorecardView, setScorecardView] = useState<ScorecardView>("table");
   const [metrics, setMetrics] = useState<Metric[]>(initialData);
 
   if (!department) return <Navigate to="/" replace />;
@@ -80,7 +83,7 @@ export default function DepartmentPage() {
 
       {/* ── Tab Toggle ────────────────────────────────────── */}
       <div className="flex items-center gap-1 bg-muted rounded-lg p-1 w-fit">
-        {(isSales ? salesTabs : tabs).map((tab) => {
+        {(isSales ? salesTabs : isProduct ? productTabs : tabs).map((tab) => {
           const Icon = tab.icon;
           return (
             <button
@@ -114,43 +117,6 @@ export default function DepartmentPage() {
         )
       )}
 
-      {activeTab === "scorecard" && (
-        <div className="space-y-4">
-          <SummaryCards metrics={deptMetrics} />
-          {/* Table / Chart sub-toggle */}
-          <div className="flex items-center gap-1 bg-muted rounded-lg p-1 w-fit">
-            <button
-              onClick={() => setScorecardView("table")}
-              className={`flex items-center gap-2 px-3 py-1.5 rounded-md text-sm font-medium transition-all ${
-                scorecardView === "table"
-                  ? "bg-white text-foreground shadow-sm"
-                  : "text-muted-foreground hover:text-foreground"
-              }`}
-            >
-              <Table2 className="h-3.5 w-3.5" />
-              Table
-            </button>
-            <button
-              onClick={() => setScorecardView("charts")}
-              className={`flex items-center gap-2 px-3 py-1.5 rounded-md text-sm font-medium transition-all ${
-                scorecardView === "charts"
-                  ? "bg-white text-foreground shadow-sm"
-                  : "text-muted-foreground hover:text-foreground"
-              }`}
-            >
-              <BarChart3 className="h-3.5 w-3.5" />
-              Charts
-            </button>
-          </div>
-
-          {scorecardView === "table" ? (
-            <MetricTable metrics={deptMetrics} onMetricChange={handleMetricChange} />
-          ) : (
-            <DepartmentCharts metrics={deptMetrics} />
-          )}
-        </div>
-      )}
-
       {activeTab === "charts" && (
         isProduct ? (
           <CircleCharts />
@@ -160,6 +126,10 @@ export default function DepartmentPage() {
       )}
 
       {activeTab === "rep-metrics" && <RepMetrics />}
+
+      {activeTab === "coaches" && <CoachesDashboard />}
+
+      {activeTab === "success" && <SuccessTrackingDashboard />}
 
     </div>
   );

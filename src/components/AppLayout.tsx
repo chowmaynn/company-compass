@@ -6,8 +6,7 @@ import { Bell, Settings } from "lucide-react";
 const pageTitles: Record<string, string> = {
   "/": "Dashboard",
   "/scorecard": "Scorecard",
-  "/departments/evergreen-metrics": "Evergreen Metrics",
-  "/departments/content": "Content",
+"/departments/content": "Content",
   "/departments/marketing": "Marketing",
   "/departments/sales": "Sales",
   "/departments/community-management": "Community",
