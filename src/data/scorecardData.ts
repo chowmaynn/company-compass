@@ -37,6 +37,25 @@ export const weekConfigs: WeekConfig[] = [
 
 export const scorecardMonth = "March 2026";
 
+/** Returns 0-3 for the current active week, 4 if past all weeks, -1 if before month */
+export function getCurrentWeekIndex(): number {
+  const now = new Date();
+  for (let i = 0; i < weekConfigs.length; i++) {
+    if (now >= new Date(weekConfigs[i].start) && now < new Date(weekConfigs[i].end)) return i;
+  }
+  if (now >= new Date(weekConfigs[weekConfigs.length - 1].end)) return weekConfigs.length;
+  return -1;
+}
+
+/** Returns the index of the most recently completed week (0-3), or -1 if none completed */
+export function getCompletedWeekIndex(): number {
+  const now = new Date();
+  for (let i = weekConfigs.length - 1; i >= 0; i--) {
+    if (now >= new Date(weekConfigs[i].end)) return i;
+  }
+  return -1;
+}
+
 export const statusOptions: { value: StatusColor; label: string }[] = [
   { value: "light-green", label: "Ahead" },
   { value: "green", label: "On Track" },

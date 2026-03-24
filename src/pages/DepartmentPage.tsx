@@ -14,6 +14,7 @@ import SupportDashboard from "@/pages/SupportDashboard";
 import { LayoutDashboard, BarChart3, Users, Shield, Trophy, HeadphonesIcon } from "lucide-react";
 
 const slugToDepartment: Record<string, Department> = {
+  "finance": "Finance",
   "evergreen-metrics": "Product",
   "content": "Content",
   "marketing": "Marketing",
@@ -93,7 +94,7 @@ export default function DepartmentPage() {
               onClick={() => setActiveTab(tab.id)}
               className={`flex items-center gap-2 px-4 py-2 rounded-md text-sm font-medium transition-all ${
                 activeTab === tab.id
-                  ? "bg-white text-foreground shadow-sm"
+                  ? "bg-card text-foreground shadow-sm"
                   : "text-muted-foreground hover:text-foreground"
               }`}
             >

@@ -87,7 +87,7 @@ function StatCard({
 function RevenueTooltip({ active, payload, label }: { active?: boolean; payload?: Array<{ value: number }>; label?: string }) {
   if (!active || !payload?.length) return null;
   return (
-    <div className="bg-white border border-border rounded-lg shadow-lg px-3 py-2 text-xs">
+    <div className="bg-card border border-border rounded-lg shadow-lg px-3 py-2 text-xs">
       <p className="font-semibold text-foreground mb-1">{label}</p>
       <p className="text-emerald-600 font-bold">{fmtRevenue(payload[0].value)}</p>
     </div>
@@ -97,7 +97,7 @@ function RevenueTooltip({ active, payload, label }: { active?: boolean; payload?
 function CountTooltip({ active, payload, label }: { active?: boolean; payload?: Array<{ value: number }>; label?: string }) {
   if (!active || !payload?.length) return null;
   return (
-    <div className="bg-white border border-border rounded-lg shadow-lg px-3 py-2 text-xs">
+    <div className="bg-card border border-border rounded-lg shadow-lg px-3 py-2 text-xs">
       <p className="font-semibold text-foreground mb-1">{label}</p>
       <p className="text-indigo-600 font-bold">{payload[0].value} wins</p>
     </div>

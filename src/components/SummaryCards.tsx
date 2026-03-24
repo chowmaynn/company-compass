@@ -1,11 +1,14 @@
 import { type Metric, type StatusColor } from "@/data/scorecardData";
 import { TrendingUp, TrendingDown, AlertTriangle, CheckCircle2, XCircle } from "lucide-react";
 
+export type StatusFilter = "ahead" | "onTrack" | "behind" | "offTrack";
+
 interface SummaryCardsProps {
   metrics: Metric[];
+  onCardClick?: (filter: StatusFilter) => void;
 }
 
-export function SummaryCards({ metrics }: SummaryCardsProps) {
+export function SummaryCards({ metrics, onCardClick }: SummaryCardsProps) {
   const statusCounts = metrics.reduce(
     (acc, m) => {
       if (m.status === "light-green") acc.ahead++;
@@ -17,34 +20,42 @@ export function SummaryCards({ metrics }: SummaryCardsProps) {
     { ahead: 0, onTrack: 0, behind: 0, atRisk: 0 }
   );
 
-  const cards = [
+  const cards: { label: string; filter: StatusFilter; value: number; icon: typeof TrendingUp; accent: string; bg: string; border: string }[] = [
     {
       label: "Ahead",
+      filter: "ahead",
       value: statusCounts.ahead,
       icon: TrendingUp,
       accent: "text-status-light-green",
       bg: "bg-status-light-green/10",
+      border: "hover:border-status-light-green/40",
     },
     {
       label: "On Track",
+      filter: "onTrack",
       value: statusCounts.onTrack,
       icon: CheckCircle2,
       accent: "text-status-green",
       bg: "bg-status-green/10",
+      border: "hover:border-status-green/40",
     },
     {
       label: "Behind",
+      filter: "behind",
       value: statusCounts.behind,
       icon: AlertTriangle,
       accent: "text-status-yellow",
       bg: "bg-status-yellow/10",
+      border: "hover:border-status-yellow/40",
     },
     {
       label: "At Risk",
+      filter: "offTrack",
       value: statusCounts.atRisk,
       icon: XCircle,
       accent: "text-status-red",
       bg: "bg-status-red/10",
+      border: "hover:border-status-red/40",
     },
   ];
 
@@ -53,7 +64,8 @@ export function SummaryCards({ metrics }: SummaryCardsProps) {
       {cards.map((card) => (
         <div
           key={card.label}
-          className="rounded-xl border border-border bg-card p-5 card-shadow transition-all hover:border-primary/30"
+          onClick={() => onCardClick?.(card.filter)}
+          className={`rounded-xl border border-border bg-card p-5 card-shadow transition-all ${card.border} ${onCardClick ? "cursor-pointer" : ""}`}
         >
           <div className="flex items-center justify-between">
             <p className="text-sm font-medium text-muted-foreground">{card.label}</p>

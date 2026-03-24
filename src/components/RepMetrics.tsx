@@ -44,7 +44,7 @@ function StatPanel({ items, loading }: {
   loading?: boolean;
 }) {
   return (
-    <div className="grid divide-x divide-border bg-white rounded-2xl border border-border overflow-hidden"
+    <div className="grid divide-x divide-border bg-card rounded-2xl border border-border overflow-hidden"
       style={{ gridTemplateColumns: `repeat(${items.length}, minmax(0, 1fr))` }}>
       {items.map((item) => (
         <div key={item.label} className="px-6 py-5">
@@ -211,7 +211,7 @@ export function RepMetrics() {
               className={`px-4 py-2 rounded-full text-sm font-medium transition-all border ${
                 active
                   ? "text-white border-transparent shadow-sm"
-                  : "bg-white text-muted-foreground border-border hover:text-foreground"
+                  : "bg-card text-muted-foreground border-border hover:text-foreground"
               }`}
               style={active ? { backgroundColor: accent, borderColor: accent } : {}}
             >

@@ -1,6 +1,8 @@
 import { useMemo, useState } from "react";
 import { Card, CardContent } from "@/components/ui/card";
-import { scorecardData, weekConfigs, type Metric } from "@/data/scorecardData";
+import { weekConfigs, type Metric } from "@/data/scorecardData";
+import { useScorecard } from "@/hooks/use-scorecard";
+import { useCurrency, useStatusModal, useSelectedMonth } from "@/components/AppLayout";
 import {
   DollarSign,
   TrendingUp,
@@ -13,9 +15,6 @@ import {
   Zap,
   Globe,
   ShieldCheck,
-  AlertTriangle,
-  XCircle,
-  CheckCircle2,
   X,
 } from "lucide-react";
 import {
@@ -57,39 +56,41 @@ function pctOfTarget(actual: number | string, target: number | string): number |
 
 // ── Component ────────────────────────────────────────────────
 
-type ModalFilter = "onTrack" | "atRisk" | "offTrack" | "total" | null;
+type ModalFilter = "ahead" | "onTrack" | "behind" | "offTrack" | null;
+// Modal state is now shared via useStatusModal() from AppLayout
 
 export default function Dashboard() {
-  const [activeModal, setActiveModal] = useState<ModalFilter>(null);
+  const { selectedMonth } = useSelectedMonth();
+  const { metrics: scorecardData, loading } = useScorecard(selectedMonth);
+  const { convert, symbol } = useCurrency();
+  const { activeFilter: activeModal, setActiveFilter: setActiveModal } = useStatusModal();
 
-  const statusSummary = useMemo(() =>
-    scorecardData.reduce(
-      (acc, m) => {
-        if (m.status === "green" || m.status === "light-green") acc.onTrack++;
-        else if (m.status === "yellow") acc.atRisk++;
-        else acc.offTrack++;
-        acc.total++;
-        return acc;
-      },
-      { onTrack: 0, atRisk: 0, offTrack: 0, total: 0 }
-    ), []
-  );
+  // Helper for currency display
+  const formatCurrency = (val: number | string | undefined) => {
+    if (!val || val === "—") return "—";
+    const n = parseNum(String(val));
+    return n !== null ? `${symbol}${compactNumber(convert(n))}` : String(val);
+  };
+
 
   const modalMetrics = useMemo((): Metric[] => {
     if (!activeModal) return [];
-    if (activeModal === "onTrack") return scorecardData.filter((m) => m.status === "green" || m.status === "light-green");
-    if (activeModal === "atRisk") return scorecardData.filter((m) => m.status === "yellow");
+    if (activeModal === "ahead") return scorecardData.filter((m) => m.status === "light-green");
+    if (activeModal === "onTrack") return scorecardData.filter((m) => m.status === "green");
+    if (activeModal === "behind") return scorecardData.filter((m) => m.status === "yellow");
     if (activeModal === "offTrack") return scorecardData.filter((m) => m.status === "red");
     return scorecardData;
-  }, [activeModal]);
+  }, [activeModal, scorecardData]);
 
-  const modalTitle = activeModal === "onTrack" ? "On Track"
-    : activeModal === "atRisk" ? "At Risk"
+  const modalTitle = activeModal === "ahead" ? "Ahead"
+    : activeModal === "onTrack" ? "On Track"
+    : activeModal === "behind" ? "Behind"
     : activeModal === "offTrack" ? "Off Track"
-    : "All KPIs";
+    : "";
 
-  const modalAccent = activeModal === "onTrack" ? { text: "text-status-green", bg: "bg-status-green/10", dot: "bg-status-green" }
-    : activeModal === "atRisk" ? { text: "text-status-yellow", bg: "bg-status-yellow/10", dot: "bg-status-yellow" }
+  const modalAccent = activeModal === "ahead" ? { text: "text-status-light-green", bg: "bg-status-light-green/10", dot: "bg-status-light-green" }
+    : activeModal === "onTrack" ? { text: "text-status-green", bg: "bg-status-green/10", dot: "bg-status-green" }
+    : activeModal === "behind" ? { text: "text-status-yellow", bg: "bg-status-yellow/10", dot: "bg-status-yellow" }
     : activeModal === "offTrack" ? { text: "text-status-red", bg: "bg-status-red/10", dot: "bg-status-red" }
     : { text: "text-primary", bg: "bg-primary/10", dot: "bg-primary" };
 
@@ -114,84 +115,9 @@ const revPct = pctOfTarget(revenue?.monthlyActual ?? 0, revenue?.monthlyTarget ?
 
   return (
     <div className="p-6 space-y-6 max-w-[1440px] mx-auto">
-      {/* ── Header ─────────────────────────────────────────── */}
-      <div className="flex items-center justify-between">
-        <div>
-          <div className="flex items-center gap-3">
-            <div className="h-10 w-10 rounded-xl gradient-pink-blue flex items-center justify-center">
-              <Activity className="h-5 w-5 text-white" />
-            </div>
-            <div>
-              <h1 className="text-2xl font-bold tracking-tight gradient-text">Mission Terminal</h1>
-              <p className="text-xs text-muted-foreground font-mono">
-                COMPANY OVERVIEW — MARCH 2026
-              </p>
-            </div>
-          </div>
-        </div>
-        <div className="flex items-center gap-2">
-          <span className="inline-flex items-center gap-1.5 rounded-full bg-status-green/15 px-3 py-1 text-xs font-medium text-status-green">
-            <span className="h-1.5 w-1.5 rounded-full bg-status-green animate-pulse" />
-            Live
-          </span>
-        </div>
-      </div>
-
       {/* ── Status Overview Row ─────────────────────────────── */}
-      <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-        <button onClick={() => setActiveModal("onTrack")} className="text-left">
-          <Card className="border-status-green/30 bg-status-green/5 hover:bg-status-green/10 transition-colors cursor-pointer">
-            <CardContent className="p-4 flex items-center gap-3">
-              <div className="h-10 w-10 rounded-xl bg-status-green/15 flex items-center justify-center">
-                <CheckCircle2 className="h-5 w-5 text-status-green" />
-              </div>
-              <div>
-                <p className="text-2xl font-bold text-status-green">{statusSummary.onTrack}</p>
-                <p className="text-[11px] text-muted-foreground font-medium uppercase tracking-wider">On Track</p>
-              </div>
-            </CardContent>
-          </Card>
-        </button>
-        <button onClick={() => setActiveModal("atRisk")} className="text-left">
-          <Card className="border-status-yellow/30 bg-status-yellow/5 hover:bg-status-yellow/10 transition-colors cursor-pointer">
-            <CardContent className="p-4 flex items-center gap-3">
-              <div className="h-10 w-10 rounded-xl bg-status-yellow/15 flex items-center justify-center">
-                <AlertTriangle className="h-5 w-5 text-status-yellow" />
-              </div>
-              <div>
-                <p className="text-2xl font-bold text-status-yellow">{statusSummary.atRisk}</p>
-                <p className="text-[11px] text-muted-foreground font-medium uppercase tracking-wider">At Risk</p>
-              </div>
-            </CardContent>
-          </Card>
-        </button>
-        <button onClick={() => setActiveModal("offTrack")} className="text-left">
-          <Card className="border-status-red/30 bg-status-red/5 hover:bg-status-red/10 transition-colors cursor-pointer">
-            <CardContent className="p-4 flex items-center gap-3">
-              <div className="h-10 w-10 rounded-xl bg-status-red/15 flex items-center justify-center">
-                <XCircle className="h-5 w-5 text-status-red" />
-              </div>
-              <div>
-                <p className="text-2xl font-bold text-status-red">{statusSummary.offTrack}</p>
-                <p className="text-[11px] text-muted-foreground font-medium uppercase tracking-wider">Off Track</p>
-              </div>
-            </CardContent>
-          </Card>
-        </button>
-        <button onClick={() => setActiveModal("total")} className="text-left">
-          <Card className="border-primary/30 bg-primary/5 hover:bg-primary/10 transition-colors cursor-pointer">
-            <CardContent className="p-4 flex items-center gap-3">
-              <div className="h-10 w-10 rounded-xl bg-primary/15 flex items-center justify-center">
-                <Target className="h-5 w-5 text-primary" />
-              </div>
-              <div>
-                <p className="text-2xl font-bold text-foreground">{statusSummary.total}</p>
-                <p className="text-[11px] text-muted-foreground font-medium uppercase tracking-wider">Total KPIs</p>
-              </div>
-            </CardContent>
-          </Card>
-        </button>
-      </div>
+
+      {/* Status cards moved to navbar */}
 
       {/* ── Financial Overview + Revenue Chart ──────────────── */}
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
@@ -206,9 +132,9 @@ const revPct = pctOfTarget(revenue?.monthlyActual ?? 0, revenue?.monthlyTarget ?
                 <span className="text-sm font-medium text-muted-foreground">Revenue</span>
               </div>
               <p className="text-3xl font-bold tracking-tight text-foreground">
-                ${typeof revenue?.monthlyActual === "number" ? compactNumber(revenue.monthlyActual) : revenue?.monthlyActual}
+                {formatCurrency(revenue?.monthlyActual)}
               </p>
-              <p className="text-xs text-muted-foreground mt-1">Target: {revenue?.monthlyTarget}</p>
+              <p className="text-xs text-muted-foreground mt-1">Target: {formatCurrency(revenue?.monthlyTarget)}</p>
               {revPct !== null && (
                 <div className="mt-3">
                   <div className="flex justify-between text-xs mb-1.5">
@@ -232,9 +158,9 @@ const revPct = pctOfTarget(revenue?.monthlyActual ?? 0, revenue?.monthlyTarget ?
                 <span className="text-sm font-medium text-muted-foreground">Cash Collected</span>
               </div>
               <p className="text-3xl font-bold tracking-tight text-foreground">
-                ${typeof cash?.monthlyActual === "number" ? compactNumber(cash.monthlyActual) : cash?.monthlyActual}
+                {formatCurrency(cash?.monthlyActual)}
               </p>
-              <p className="text-xs text-muted-foreground mt-1">Target: {cash?.monthlyTarget}</p>
+              <p className="text-xs text-muted-foreground mt-1">Target: {formatCurrency(cash?.monthlyTarget)}</p>
               {cashPct !== null && (
                 <div className="mt-3">
                   <div className="flex justify-between text-xs mb-1.5">
@@ -392,7 +318,7 @@ const revPct = pctOfTarget(revenue?.monthlyActual ?? 0, revenue?.monthlyTarget ?
 
           {/* Panel */}
           <div
-            className="relative bg-white rounded-2xl shadow-2xl w-full max-w-2xl max-h-[80vh] flex flex-col overflow-hidden"
+            className="relative bg-card rounded-2xl shadow-2xl w-full max-w-2xl max-h-[80vh] flex flex-col overflow-hidden"
             onClick={(e) => e.stopPropagation()}
           >
             {/* Header */}
@@ -434,7 +360,7 @@ const revPct = pctOfTarget(revenue?.monthlyActual ?? 0, revenue?.monthlyTarget ?
                   m.status === "green" || m.status === "light-green"
                     ? "On Track"
                     : m.status === "yellow"
-                    ? "At Risk"
+                    ? "Behind"
                     : "Off Track";
                 const statusText =
                   m.status === "green" || m.status === "light-green"
