@@ -39,7 +39,7 @@ export interface Transaction {
 
 export async function fetchTransactions(): Promise<Transaction[]> {
   const params = new URLSearchParams();
-  // Airtable sort uses array notation, not JSON
+  params.set("maxRecords", "600"); // ~1 year of data, avoids full pagination
   params.append("sort[0][field]", "Payment Date");
   params.append("sort[0][direction]", "desc");
   [
@@ -84,6 +84,7 @@ export interface Member {
 
 export async function fetchMembers(): Promise<Member[]> {
   const params = new URLSearchParams();
+  params.set("maxRecords", "500");
   ["Customer Name", "Status", "Plan Name", "Total Amount Paid (Payment Plan or Full Payment)", "Current Last Payment Status"]
     .forEach((f) => params.append("fields[]", f));
 
@@ -116,6 +117,7 @@ export interface FailedPayment {
 
 export async function fetchFailedPayments(): Promise<FailedPayment[]> {
   const params = new URLSearchParams();
+  params.set("maxRecords", "100");
   params.append("sort[0][field]", "Created time");
   params.append("sort[0][direction]", "desc");
   ["Customer", "Email", "Subscription Plan", "Status", "Next Follow Up"]
@@ -150,6 +152,7 @@ export interface CancellationRequest {
 
 export async function fetchCancellationRequests(): Promise<CancellationRequest[]> {
   const params = new URLSearchParams();
+  params.set("maxRecords", "300");
   params.append("sort[0][field]", "Date of Submission");
   params.append("sort[0][direction]", "desc");
   ["Full Name", "Cancellation Reason", "Status", "Date of Submission"]
