@@ -11,7 +11,8 @@ import { DepartmentCharts } from "@/components/DepartmentCharts";
 import CoachesDashboard from "@/pages/CoachesDashboard";
 import SuccessTrackingDashboard from "@/pages/SuccessTrackingDashboard";
 import SupportDashboard from "@/pages/SupportDashboard";
-import { LayoutDashboard, BarChart3, Users, Shield, Trophy, HeadphonesIcon } from "lucide-react";
+import FinanceDashboard from "@/pages/FinanceDashboard";
+import { LayoutDashboard, BarChart3, Users, Shield, Trophy, HeadphonesIcon, DollarSign } from "lucide-react";
 
 const slugToDepartment: Record<string, Department> = {
   "finance": "Finance",
@@ -22,7 +23,7 @@ const slugToDepartment: Record<string, Department> = {
   "community-management": "Product",
 };
 
-type Tab = "dashboard" | "charts" | "rep-metrics" | "coaches" | "success" | "support";
+type Tab = "dashboard" | "charts" | "rep-metrics" | "coaches" | "success" | "support" | "finance";
 
 const tabs: { id: Tab; label: string; icon: React.ElementType }[] = [
   { id: "dashboard", label: "Overview", icon: LayoutDashboard },
@@ -41,11 +42,16 @@ const salesTabs: { id: Tab; label: string; icon: React.ElementType }[] = [
   { id: "rep-metrics", label: "Rep Metrics", icon: Users },
 ];
 
+const financeTabs: { id: Tab; label: string; icon: React.ElementType }[] = [
+  { id: "finance",     label: "Overview",    icon: DollarSign },
+  { id: "charts",      label: "Scorecard",   icon: BarChart3 },
+];
+
 export default function DepartmentPage() {
   const { slug } = useParams<{ slug: string }>();
   const department = slug ? slugToDepartment[slug] : undefined;
 
-  const [activeTab, setActiveTab] = useState<Tab>("dashboard");
+  const [activeTab, setActiveTab] = useState<Tab>(slug === "finance" ? "finance" : "dashboard");
   const [metrics, setMetrics] = useState<Metric[]>(initialData);
 
   if (!department) return <Navigate to="/" replace />;
@@ -74,6 +80,7 @@ export default function DepartmentPage() {
 
   const isProduct = department === "Product";
   const isSales = department === "Sales";
+  const isFinance = department === "Finance";
 
   return (
     <div className="p-6 max-w-7xl mx-auto space-y-6">
@@ -86,7 +93,7 @@ export default function DepartmentPage() {
 
       {/* ── Tab Toggle ────────────────────────────────────── */}
       <div className="flex items-center gap-1 bg-muted rounded-lg p-1 w-fit">
-        {(isSales ? salesTabs : isProduct ? productTabs : tabs).map((tab) => {
+        {(isFinance ? financeTabs : isSales ? salesTabs : isProduct ? productTabs : tabs).map((tab) => {
           const Icon = tab.icon;
           return (
             <button
@@ -106,6 +113,8 @@ export default function DepartmentPage() {
       </div>
 
       {/* ── Tab Content ───────────────────────────────────── */}
+      {activeTab === "finance" && <FinanceDashboard />}
+
       {activeTab === "dashboard" && (
         isProduct ? (
           <ProductDashboard />

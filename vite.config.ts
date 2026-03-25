@@ -77,6 +77,14 @@ export default defineConfig(({ mode }) => {
             "Accept": "application/json",
           },
         },
+        "/api/stripe": {
+          target: "https://api.stripe.com",
+          changeOrigin: true,
+          rewrite: (path) => path.replace(/^\/api\/stripe/, ""),
+          headers: {
+            "Authorization": `Basic ${Buffer.from(env.STRIPE_SECRET_KEY + ":").toString("base64")}`,
+          },
+        },
         "/api/supabase": {
           target: "https://unelmbldddpwzguttluq.supabase.co",
           changeOrigin: true,
