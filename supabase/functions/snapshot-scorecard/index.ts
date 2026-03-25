@@ -185,7 +185,7 @@ async function snapshotBitly(weekIndex: number, column: string): Promise<string[
 
   const categories: Record<string, { metric: string; links: string[] }> = {
     "skool-accelerator": {
-      metric: "Bitly clicks: Skool > Accelerator",
+      metric: "Clicks: Skool > Accelerator",
       links: [
         "bit.ly/Consultant-Fast-Lane-Accelerator",
         "bit.ly/Builder-Fast-Lane-Accelerator",
