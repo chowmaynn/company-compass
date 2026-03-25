@@ -79,9 +79,9 @@ export async function snapshotWeeklyApiMetrics(): Promise<SnapshotResult[]> {
     const bucketed = bucketClicksByWeek(categorized, weekConfigs);
 
     const bitlyMap: Record<string, string> = {
-      "yt-skool": "Bitly clicks: YouTube > Skool",
-      "yt-accelerator": "Bitly clicks: YouTube > Accelerator",
-      "skool-accelerator": "Bitly clicks: Skool > Accelerator",
+      "yt-skool": "Clicks: YouTube > Skool",
+      "yt-accelerator": "Clicks: YouTube > Accelerator",
+      "skool-accelerator": "Clicks: Skool > Accelerator",
     };
 
     for (const [category, metricName] of Object.entries(bitlyMap)) {

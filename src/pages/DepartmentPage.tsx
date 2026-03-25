@@ -11,7 +11,9 @@ import { DepartmentCharts } from "@/components/DepartmentCharts";
 import CoachesDashboard from "@/pages/CoachesDashboard";
 import SuccessTrackingDashboard from "@/pages/SuccessTrackingDashboard";
 import SupportDashboard from "@/pages/SupportDashboard";
-import { LayoutDashboard, BarChart3, Users, Shield, Trophy, HeadphonesIcon } from "lucide-react";
+import { CompetitorsDashboard } from "@/components/CompetitorsDashboard";
+import { ContentOverview } from "@/components/ContentOverview";
+import { LayoutDashboard, BarChart3, Users, Shield, Trophy, HeadphonesIcon, Swords } from "lucide-react";
 
 const slugToDepartment: Record<string, Department> = {
   "finance": "Finance",
@@ -22,7 +24,7 @@ const slugToDepartment: Record<string, Department> = {
   "community-management": "Product",
 };
 
-type Tab = "dashboard" | "charts" | "rep-metrics" | "coaches" | "success" | "support";
+type Tab = "dashboard" | "charts" | "rep-metrics" | "coaches" | "success" | "support" | "competitors";
 
 const tabs: { id: Tab; label: string; icon: React.ElementType }[] = [
   { id: "dashboard", label: "Overview", icon: LayoutDashboard },
@@ -39,6 +41,11 @@ const productTabs: { id: Tab; label: string; icon: React.ElementType }[] = [
 const salesTabs: { id: Tab; label: string; icon: React.ElementType }[] = [
   { id: "dashboard",   label: "Dashboard",   icon: LayoutDashboard },
   { id: "rep-metrics", label: "Rep Metrics", icon: Users },
+];
+
+const contentTabs: { id: Tab; label: string; icon: React.ElementType }[] = [
+  { id: "dashboard",   label: "Our Channel",  icon: LayoutDashboard },
+  { id: "competitors", label: "Competitors",  icon: Swords },
 ];
 
 export default function DepartmentPage() {
@@ -74,19 +81,22 @@ export default function DepartmentPage() {
 
   const isProduct = department === "Product";
   const isSales = department === "Sales";
+  const isContent = department === "Content";
 
   return (
     <div className="p-6 max-w-7xl mx-auto space-y-6">
 
       {/* ── Header ────────────────────────────────────────── */}
-      <div>
-        <h1 className="text-2xl font-bold tracking-tight text-foreground">{department}</h1>
-        <p className="text-sm text-muted-foreground mt-0.5">Department metrics & performance</p>
-      </div>
+      {!isContent && (
+        <div>
+          <h1 className="text-2xl font-bold tracking-tight text-foreground">{department}</h1>
+          <p className="text-sm text-muted-foreground mt-0.5">Department metrics & performance</p>
+        </div>
+      )}
 
       {/* ── Tab Toggle ────────────────────────────────────── */}
       <div className="flex items-center gap-1 bg-muted rounded-lg p-1 w-fit">
-        {(isSales ? salesTabs : isProduct ? productTabs : tabs).map((tab) => {
+        {(isSales ? salesTabs : isProduct ? productTabs : isContent ? contentTabs : tabs).map((tab) => {
           const Icon = tab.icon;
           return (
             <button
@@ -111,6 +121,8 @@ export default function DepartmentPage() {
           <ProductDashboard />
         ) : isSales ? (
           <SalesDashboard />
+        ) : isContent ? (
+          <ContentOverview />
         ) : (
           <DepartmentSection
             department={department}
@@ -135,6 +147,8 @@ export default function DepartmentPage() {
       {activeTab === "success" && <SuccessTrackingDashboard />}
 
       {activeTab === "support" && <SupportDashboard />}
+
+      {activeTab === "competitors" && <CompetitorsDashboard />}
 
     </div>
   );

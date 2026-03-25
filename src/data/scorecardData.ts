@@ -132,7 +132,7 @@ export const scorecardData: Metric[] = [
     status: "green",
     owner: "Adam Jahr",
     source: "Notion",
-    description: "Videos recorded and prepared for the editing process",
+    description: "Videos that have entered production",
   },
   {
     name: "YouTube views",
@@ -169,7 +169,7 @@ export const scorecardData: Metric[] = [
     description: "The total number of new subscribers to the main channel",
   },
   {
-    name: "Bitly clicks: YouTube > Skool",
+    name: "Clicks: YouTube > Skool",
     department: "Content",
     catchUp: { actual: 1129, projection: 2500 },
     weeks: [
@@ -186,7 +186,7 @@ export const scorecardData: Metric[] = [
     description: "The number of funnel-clicks on links from YouTube to Skool",
   },
   {
-    name: "Bitly clicks: YouTube > Accelerator",
+    name: "Clicks: YouTube > Accelerator",
     department: "Content",
     catchUp: { actual: 113, projection: 500 },
     weeks: [
@@ -203,7 +203,7 @@ export const scorecardData: Metric[] = [
     description: "The number of funnel-clicks on links from YouTube to Accelerator",
   },
   {
-    name: "Bitly clicks: Skool > Accelerator",
+    name: "Clicks: Skool > Accelerator",
     department: "Content",
     catchUp: { actual: 0, projection: 0 },
     weeks: [

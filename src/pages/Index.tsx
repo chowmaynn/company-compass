@@ -79,9 +79,9 @@ const Index = () => {
   // Update Content metrics with live Bitly data
   useEffect(() => {
     const metricMap: Record<string, keyof typeof bitly.weeklyClicks> = {
-      "Bitly clicks: YouTube > Skool": "yt-skool",
-      "Bitly clicks: YouTube > Accelerator": "yt-accelerator",
-      "Bitly clicks: Skool > Accelerator": "skool-accelerator",
+      "Clicks: YouTube > Skool": "yt-skool",
+      "Clicks: YouTube > Accelerator": "yt-accelerator",
+      "Clicks: Skool > Accelerator": "skool-accelerator",
     };
 
     setMetrics((prev) =>
@@ -220,7 +220,7 @@ const Index = () => {
 
   const autoMetrics = new Set([
     "Videos posted last week", "Videos in the backlog", "YouTube views", "New YouTube subscribers",
-    "Bitly clicks: YouTube > Skool", "Bitly clicks: YouTube > Accelerator", "Bitly clicks: Skool > Accelerator",
+    "Clicks: YouTube > Skool", "Clicks: YouTube > Accelerator", "Clicks: Skool > Accelerator",
     "Website Views",
     "Emails Sent", "Email Clicks",
   ]);

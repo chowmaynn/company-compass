@@ -61,6 +61,23 @@ export async function fetchScorecard(month: string): Promise<ScorecardRow[]> {
 }
 
 /**
+ * Fetch Revenue rows across multiple months for the trend chart.
+ */
+export async function fetchRevenueHistory(months: string[]): Promise<ScorecardRow[]> {
+  if (months.length === 0) return [];
+  const filter = months.map((m) => `month.eq.${m}`).join(",");
+  const res = await fetch(
+    `${SUPABASE_URL}/rest/v1/scorecard?metric=eq.Revenue&or=(${filter})&order=month.asc`,
+    { headers }
+  );
+  if (!res.ok) {
+    console.error("Supabase revenue history fetch error:", res.status);
+    return [];
+  }
+  return res.json();
+}
+
+/**
  * Update a single cell in a scorecard row.
  * Uses metric + month as the unique key.
  */

@@ -17,10 +17,10 @@ const METRIC_ORDER: string[] = [
   "Videos in the backlog",
   "YouTube views",
   "New YouTube subscribers",
-  "Bitly clicks: YouTube > Skool",
-  "Bitly clicks: YouTube > Accelerator",
-  "Bitly clicks: Skool > Accelerator",
-  "Bitly clicks: Webinar (total)",
+  "Clicks: YouTube > Skool",
+  "Clicks: YouTube > Accelerator",
+  "Clicks: Skool > Accelerator",
+  "Clicks: Webinar (total)",
   // Marketing
   "Emails Sent",
   "Email Clicks",
@@ -112,7 +112,7 @@ function fieldToColumn(field: string): string | null {
 }
 
 // Current month in YYYY-MM format
-const DEFAULT_MONTH = "2026-03";
+const DEFAULT_MONTH = `${new Date().getFullYear()}-${String(new Date().getMonth() + 1).padStart(2, "0")}`;
 
 // Metrics sourced from live APIs — only the current week gets overlaid
 type ApiSource = {
@@ -126,9 +126,9 @@ const API_METRIC_MAP: Record<string, ApiSource> = {
   "Videos posted last week":              { hook: "notion", field: "weeklyPublished" },
   "Videos in the backlog":                { hook: "notion", field: "backlogCount" },
   "Website Views":                        { hook: "ga",     field: "weeklyViews" },
-  "Bitly clicks: YouTube > Skool":        { hook: "bitly",  field: "yt-skool" },
-  "Bitly clicks: YouTube > Accelerator":  { hook: "bitly",  field: "yt-accelerator" },
-  "Bitly clicks: Skool > Accelerator":    { hook: "bitly",  field: "skool-accelerator" },
+  "Clicks: YouTube > Skool":        { hook: "bitly",  field: "yt-skool" },
+  "Clicks: YouTube > Accelerator":  { hook: "bitly",  field: "yt-accelerator" },
+  "Clicks: Skool > Accelerator":    { hook: "bitly",  field: "skool-accelerator" },
 };
 
 /** Set of metric names that are API-sourced (read-only for current week) */

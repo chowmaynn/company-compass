@@ -1,22 +1,11 @@
-import { useMemo, useState } from "react";
+import { useState, useEffect, useMemo, useCallback } from "react";
 import { Card, CardContent } from "@/components/ui/card";
-import { weekConfigs, type Metric } from "@/data/scorecardData";
+import { weekConfigs } from "@/data/scorecardData";
 import { useScorecard } from "@/hooks/use-scorecard";
-import { useCurrency, useStatusModal, useSelectedMonth } from "@/components/AppLayout";
-import {
-  DollarSign,
-  TrendingUp,
-  Eye,
-  UserPlus,
-  Phone,
-  BarChart3,
-  Activity,
-  Target,
-  Zap,
-  Globe,
-  ShieldCheck,
-  X,
-} from "lucide-react";
+import { useCurrency, useSelectedMonth } from "@/components/AppLayout";
+import { fetchRevenueHistory, type ScorecardRow } from "@/lib/supabase-scorecard";
+import { DollarSign, TrendingUp, BarChart3 } from "lucide-react";
+import { FunnelSankey } from "@/components/FunnelSankey";
 import {
   AreaChart,
   Area,
@@ -56,15 +45,10 @@ function pctOfTarget(actual: number | string, target: number | string): number |
 
 // ── Component ────────────────────────────────────────────────
 
-type ModalFilter = "ahead" | "onTrack" | "behind" | "offTrack" | null;
-// Modal state is now shared via useStatusModal() from AppLayout
-
 export default function Dashboard() {
   const { selectedMonth } = useSelectedMonth();
   const { metrics: scorecardData, loading } = useScorecard(selectedMonth);
   const { convert, symbol } = useCurrency();
-  const { activeFilter: activeModal, setActiveFilter: setActiveModal } = useStatusModal();
-
   // Helper for currency display
   const formatCurrency = (val: number | string | undefined) => {
     if (!val || val === "—") return "—";
@@ -73,37 +57,10 @@ export default function Dashboard() {
   };
 
 
-  const modalMetrics = useMemo((): Metric[] => {
-    if (!activeModal) return [];
-    if (activeModal === "ahead") return scorecardData.filter((m) => m.status === "light-green");
-    if (activeModal === "onTrack") return scorecardData.filter((m) => m.status === "green");
-    if (activeModal === "behind") return scorecardData.filter((m) => m.status === "yellow");
-    if (activeModal === "offTrack") return scorecardData.filter((m) => m.status === "red");
-    return scorecardData;
-  }, [activeModal, scorecardData]);
-
-  const modalTitle = activeModal === "ahead" ? "Ahead"
-    : activeModal === "onTrack" ? "On Track"
-    : activeModal === "behind" ? "Behind"
-    : activeModal === "offTrack" ? "Off Track"
-    : "";
-
-  const modalAccent = activeModal === "ahead" ? { text: "text-status-light-green", bg: "bg-status-light-green/10", dot: "bg-status-light-green" }
-    : activeModal === "onTrack" ? { text: "text-status-green", bg: "bg-status-green/10", dot: "bg-status-green" }
-    : activeModal === "behind" ? { text: "text-status-yellow", bg: "bg-status-yellow/10", dot: "bg-status-yellow" }
-    : activeModal === "offTrack" ? { text: "text-status-red", bg: "bg-status-red/10", dot: "bg-status-red" }
-    : { text: "text-primary", bg: "bg-primary/10", dot: "bg-primary" };
-
   const revenue = scorecardData.find((m) => m.name === "Revenue");
   const cash = scorecardData.find((m) => m.name === "Cash Collected");
-  const ytViews = scorecardData.find((m) => m.name === "YouTube views");
-  const ytSubs = scorecardData.find((m) => m.name === "New YouTube subscribers");
-  const totalBookings = scorecardData.find((m) => m.name === "Total Bookings");
-  const closingRate = scorecardData.find((m) => m.name === "Closing Call Close Rate");
-  const complaints = scorecardData.find((m) => m.name === "Customer support complaints");
-  const websiteViews = scorecardData.find((m) => m.name === "Website Views");
 
-  // Revenue weekly trend data
+  // Revenue weekly trend data (current month only — used as fallback)
   const revenueWeekly = revenue?.weeks.map((w, i) => ({
     week: weekConfigs[i].label,
     actual: parseNum(w.actual) ?? 0,
@@ -179,225 +136,12 @@ const revPct = pctOfTarget(revenue?.monthlyActual ?? 0, revenue?.monthlyTarget ?
           </CardContent>
         </Card>
 
-        {/* Revenue Weekly Trend */}
-        <Card className="lg:col-span-2 border-border/50">
-          <CardContent className="p-5">
-            <div className="flex items-center justify-between mb-4">
-              <div className="flex items-center gap-2">
-                <BarChart3 className="h-4 w-4 text-primary" />
-                <h3 className="text-sm font-semibold text-foreground">Weekly Revenue Trend</h3>
-              </div>
-              <div className="flex items-center gap-4 text-xs text-muted-foreground">
-                <span className="flex items-center gap-1.5">
-                  <span className="h-2 w-2 rounded-full bg-primary" /> Actual
-                </span>
-                <span className="flex items-center gap-1.5">
-                  <span className="h-2 w-2 rounded-full bg-muted-foreground" /> Projection
-                </span>
-              </div>
-            </div>
-            <ResponsiveContainer width="100%" height={240}>
-              <AreaChart data={revenueWeekly}>
-                <defs>
-                  <linearGradient id="revGradient" x1="0" y1="0" x2="0" y2="1">
-                    <stop offset="5%" stopColor="hsl(221, 83%, 53%)" stopOpacity={0.15} />
-                    <stop offset="95%" stopColor="hsl(221, 83%, 53%)" stopOpacity={0} />
-                  </linearGradient>
-                </defs>
-                <CartesianGrid strokeDasharray="3 3" stroke="hsl(220, 13%, 91%)" vertical={false} />
-                <XAxis
-                  dataKey="week"
-                  tick={{ fontSize: 11, fill: "hsl(220, 9%, 46%)" }}
-                  axisLine={{ stroke: "hsl(220, 13%, 91%)" }}
-                  tickLine={false}
-                />
-                <YAxis
-                  tick={{ fontSize: 11, fill: "hsl(220, 9%, 46%)" }}
-                  axisLine={false}
-                  tickLine={false}
-                  tickFormatter={(v) => `$${compactNumber(v)}`}
-                />
-                <Tooltip
-                  contentStyle={{
-                    backgroundColor: "#ffffff",
-                    border: "1px solid hsl(220, 13%, 91%)",
-                    borderRadius: "8px",
-                    color: "hsl(224, 71%, 4%)",
-                    fontSize: "12px",
-                    boxShadow: "0 4px 6px -1px rgb(0 0 0 / 0.07)",
-                  }}
-                  formatter={(value: number) => [`$${compactNumber(value)}`, undefined]}
-                />
-                <Area
-                  type="monotone"
-                  dataKey="actual"
-                  name="Actual"
-                  stroke="hsl(221, 83%, 53%)"
-                  strokeWidth={2.5}
-                  fill="url(#revGradient)"
-                  dot={{ r: 4, fill: "hsl(221, 83%, 53%)", strokeWidth: 0 }}
-                  activeDot={{ r: 6 }}
-                />
-                <Area
-                  type="monotone"
-                  dataKey="projection"
-                  name="Projection"
-                  stroke="hsl(220, 9%, 70%)"
-                  strokeWidth={1.5}
-                  strokeDasharray="6 3"
-                  fill="transparent"
-                  dot={{ r: 3, fill: "hsl(220, 9%, 70%)", strokeWidth: 0 }}
-                />
-              </AreaChart>
-            </ResponsiveContainer>
-          </CardContent>
-        </Card>
+        {/* Revenue Trend */}
+        <RevenueTrendChart convert={convert} symbol={symbol} fallbackData={revenueWeekly} />
       </div>
 
-      {/* ── Key Metrics Grid ───────────────────────────────── */}
-      <div>
-        <div className="flex items-center gap-2 mb-4">
-          <Zap className="h-4 w-4 text-accent" />
-          <h2 className="text-sm font-semibold text-foreground uppercase tracking-wider">Key Performance Indicators</h2>
-        </div>
-        <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-3">
-          <KPICard
-            icon={Eye}
-            label="YouTube Views"
-            value={String(ytViews?.monthlyActual ?? "—")}
-            target={`Target: ${ytViews?.monthlyTarget}`}
-            status={ytViews?.status ?? "green"}
-          />
-          <KPICard
-            icon={UserPlus}
-            label="New Subscribers"
-            value={String(ytSubs?.monthlyActual ?? "—")}
-            target={`Target: ${ytSubs?.monthlyTarget}`}
-            status={ytSubs?.status ?? "green"}
-          />
-          <KPICard
-            icon={Phone}
-            label="Total Bookings"
-            value={String(totalBookings?.monthlyActual ?? "—")}
-            target={`Target: ${totalBookings?.monthlyTarget}`}
-            status={totalBookings?.status ?? "green"}
-          />
-          <KPICard
-            icon={Globe}
-            label="Website Views"
-            value={String(websiteViews?.monthlyActual || "—")}
-            target={`Target: ${websiteViews?.monthlyTarget}`}
-            status={websiteViews?.status ?? "green"}
-          />
-          <KPICard
-            icon={Target}
-            label="Close Rate"
-            value={String(closingRate?.monthlyActual ?? "—")}
-            target={`Target: 30%`}
-            status={closingRate?.status ?? "green"}
-          />
-          <KPICard
-            icon={ShieldCheck}
-            label="Complaints"
-            value={String(complaints?.monthlyActual ?? "—")}
-            target={`Target: <${complaints?.monthlyTarget}`}
-            status={complaints?.status ?? "green"}
-            invertTrend
-          />
-        </div>
-      </div>
-
-      {/* ── KPI Detail Modal ───────────────────────────────── */}
-      {activeModal && (
-        <div
-          className="fixed inset-0 z-50 flex items-center justify-center p-4"
-          onClick={() => setActiveModal(null)}
-        >
-          {/* Backdrop */}
-          <div className="absolute inset-0 bg-black/30 backdrop-blur-sm" />
-
-          {/* Panel */}
-          <div
-            className="relative bg-card rounded-2xl shadow-2xl w-full max-w-2xl max-h-[80vh] flex flex-col overflow-hidden"
-            onClick={(e) => e.stopPropagation()}
-          >
-            {/* Header */}
-            <div className="flex items-center justify-between px-6 py-4 border-b border-border">
-              <div className="flex items-center gap-3">
-                <span className={`h-2.5 w-2.5 rounded-full ${modalAccent.dot}`} />
-                <h2 className={`text-base font-bold ${modalAccent.text}`}>{modalTitle}</h2>
-                <span className="text-xs text-muted-foreground bg-muted px-2 py-0.5 rounded-full font-medium">
-                  {modalMetrics.length} KPI{modalMetrics.length !== 1 ? "s" : ""}
-                </span>
-              </div>
-              <button
-                onClick={() => setActiveModal(null)}
-                className="h-8 w-8 rounded-lg flex items-center justify-center text-muted-foreground hover:bg-muted hover:text-foreground transition-colors"
-              >
-                <X className="h-4 w-4" />
-              </button>
-            </div>
-
-            {/* Table header */}
-            <div className="grid grid-cols-[1fr_100px_100px_80px_80px] gap-3 px-6 py-2.5 bg-muted/40 border-b border-border text-[10px] font-semibold text-muted-foreground uppercase tracking-wider">
-              <span>KPI</span>
-              <span>Department</span>
-              <span className="text-right">Actual</span>
-              <span className="text-right">Target</span>
-              <span className="text-center">Status</span>
-            </div>
-
-            {/* Rows */}
-            <div className="overflow-y-auto flex-1">
-              {modalMetrics.map((m) => {
-                const statusDot =
-                  m.status === "green" || m.status === "light-green"
-                    ? "bg-status-green"
-                    : m.status === "yellow"
-                    ? "bg-status-yellow"
-                    : "bg-status-red";
-                const statusLabel =
-                  m.status === "green" || m.status === "light-green"
-                    ? "On Track"
-                    : m.status === "yellow"
-                    ? "Behind"
-                    : "Off Track";
-                const statusText =
-                  m.status === "green" || m.status === "light-green"
-                    ? "text-status-green bg-status-green/10"
-                    : m.status === "yellow"
-                    ? "text-status-yellow bg-status-yellow/10"
-                    : "text-status-red bg-status-red/10";
-
-                return (
-                  <div
-                    key={m.name}
-                    className="grid grid-cols-[1fr_100px_100px_80px_80px] gap-3 px-6 py-3 items-center border-b border-border/50 hover:bg-muted/20 transition-colors last:border-0"
-                  >
-                    <div className="min-w-0">
-                      <p className="text-sm font-medium text-foreground truncate">{m.name}</p>
-                      {m.owner && <p className="text-[10px] text-muted-foreground truncate">{m.owner}</p>}
-                    </div>
-                    <span className="text-xs text-muted-foreground">{m.department}</span>
-                    <span className="text-sm font-semibold text-foreground text-right font-mono">
-                      {String(m.monthlyActual)}
-                    </span>
-                    <span className="text-xs text-muted-foreground text-right font-mono">
-                      {String(m.monthlyTarget)}
-                    </span>
-                    <div className="flex justify-center">
-                      <span className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-semibold ${statusText}`}>
-                        <span className={`h-1.5 w-1.5 rounded-full ${statusDot}`} />
-                        {statusLabel}
-                      </span>
-                    </div>
-                  </div>
-                );
-              })}
-            </div>
-          </div>
-        </div>
-      )}
+      {/* ── Conversion Funnel ─────────────────────────────── */}
+      <FunnelSankey metrics={scorecardData} formatCurrency={formatCurrency} />
 
     </div>
   );
@@ -405,44 +149,259 @@ const revPct = pctOfTarget(revenue?.monthlyActual ?? 0, revenue?.monthlyTarget ?
 
 // ── Sub-components ──────────────────────────────────────────
 
-function KPICard({
-  icon: Icon,
-  label,
-  value,
-  target,
-  status,
-  invertTrend: _invertTrend,
+
+// ── Revenue Trend Chart ──────────────────────────────────────
+
+type RevenueRange = "week" | "month" | "last-month" | "3m" | "6m" | "ytd" | "yoy";
+
+const RANGE_LABELS: { id: RevenueRange; label: string }[] = [
+  { id: "month", label: "This Month" },
+  { id: "last-month", label: "Last Month" },
+  { id: "3m", label: "3M" },
+  { id: "6m", label: "6M" },
+  { id: "ytd", label: "YTD" },
+  { id: "yoy", label: "YOY" },
+];
+
+function getMonthsForRange(range: RevenueRange): string[] {
+  const now = new Date();
+  const y = now.getFullYear();
+  const m = now.getMonth(); // 0-indexed
+
+  const fmt = (date: Date) => `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, "0")}`;
+  const months: string[] = [];
+
+  let startDate: Date;
+  switch (range) {
+    case "week":
+    case "month":
+      return [fmt(now)];
+    case "last-month": {
+      const prev = new Date(y, m - 1, 1);
+      return [fmt(prev)];
+    }
+    case "3m":
+      startDate = new Date(y, m - 2, 1);
+      break;
+    case "6m":
+      startDate = new Date(y, m - 5, 1);
+      break;
+    case "ytd":
+      startDate = new Date(y, 0, 1);
+      break;
+    case "yoy":
+      startDate = new Date(y - 1, m, 1);
+      break;
+  }
+
+  const currentMonth = fmt(now);
+  const cursor = new Date(startDate);
+  while (fmt(cursor) <= currentMonth) {
+    months.push(fmt(cursor));
+    cursor.setMonth(cursor.getMonth() + 1);
+  }
+  return months;
+}
+
+function flattenRevenueRows(
+  rows: ScorecardRow[],
+  range: RevenueRange
+): { label: string; actual: number; projection: number }[] {
+  const result: { label: string; actual: number; projection: number }[] = [];
+
+  // Sort by month
+  const sorted = [...rows].sort((a, b) => a.month.localeCompare(b.month));
+
+  for (const row of sorted) {
+    const [yr, mo] = row.month.split("-").map(Number);
+    const monthLabel = new Date(yr, mo - 1, 1).toLocaleDateString("en-US", { month: "short", year: "2-digit" });
+    const weeks = [
+      { actual: row.w1_actual, target: row.w1_target, label: "W1" },
+      { actual: row.w2_actual, target: row.w2_target, label: "W2" },
+      { actual: row.w3_actual, target: row.w3_target, label: "W3" },
+      { actual: row.w4_actual, target: row.w4_target, label: "W4" },
+    ];
+
+    if (range === "week") {
+      // Only show the current week
+      const wi = getCurrentWeekIdx();
+      if (wi >= 0 && wi < 4) {
+        const w = weeks[wi];
+        const a = parseNumSafe(w.actual);
+        const p = parseNumSafe(w.target);
+        if (a !== null) result.push({ label: `${w.label}`, actual: a, projection: p ?? 0 });
+      }
+    } else if (range === "month" || range === "last-month") {
+      // Show all 4 weeks of the month
+      for (const w of weeks) {
+        const a = parseNumSafe(w.actual);
+        if (a !== null) result.push({ label: `${w.label}`, actual: a, projection: parseNumSafe(w.target) ?? 0 });
+      }
+    } else {
+      // Multi-month: show monthly totals
+      const total = parseNumSafe(row.monthly_actual);
+      const target = parseNumSafe(row.monthly_target);
+      if (total !== null) {
+        result.push({ label: monthLabel, actual: total, projection: target ?? 0 });
+      }
+    }
+  }
+
+  return result;
+}
+
+function parseNumSafe(val: string): number | null {
+  if (!val || val === "—") return null;
+  const cleaned = val.replace(/[$,]/g, "").trim();
+  const n = parseFloat(cleaned);
+  return isNaN(n) ? null : n;
+}
+
+function getCurrentWeekIdx(): number {
+  const now = new Date();
+  for (let i = weekConfigs.length - 1; i >= 0; i--) {
+    if (now >= new Date(weekConfigs[i].start)) return i;
+  }
+  return -1;
+}
+
+function RevenueTrendChart({
+  convert,
+  symbol,
+  fallbackData,
 }: {
-  icon: React.ElementType;
-  label: string;
-  value: string;
-  target: string;
-  status: string;
-  invertTrend?: boolean;
+  convert: (n: number) => number;
+  symbol: string;
+  fallbackData: { week: string; actual: number; projection: number }[];
 }) {
-  const borderColor =
-    status === "green" || status === "light-green"
-      ? "border-status-green/25"
-      : status === "yellow"
-      ? "border-status-yellow/25"
-      : "border-status-red/25";
+  const [range, setRange] = useState<RevenueRange>("month");
+  const [historyRows, setHistoryRows] = useState<ScorecardRow[]>([]);
+  const [histLoading, setHistLoading] = useState(false);
+
+  const loadHistory = useCallback(async (r: RevenueRange) => {
+    const months = getMonthsForRange(r);
+    if (months.length <= 1 && (r === "month" || r === "week")) {
+      setHistoryRows([]);
+      return;
+    }
+    setHistLoading(true);
+    const rows = await fetchRevenueHistory(months);
+    setHistoryRows(rows);
+    setHistLoading(false);
+  }, []);
+
+  useEffect(() => {
+    loadHistory(range);
+  }, [range, loadHistory]);
+
+  const chartData = useMemo(() => {
+    if (range === "month" && historyRows.length === 0) {
+      // Use fallback from current scorecard
+      return fallbackData.map((d) => ({
+        label: d.week,
+        actual: convert(d.actual),
+        projection: convert(d.projection),
+      }));
+    }
+    if (range === "week" && historyRows.length === 0) {
+      // Single current week from fallback
+      const wi = getCurrentWeekIdx();
+      if (wi >= 0 && wi < fallbackData.length) {
+        return [{ label: fallbackData[wi].week, actual: convert(fallbackData[wi].actual), projection: convert(fallbackData[wi].projection) }];
+      }
+      return [];
+    }
+    return flattenRevenueRows(historyRows, range).map((d) => ({
+      ...d,
+      actual: convert(d.actual),
+      projection: convert(d.projection),
+    }));
+  }, [range, historyRows, fallbackData, convert]);
 
   return (
-    <Card className={`${borderColor} card-shadow transition-shadow hover:card-shadow-md`}>
-      <CardContent className="p-4">
-        <div className="flex items-center justify-between mb-2">
-          <Icon className="h-4 w-4 text-muted-foreground" />
-          <span className={`h-2 w-2 rounded-full ${
-            status === "green" || status === "light-green"
-              ? "bg-status-green"
-              : status === "yellow"
-              ? "bg-status-yellow"
-              : "bg-status-red"
-          }`} />
+    <Card className="lg:col-span-2 border-border/50">
+      <CardContent className="p-5">
+        <div className="flex items-center justify-between mb-4">
+          <div className="flex items-center gap-2">
+            <BarChart3 className="h-4 w-4 text-primary" />
+            <h3 className="text-sm font-semibold text-foreground">Revenue Trend</h3>
+          </div>
+          <div className="flex items-center gap-1 bg-muted rounded-lg p-0.5">
+            {RANGE_LABELS.map((r) => (
+              <button
+                key={r.id}
+                onClick={() => setRange(r.id)}
+                className={`px-2 py-1 rounded-md text-[10px] font-medium transition-all ${
+                  range === r.id
+                    ? "bg-card text-foreground shadow-sm"
+                    : "text-muted-foreground hover:text-foreground"
+                }`}
+              >
+                {r.label}
+              </button>
+            ))}
+          </div>
         </div>
-        <p className="text-xl font-bold tracking-tight text-foreground">{value}</p>
-        <p className="text-[10px] text-muted-foreground mt-0.5 font-medium">{label}</p>
-        <p className="text-[10px] text-muted-foreground/70 mt-1">{target}</p>
+        {histLoading ? (
+          <div className="flex items-center justify-center h-[240px] text-xs text-muted-foreground">Loading...</div>
+        ) : chartData.length === 0 ? (
+          <div className="flex items-center justify-center h-[240px] text-xs text-muted-foreground">No data for this range</div>
+        ) : (
+          <ResponsiveContainer width="100%" height={240}>
+            <AreaChart data={chartData}>
+              <defs>
+                <linearGradient id="revGradient" x1="0" y1="0" x2="0" y2="1">
+                  <stop offset="5%" stopColor="hsl(221, 83%, 53%)" stopOpacity={0.15} />
+                  <stop offset="95%" stopColor="hsl(221, 83%, 53%)" stopOpacity={0} />
+                </linearGradient>
+              </defs>
+              <CartesianGrid strokeDasharray="3 3" stroke="hsl(220, 13%, 91%)" vertical={false} />
+              <XAxis
+                dataKey="label"
+                tick={{ fontSize: 11, fill: "hsl(220, 9%, 46%)" }}
+                axisLine={{ stroke: "hsl(220, 13%, 91%)" }}
+                tickLine={false}
+              />
+              <YAxis
+                tick={{ fontSize: 11, fill: "hsl(220, 9%, 46%)" }}
+                axisLine={false}
+                tickLine={false}
+                tickFormatter={(v) => `${symbol}${compactNumber(v)}`}
+              />
+              <Tooltip
+                contentStyle={{
+                  backgroundColor: "#ffffff",
+                  border: "1px solid hsl(220, 13%, 91%)",
+                  borderRadius: "8px",
+                  color: "hsl(224, 71%, 4%)",
+                  fontSize: "12px",
+                  boxShadow: "0 4px 6px -1px rgb(0 0 0 / 0.07)",
+                }}
+                formatter={(value: number) => [`${symbol}${compactNumber(value)}`, undefined]}
+              />
+              <Area
+                type="monotone"
+                dataKey="actual"
+                name="Actual"
+                stroke="hsl(221, 83%, 53%)"
+                strokeWidth={2.5}
+                fill="url(#revGradient)"
+                dot={{ r: chartData.length > 12 ? 0 : 4, fill: "hsl(221, 83%, 53%)", strokeWidth: 0 }}
+                activeDot={{ r: 6 }}
+              />
+              <Area
+                type="monotone"
+                dataKey="projection"
+                name="Target"
+                stroke="hsl(220, 9%, 70%)"
+                strokeWidth={1.5}
+                strokeDasharray="6 3"
+                fill="transparent"
+                dot={{ r: chartData.length > 12 ? 0 : 3, fill: "hsl(220, 9%, 70%)", strokeWidth: 0 }}
+              />
+            </AreaChart>
+          </ResponsiveContainer>
+        )}
       </CardContent>
     </Card>
   );
