@@ -1,15 +1,18 @@
-import { useMemo } from "react";
+import { useMemo, useState } from "react";
 import {
   AreaChart, Area, BarChart, Bar, XAxis, YAxis, Tooltip,
-  ResponsiveContainer,
+  ResponsiveContainer, CartesianGrid,
 } from "recharts";
 import { useFinance } from "@/hooks/use-finance";
-import { Loader2, TrendingUp, AlertTriangle, XCircle, CreditCard, ArrowUpRight, ArrowDownRight } from "lucide-react";
+import {
+  Loader2, TrendingUp, AlertTriangle, XCircle, CreditCard,
+  ArrowUpRight, ArrowDownRight, RefreshCw,
+} from "lucide-react";
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
 
 function fmt(n: number) {
-  if (n >= 1_000_000) return `$${(n / 1_000_000).toFixed(1)}M`;
+  if (n >= 1_000_000) return `$${(n / 1_000_000).toFixed(2)}m`;
   if (n >= 1_000) return `$${(n / 1_000).toFixed(1)}k`;
   return `$${n.toLocaleString()}`;
 }
@@ -21,11 +24,32 @@ function getYearMonth(dateStr: string): string {
 
 function formatYearMonth(ym: string): string {
   const [year, month] = ym.split("-");
-  const names = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
+  const names = ["Jan","Feb","Mar","Apr","May","Jun","Jul","Aug","Sep","Oct","Nov","Dec"];
   return `${names[parseInt(month) - 1]} ${year.slice(2)}`;
 }
 
-// ── Stat Card ────────────────────────────────────────────────────────────────
+// ── Date Range Presets ────────────────────────────────────────────────────────
+
+type Preset = "mtd" | "7d" | "30d" | "3m";
+
+function getRange(preset: Preset): { startTs: number; endTs: number; label: string } {
+  const now = Math.floor(Date.now() / 1000);
+  const d = new Date();
+  switch (preset) {
+    case "mtd": {
+      const start = new Date(d.getFullYear(), d.getMonth(), 1);
+      return { startTs: Math.floor(start.getTime() / 1000), endTs: now, label: "Month to date" };
+    }
+    case "7d":
+      return { startTs: now - 7 * 86400, endTs: now, label: "Last 7 days" };
+    case "30d":
+      return { startTs: now - 30 * 86400, endTs: now, label: "Last 30 days" };
+    case "3m":
+      return { startTs: now - 90 * 86400, endTs: now, label: "Last 3 months" };
+  }
+}
+
+// ── Components ────────────────────────────────────────────────────────────────
 
 function StatCard({
   label, value, sub, icon: Icon, color = "text-foreground", trend,
@@ -55,8 +79,6 @@ function StatCard({
   );
 }
 
-// ── Tooltips ──────────────────────────────────────────────────────────────────
-
 function CurrencyTooltip({ active, payload, label }: { active?: boolean; payload?: Array<{value: number; name: string; color: string}>; label?: string }) {
   if (!active || !payload?.length) return null;
   return (
@@ -84,44 +106,22 @@ function CountTooltip({ active, payload, label }: { active?: boolean; payload?: 
 // ── Main Dashboard ────────────────────────────────────────────────────────────
 
 export default function FinanceDashboard() {
-  const { transactions, failedPayments, cancellationRequests, loading, error } = useFinance();
+  const [preset, setPreset] = useState<Preset>("mtd");
+  const range = useMemo(() => getRange(preset), [preset]);
+  const { transactions, failedPayments, cancellationRequests, stripeOverview, loading, stripeLoading, error } = useFinance(range.startTs, range.endTs);
 
-  // ── Derived stats ──────────────────────────────────────────────────────────
+  const presets: { id: Preset; label: string }[] = [
+    { id: "mtd", label: "MTD" },
+    { id: "7d",  label: "7d" },
+    { id: "30d", label: "30d" },
+    { id: "3m",  label: "3m" },
+  ];
+
+  // ── Airtable-derived stats ─────────────────────────────────────────────────
 
   const succeededTxns = useMemo(
     () => transactions.filter((t) => t.eventType === "charge.succeeded" || t.status === "Paid"),
     [transactions]
-  );
-
-  const currentMonthKey = getYearMonth(new Date().toISOString());
-
-  const thisMonthRevenue = useMemo(
-    () => succeededTxns
-      .filter((t) => getYearMonth(t.paymentDate) === currentMonthKey)
-      .reduce((sum, t) => sum + t.amount, 0),
-    [succeededTxns, currentMonthKey]
-  );
-
-  const lastMonthKey = useMemo(() => {
-    const d = new Date();
-    d.setMonth(d.getMonth() - 1);
-    return getYearMonth(d.toISOString());
-  }, []);
-
-  const lastMonthRevenue = useMemo(
-    () => succeededTxns
-      .filter((t) => getYearMonth(t.paymentDate) === lastMonthKey)
-      .reduce((sum, t) => sum + t.amount, 0),
-    [succeededTxns, lastMonthKey]
-  );
-
-  const revenueChange = lastMonthRevenue > 0
-    ? Math.round(((thisMonthRevenue - lastMonthRevenue) / lastMonthRevenue) * 100)
-    : null;
-
-  const thisMonthPaymentCount = useMemo(
-    () => succeededTxns.filter((t) => getYearMonth(t.paymentDate) === currentMonthKey).length,
-    [succeededTxns, currentMonthKey]
   );
 
   const openFailedPayments = useMemo(
@@ -133,23 +133,6 @@ export default function FinanceDashboard() {
     () => cancellationRequests.filter((c) => c.status !== "Cancellation Complete").length,
     [cancellationRequests]
   );
-
-  // ── Monthly revenue (last 8 months) ───────────────────────────────────────
-
-  const monthlyRevenue = useMemo(() => {
-    const map: Record<string, number> = {};
-    succeededTxns.forEach((t) => {
-      if (!t.paymentDate) return;
-      const ym = getYearMonth(t.paymentDate);
-      map[ym] = (map[ym] ?? 0) + t.amount;
-    });
-    return Object.entries(map)
-      .sort(([a], [b]) => a.localeCompare(b))
-      .slice(-8)
-      .map(([ym, revenue]) => ({ month: formatYearMonth(ym), revenue }));
-  }, [succeededTxns]);
-
-  // ── Monthly cancellations ─────────────────────────────────────────────────
 
   const monthlyCancellations = useMemo(() => {
     const map: Record<string, number> = {};
@@ -164,14 +147,10 @@ export default function FinanceDashboard() {
       .map(([ym, cancels]) => ({ month: formatYearMonth(ym), cancels }));
   }, [cancellationRequests]);
 
-  // ── Cancellation reasons ───────────────────────────────────────────────────
-
   const cancellationReasons = useMemo(() => {
     const map: Record<string, number> = {};
     cancellationRequests.forEach((c) => {
-      c.cancellationReason.forEach((r) => {
-        map[r] = (map[r] ?? 0) + 1;
-      });
+      c.cancellationReason.forEach((r) => { map[r] = (map[r] ?? 0) + 1; });
     });
     return Object.entries(map)
       .sort(([, a], [, b]) => b - a)
@@ -194,29 +173,157 @@ export default function FinanceDashboard() {
     return <div className="p-6 text-sm text-red-500">Failed to load finance data: {error}</div>;
   }
 
+  const s = stripeOverview;
+
   return (
     <div className="space-y-6">
 
-      {/* ── Row 1: Stat Cards ──────────────────────────────────────────── */}
-      <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
-        <StatCard
-          label="Stripe Revenue (MTD)"
-          value={fmt(thisMonthRevenue)}
-          sub="Stripe / Payfunnels collected"
-          icon={TrendingUp}
-          color="text-emerald-500"
-          trend={revenueChange !== null ? {
-            value: `${revenueChange > 0 ? "+" : ""}${revenueChange}% vs last month`,
-            up: revenueChange >= 0,
-          } : undefined}
-        />
-        <StatCard
-          label="Payments This Month"
-          value={thisMonthPaymentCount.toString()}
-          sub="Successful charges"
-          icon={CreditCard}
-          color="text-blue-500"
-        />
+      {/* ── Date range filter ─────────────────────────────────────────── */}
+      <div className="flex items-center gap-2">
+        <span className="text-xs text-muted-foreground font-medium">Date range</span>
+        <div className="flex items-center gap-1 bg-muted rounded-lg p-1">
+          {presets.map((p) => (
+            <button
+              key={p.id}
+              onClick={() => setPreset(p.id)}
+              className={`px-3 py-1.5 rounded-md text-xs font-medium transition-all ${
+                preset === p.id
+                  ? "bg-card text-foreground shadow-sm"
+                  : "text-muted-foreground hover:text-foreground"
+              }`}
+            >
+              {p.label}
+            </button>
+          ))}
+        </div>
+        {stripeLoading && <RefreshCw className="h-3.5 w-3.5 text-muted-foreground animate-spin" />}
+      </div>
+
+      {/* ── Stripe: Gross + Net + Payments ───────────────────────────── */}
+      <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
+
+        {/* Gross Volume */}
+        <div className="bg-card border border-border rounded-xl p-5">
+          <p className="text-xs text-muted-foreground font-medium mb-1">Gross Volume</p>
+          <p className="text-2xl font-bold text-foreground">
+            {s ? `NZ${fmt(s.grossVolume)}` : "—"}
+          </p>
+          <p className="text-xs text-muted-foreground mt-1">via Stripe / Payfunnels</p>
+          {s && s.dailyVolume.length > 0 && (
+            <div className="mt-4">
+              <ResponsiveContainer width="100%" height={80}>
+                <AreaChart data={s.dailyVolume} margin={{ top: 2, right: 2, left: 0, bottom: 0 }}>
+                  <defs>
+                    <linearGradient id="grossGrad" x1="0" y1="0" x2="0" y2="1">
+                      <stop offset="5%" stopColor="#8b5cf6" stopOpacity={0.3} />
+                      <stop offset="95%" stopColor="#8b5cf6" stopOpacity={0} />
+                    </linearGradient>
+                  </defs>
+                  <Tooltip content={<CurrencyTooltip />} />
+                  <Area type="monotone" dataKey="gross" name="Gross" stroke="#8b5cf6" strokeWidth={1.5} fill="url(#grossGrad)" dot={false} />
+                </AreaChart>
+              </ResponsiveContainer>
+            </div>
+          )}
+        </div>
+
+        {/* Net Volume */}
+        <div className="bg-card border border-border rounded-xl p-5">
+          <p className="text-xs text-muted-foreground font-medium mb-1">Net Volume</p>
+          <p className="text-2xl font-bold text-foreground">
+            {s ? `NZ${fmt(s.netVolume)}` : "—"}
+          </p>
+          <p className="text-xs text-muted-foreground mt-1">after Stripe fees</p>
+          {s && s.dailyVolume.length > 0 && (
+            <div className="mt-4">
+              <ResponsiveContainer width="100%" height={80}>
+                <AreaChart data={s.dailyVolume} margin={{ top: 2, right: 2, left: 0, bottom: 0 }}>
+                  <defs>
+                    <linearGradient id="netGrad" x1="0" y1="0" x2="0" y2="1">
+                      <stop offset="5%" stopColor="#10b981" stopOpacity={0.3} />
+                      <stop offset="95%" stopColor="#10b981" stopOpacity={0} />
+                    </linearGradient>
+                  </defs>
+                  <Tooltip content={<CurrencyTooltip />} />
+                  <Area type="monotone" dataKey="net" name="Net" stroke="#10b981" strokeWidth={1.5} fill="url(#netGrad)" dot={false} />
+                </AreaChart>
+              </ResponsiveContainer>
+            </div>
+          )}
+        </div>
+
+        {/* Payments breakdown */}
+        <div className="bg-card border border-border rounded-xl p-5">
+          <p className="text-xs text-muted-foreground font-medium mb-3">Payments</p>
+          {s ? (
+            <>
+              {/* Stacked bar */}
+              <div className="flex h-2 rounded-full overflow-hidden mb-4 gap-px">
+                {[
+                  { val: s.succeeded, color: "bg-emerald-500" },
+                  { val: s.refunded, color: "bg-cyan-400" },
+                  { val: s.blocked,  color: "bg-amber-400" },
+                  { val: s.failed,   color: "bg-red-500" },
+                ].map(({ val, color }, i) => {
+                  const total = s.succeeded + s.refunded + s.blocked + s.failed || 1;
+                  return <div key={i} className={`${color} rounded-sm`} style={{ width: `${(val / total) * 100}%` }} />;
+                })}
+              </div>
+              <div className="space-y-2">
+                {[
+                  { label: "Succeeded", val: s.succeeded, dot: "bg-emerald-500" },
+                  { label: "Refunded",  val: s.refunded,  dot: "bg-cyan-400" },
+                  { label: "Blocked",   val: s.blocked,   dot: "bg-amber-400" },
+                  { label: "Failed",    val: s.failed,    dot: "bg-red-500" },
+                ].map(({ label, val, dot }) => (
+                  <div key={label} className="flex items-center justify-between">
+                    <div className="flex items-center gap-2">
+                      <div className={`h-2.5 w-2.5 rounded-full ${dot}`} />
+                      <span className="text-xs text-muted-foreground">{label}</span>
+                    </div>
+                    <span className="text-xs font-semibold text-foreground">NZ{fmt(val)}</span>
+                  </div>
+                ))}
+              </div>
+            </>
+          ) : (
+            <div className="flex items-center gap-2 text-muted-foreground text-xs">
+              <Loader2 className="h-3.5 w-3.5 animate-spin" /> Loading…
+            </div>
+          )}
+        </div>
+      </div>
+
+      {/* ── Full daily volume chart ───────────────────────────────────── */}
+      {s && s.dailyVolume.length > 0 && (
+        <div className="bg-card border border-border rounded-xl p-5">
+          <h3 className="text-sm font-semibold text-foreground mb-1">Daily Volume</h3>
+          <p className="text-xs text-muted-foreground mb-4">{range.label} — Gross vs Net (NZD)</p>
+          <ResponsiveContainer width="100%" height={220}>
+            <AreaChart data={s.dailyVolume} margin={{ top: 4, right: 4, left: 0, bottom: 0 }}>
+              <defs>
+                <linearGradient id="g2" x1="0" y1="0" x2="0" y2="1">
+                  <stop offset="5%" stopColor="#8b5cf6" stopOpacity={0.2} />
+                  <stop offset="95%" stopColor="#8b5cf6" stopOpacity={0} />
+                </linearGradient>
+                <linearGradient id="n2" x1="0" y1="0" x2="0" y2="1">
+                  <stop offset="5%" stopColor="#10b981" stopOpacity={0.2} />
+                  <stop offset="95%" stopColor="#10b981" stopOpacity={0} />
+                </linearGradient>
+              </defs>
+              <CartesianGrid strokeDasharray="3 3" stroke="var(--border)" vertical={false} />
+              <XAxis dataKey="date" tick={{ fontSize: 11, fill: "var(--muted-foreground)" }} axisLine={false} tickLine={false} interval="preserveStartEnd" />
+              <YAxis tick={{ fontSize: 11, fill: "var(--muted-foreground)" }} axisLine={false} tickLine={false} tickFormatter={(v) => fmt(v)} width={60} />
+              <Tooltip content={<CurrencyTooltip />} />
+              <Area type="monotone" dataKey="gross" name="Gross" stroke="#8b5cf6" strokeWidth={2} fill="url(#g2)" dot={false} />
+              <Area type="monotone" dataKey="net" name="Net" stroke="#10b981" strokeWidth={2} fill="url(#n2)" dot={false} />
+            </AreaChart>
+          </ResponsiveContainer>
+        </div>
+      )}
+
+      {/* ── Stat Cards row ───────────────────────────────────────────── */}
+      <div className="grid grid-cols-2 lg:grid-cols-3 gap-4">
         <StatCard
           label="Failed Payments"
           value={openFailedPayments.length.toString()}
@@ -231,35 +338,20 @@ export default function FinanceDashboard() {
           icon={XCircle}
           color="text-red-500"
         />
+        <StatCard
+          label="New Customers"
+          value={s ? s.newCustomers.toString() : "—"}
+          sub={range.label}
+          icon={CreditCard}
+          color="text-blue-500"
+        />
       </div>
 
-      {/* ── Row 2: Revenue Chart ──────────────────────────────────────── */}
-      <div className="bg-card border border-border rounded-xl p-5">
-        <h3 className="text-sm font-semibold text-foreground mb-1">Stripe Revenue Over Time</h3>
-        <p className="text-xs text-muted-foreground mb-4">Monthly collected revenue via Stripe / Payfunnels (NZD, last 8 months)</p>
-        <ResponsiveContainer width="100%" height={200}>
-          <AreaChart data={monthlyRevenue} margin={{ top: 4, right: 4, left: 0, bottom: 0 }}>
-            <defs>
-              <linearGradient id="revGrad" x1="0" y1="0" x2="0" y2="1">
-                <stop offset="5%" stopColor="#10b981" stopOpacity={0.3} />
-                <stop offset="95%" stopColor="#10b981" stopOpacity={0} />
-              </linearGradient>
-            </defs>
-            <XAxis dataKey="month" tick={{ fontSize: 11, fill: "var(--muted-foreground)" }} axisLine={false} tickLine={false} />
-            <YAxis tick={{ fontSize: 11, fill: "var(--muted-foreground)" }} axisLine={false} tickLine={false} tickFormatter={(v) => fmt(v)} width={60} />
-            <Tooltip content={<CurrencyTooltip />} />
-            <Area type="monotone" dataKey="revenue" name="Revenue" stroke="#10b981" strokeWidth={2} fill="url(#revGrad)" dot={false} />
-          </AreaChart>
-        </ResponsiveContainer>
-      </div>
-
-      {/* ── Row 3: Cancellations (chart + reasons combined) ──────────── */}
+      {/* ── Cancellations combined card ───────────────────────────────── */}
       <div className="bg-card border border-border rounded-xl p-5">
         <h3 className="text-sm font-semibold text-foreground mb-1">Cancellations</h3>
         <p className="text-xs text-muted-foreground mb-5">Monthly volume and top reasons</p>
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
-
-          {/* Monthly bar chart */}
           <div>
             <p className="text-xs font-medium text-muted-foreground mb-3">Requests per month</p>
             <ResponsiveContainer width="100%" height={200}>
@@ -271,8 +363,6 @@ export default function FinanceDashboard() {
               </BarChart>
             </ResponsiveContainer>
           </div>
-
-          {/* Reasons horizontal bars */}
           <div>
             <p className="text-xs font-medium text-muted-foreground mb-3">Top reasons</p>
             <div className="space-y-3 pt-1">
@@ -289,16 +379,12 @@ export default function FinanceDashboard() {
                   </div>
                 );
               })}
-              {cancellationReasons.length === 0 && (
-                <p className="text-xs text-muted-foreground">No data available</p>
-              )}
             </div>
           </div>
-
         </div>
       </div>
 
-      {/* ── Row 4: Failed Payments ────────────────────────────────────── */}
+      {/* ── Failed Payments table ─────────────────────────────────────── */}
       <div className="bg-card border border-border rounded-xl p-5">
         <h3 className="text-sm font-semibold text-foreground mb-1">Failed Payments</h3>
         <p className="text-xs text-muted-foreground mb-4">Members currently in dunning</p>

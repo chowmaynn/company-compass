@@ -43,8 +43,7 @@ const salesTabs: { id: Tab; label: string; icon: React.ElementType }[] = [
 ];
 
 const financeTabs: { id: Tab; label: string; icon: React.ElementType }[] = [
-  { id: "finance",     label: "Overview",    icon: DollarSign },
-  { id: "charts",      label: "Scorecard",   icon: BarChart3 },
+  { id: "finance", label: "Overview", icon: DollarSign },
 ];
 
 export default function DepartmentPage() {
@@ -87,7 +86,9 @@ export default function DepartmentPage() {
 
       {/* ── Header ────────────────────────────────────────── */}
       <div>
-        <h1 className="text-2xl font-bold tracking-tight text-foreground">{department}</h1>
+        <h1 className="text-2xl font-bold tracking-tight text-foreground">
+          {isFinance ? "Subscriptions Overview" : department}
+        </h1>
         <p className="text-sm text-muted-foreground mt-0.5">Department metrics & performance</p>
       </div>
 

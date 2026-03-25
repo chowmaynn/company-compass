@@ -172,29 +172,110 @@ export async function fetchCancellationRequests(): Promise<CancellationRequest[]
   }));
 }
 
-// ── Stripe Charges ────────────────────────────────────────────────────────────
+// ── Stripe Overview ───────────────────────────────────────────────────────────
 
-export interface StripeCharge {
-  id: string;
-  amount: number;
-  currency: string;
-  status: string;
-  description: string;
-  created: number;
-  customerName?: string;
+export interface DailyVolume {
+  date: string; // "dd MMM"
+  gross: number;
+  net: number;
 }
 
-export async function fetchRecentCharges(limit = 50): Promise<StripeCharge[]> {
-  const res = await fetch(`/api/stripe/v1/charges?limit=${limit}`);
-  if (!res.ok) throw new Error(`Stripe ${res.status}`);
-  const data = await res.json();
-  return (data.data ?? []).map((c: Record<string, unknown>) => ({
-    id: c.id as string,
-    amount: (c.amount as number) / 100,
-    currency: c.currency as string,
-    status: c.status as string,
-    description: (c.description as string) ?? "",
-    created: c.created as number,
-    customerName: (c.billing_details as Record<string, unknown>)?.name as string | undefined,
-  }));
+export interface StripeOverview {
+  grossVolume: number;
+  netVolume: number;
+  succeeded: number;
+  failed: number;
+  refunded: number;
+  blocked: number;
+  newCustomers: number;
+  dailyVolume: DailyVolume[];
+}
+
+function stripeFetch(path: string) {
+  return fetch(`/api/stripe${path}`).then((r) => {
+    if (!r.ok) throw new Error(`Stripe ${r.status}`);
+    return r.json();
+  });
+}
+
+function dayLabel(ts: number): string {
+  const d = new Date(ts * 1000);
+  return d.toLocaleDateString("en-NZ", { day: "numeric", month: "short" });
+}
+
+async function paginateStripe(path: string, limit = 100): Promise<Record<string, unknown>[]> {
+  const all: Record<string, unknown>[] = [];
+  let url = `${path}&limit=${limit}`;
+  // cap at 5 pages to avoid slow loads
+  for (let i = 0; i < 5; i++) {
+    const data = await stripeFetch(url);
+    all.push(...(data.data ?? []));
+    if (!data.has_more) break;
+    const last = data.data[data.data.length - 1];
+    url = `${path}&limit=${limit}&starting_after=${last.id}`;
+  }
+  return all;
+}
+
+export async function fetchStripeOverview(startTs: number, endTs: number): Promise<StripeOverview> {
+  const range = `created%5Bgte%5D=${startTs}&created%5Blte%5D=${endTs}`;
+
+  const [balanceTxns, charges, customers] = await Promise.all([
+    paginateStripe(`/v1/balance_transactions?type=charge&${range}`),
+    paginateStripe(`/v1/charges?${range}`),
+    stripeFetch(`/v1/customers?created%5Bgte%5D=${startTs}&created%5Blte%5D=${endTs}&limit=1`)
+      .then((d) => d.total_count ?? 0).catch(() => 0),
+  ]);
+
+  // Gross / net from balance transactions
+  let grossVolume = 0;
+  let netVolume = 0;
+  const dayMap: Record<string, { gross: number; net: number }> = {};
+
+  for (const tx of balanceTxns) {
+    const amount = (tx.amount as number) / 100;
+    const net = (tx.net as number) / 100;
+    grossVolume += amount;
+    netVolume += net;
+    const label = dayLabel(tx.created as number);
+    if (!dayMap[label]) dayMap[label] = { gross: 0, net: 0 };
+    dayMap[label].gross += amount;
+    dayMap[label].net += net;
+  }
+
+  // Sort daily by actual date
+  const dailyVolume: DailyVolume[] = Object.entries(dayMap)
+    .sort(([, , a], [, , b]) => 0) // keep insertion order (already sorted from API)
+    .map(([date, v]) => ({ date, gross: Math.round(v.gross), net: Math.round(v.net) }));
+
+  // Payment breakdown from charges
+  let succeeded = 0;
+  let failed = 0;
+  let refunded = 0;
+  let blocked = 0;
+
+  for (const c of charges) {
+    const amount = (c.amount as number) / 100;
+    const amountRefunded = (c.amount_refunded as number) / 100;
+    const outcome = c.outcome as Record<string, unknown> | null;
+    if (outcome?.type === "blocked") {
+      blocked += amount;
+    } else if (c.status === "failed") {
+      failed += amount;
+    } else if (c.status === "succeeded") {
+      succeeded += amount - amountRefunded;
+      refunded += amountRefunded;
+    }
+  }
+
+  return {
+    grossVolume: Math.round(grossVolume),
+    netVolume: Math.round(netVolume),
+    succeeded: Math.round(succeeded),
+    failed: Math.round(failed),
+    refunded: Math.round(refunded),
+    blocked: Math.round(blocked),
+    newCustomers: customers as number,
+    dailyVolume,
+  };
 }
