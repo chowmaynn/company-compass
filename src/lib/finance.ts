@@ -38,10 +38,10 @@ export interface Transaction {
 }
 
 export async function fetchTransactions(): Promise<Transaction[]> {
-  const params = new URLSearchParams({
-    filterByFormula: "IS_AFTER({Payment Date}, DATEADD(TODAY(), -365, 'days'))",
-    sort: JSON.stringify([{ field: "Payment Date", direction: "desc" }]),
-  });
+  const params = new URLSearchParams();
+  // Airtable sort uses array notation, not JSON
+  params.append("sort[0][field]", "Payment Date");
+  params.append("sort[0][direction]", "desc");
   [
     "Customer Name",
     "Payment Date",
@@ -51,7 +51,6 @@ export async function fetchTransactions(): Promise<Transaction[]> {
     "Status",
     "Invoice Name",
     "Subscription Type",
-    "True Amount for Calculation",
   ].forEach((f) => params.append("fields[]", f));
 
   const records = await paginateAll<{
@@ -116,10 +115,9 @@ export interface FailedPayment {
 }
 
 export async function fetchFailedPayments(): Promise<FailedPayment[]> {
-  const params = new URLSearchParams({
-    filterByFormula: "AND({Status}!='Paid', {Status}!='Cancelled')",
-    sort: JSON.stringify([{ field: "Created time", direction: "desc" }]),
-  });
+  const params = new URLSearchParams();
+  params.append("sort[0][field]", "Created time");
+  params.append("sort[0][direction]", "desc");
   ["Customer", "Email", "Subscription Plan", "Status", "Next Follow Up"]
     .forEach((f) => params.append("fields[]", f));
 
@@ -151,9 +149,9 @@ export interface CancellationRequest {
 }
 
 export async function fetchCancellationRequests(): Promise<CancellationRequest[]> {
-  const params = new URLSearchParams({
-    sort: JSON.stringify([{ field: "Date of Submission", direction: "desc" }]),
-  });
+  const params = new URLSearchParams();
+  params.append("sort[0][field]", "Date of Submission");
+  params.append("sort[0][direction]", "desc");
   ["Full Name", "Cancellation Reason", "Status", "Date of Submission"]
     .forEach((f) => params.append("fields[]", f));
 
