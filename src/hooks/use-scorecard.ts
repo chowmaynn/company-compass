@@ -1,5 +1,5 @@
 import { useState, useEffect, useCallback, useMemo } from "react";
-import { type Metric, type StatusColor, type Department, scorecardMonth, getCurrentWeekIndex } from "@/data/scorecardData";
+import { type Metric, type StatusColor, type Department, scorecardMonth, getCurrentWeekIndex, scorecardData as staticScorecardData } from "@/data/scorecardData";
 import { fetchScorecard, updateScorecardCell, type ScorecardRow } from "@/lib/supabase-scorecard";
 import { calculateStatus, invertedMetrics } from "@/lib/calculateStatus";
 import { useKit } from "@/hooks/use-kit";
@@ -185,6 +185,9 @@ export function useScorecard(month: string = DEFAULT_MONTH) {
 
         if (rows.length > 0) {
           setSupabaseMetrics(sortMetrics(rows.map(rowToMetric)));
+        } else {
+          // Supabase table is empty — fall back to static seed data
+          setSupabaseMetrics(sortMetrics(staticScorecardData));
         }
       } catch (err) {
         if (!cancelled) {
