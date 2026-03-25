@@ -220,11 +220,10 @@ async function paginateStripe(path: string, limit = 100): Promise<Record<string,
 export async function fetchStripeOverview(startTs: number, endTs: number): Promise<StripeOverview> {
   const range = `created%5Bgte%5D=${startTs}&created%5Blte%5D=${endTs}`;
 
-  const [balanceTxns, charges, customers] = await Promise.all([
+  const [balanceTxns, charges, customerPages] = await Promise.all([
     paginateStripe(`/v1/balance_transactions?type=charge&${range}`),
     paginateStripe(`/v1/charges?${range}`),
-    stripeFetch(`/v1/customers?created%5Bgte%5D=${startTs}&created%5Blte%5D=${endTs}&limit=1`)
-      .then((d) => d.total_count ?? 0).catch(() => 0),
+    paginateStripe(`/v1/customers?${range}`, 100),
   ]);
 
   // Gross / net from balance transactions
@@ -243,9 +242,9 @@ export async function fetchStripeOverview(startTs: number, endTs: number): Promi
     dayMap[label].net += net;
   }
 
-  // Sort daily by actual date
+  // Stripe returns newest-first; reverse so chart reads left→right (oldest first)
   const dailyVolume: DailyVolume[] = Object.entries(dayMap)
-    .sort(([, , a], [, , b]) => 0) // keep insertion order (already sorted from API)
+    .reverse()
     .map(([date, v]) => ({ date, gross: Math.round(v.gross), net: Math.round(v.net) }));
 
   // Payment breakdown from charges
@@ -275,7 +274,7 @@ export async function fetchStripeOverview(startTs: number, endTs: number): Promi
     failed: Math.round(failed),
     refunded: Math.round(refunded),
     blocked: Math.round(blocked),
-    newCustomers: customers as number,
+    newCustomers: customerPages.length,
     dailyVolume,
   };
 }

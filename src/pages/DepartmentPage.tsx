@@ -87,7 +87,7 @@ export default function DepartmentPage() {
       {/* ── Header ────────────────────────────────────────── */}
       <div>
         <h1 className="text-2xl font-bold tracking-tight text-foreground">
-          {isFinance ? "Subscriptions Overview" : department}
+          {isFinance ? "Subscriptions" : department}
         </h1>
         <p className="text-sm text-muted-foreground mt-0.5">Department metrics & performance</p>
       </div>
