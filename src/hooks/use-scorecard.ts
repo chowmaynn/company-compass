@@ -6,6 +6,8 @@ import { useKit } from "@/hooks/use-kit";
 import { useNotion } from "@/hooks/use-notion";
 import { useGoogleAnalytics } from "@/hooks/use-google-analytics";
 import { useBitly, type BitlyWeeklyData } from "@/hooks/use-bitly";
+import { useCalendly } from "@/hooks/use-calendly";
+import { useClose } from "@/hooks/use-close";
 
 // Define display order for metrics within each department
 const METRIC_ORDER: string[] = [
@@ -116,19 +118,26 @@ const DEFAULT_MONTH = `${new Date().getFullYear()}-${String(new Date().getMonth(
 
 // Metrics sourced from live APIs — only the current week gets overlaid
 type ApiSource = {
-  hook: "kit" | "notion" | "ga" | "bitly";
+  hook: "kit" | "notion" | "ga" | "bitly" | "calendly" | "close" | "computed";
   field: string;
 };
 
 const API_METRIC_MAP: Record<string, ApiSource> = {
-  "Emails Sent":                          { hook: "kit",    field: "weeklyBroadcastCount" },
-  "Email Clicks":                         { hook: "kit",    field: "weeklyBroadcastClicks" },
-  "Videos posted last week":              { hook: "notion", field: "weeklyPublished" },
-  "Videos in the backlog":                { hook: "notion", field: "backlogCount" },
-  "Website Views":                        { hook: "ga",     field: "weeklyViews" },
-  "Clicks: YouTube > Skool":        { hook: "bitly",  field: "yt-skool" },
-  "Clicks: YouTube > Accelerator":  { hook: "bitly",  field: "yt-accelerator" },
-  "Clicks: Skool > Accelerator":    { hook: "bitly",  field: "skool-accelerator" },
+  "Emails Sent":                          { hook: "kit",       field: "weeklyBroadcastCount" },
+  "Email Clicks":                         { hook: "kit",       field: "weeklyBroadcastClicks" },
+  "Videos posted last week":              { hook: "notion",    field: "weeklyPublished" },
+  "Videos in the backlog":                { hook: "notion",    field: "backlogCount" },
+  "Website Views":                        { hook: "ga",        field: "weeklyViews" },
+  "Clicks: YouTube > Skool":              { hook: "bitly",     field: "yt-skool" },
+  "Clicks: YouTube > Accelerator":        { hook: "bitly",     field: "yt-accelerator" },
+  "Clicks: Skool > Accelerator":          { hook: "bitly",     field: "skool-accelerator" },
+  "Total Bookings":                       { hook: "calendly",  field: "salesBooked" },
+  "Email Bookings":                       { hook: "calendly",  field: "emailBooked" },
+  "Closing Calls Booked":                 { hook: "calendly",  field: "salesBooked" },
+  "Website Booking Rate":                 { hook: "computed",  field: "websiteBookingRate" },
+  "Closing Call Show Rate":               { hook: "close",     field: "showRate" },
+  "Closing Calls Taken":                  { hook: "close",     field: "callsAnswered" },
+  "Closing Call Close Rate":              { hook: "close",     field: "winRate" },
 };
 
 /** Set of metric names that are API-sourced (read-only for current week) */
@@ -142,8 +151,10 @@ function resolveApiValue(
     notion: ReturnType<typeof useNotion>;
     ga: { weeklyViews: (number | "—")[] };
     bitly: { weeklyClicks: BitlyWeeklyData };
+    calendly: ReturnType<typeof useCalendly>;
+    close: ReturnType<typeof useClose>;
   }
-): number | "—" {
+): number | string | "—" {
   switch (source.hook) {
     case "kit": {
       const data = apis.kit as Record<string, (number | "—")[]>;
@@ -158,6 +169,28 @@ function resolveApiValue(
       return apis.ga.weeklyViews[weekIndex] ?? "—";
     case "bitly":
       return apis.bitly.weeklyClicks[source.field as keyof BitlyWeeklyData]?.[weekIndex] ?? "—";
+    case "calendly": {
+      // Calendly returns monthly totals, not weekly — use salesBooked as the monthly actual
+      const val = apis.calendly[source.field as keyof ReturnType<typeof useCalendly>];
+      return typeof val === "number" ? val : "—";
+    }
+    case "close": {
+      const val = apis.close[source.field as keyof ReturnType<typeof useClose>];
+      if (typeof val === "number") {
+        return val;
+      }
+      return "—";
+    }
+    case "computed": {
+      if (source.field === "websiteBookingRate") {
+        const views = apis.ga.weeklyViews[weekIndex];
+        const bookings = apis.calendly.websiteBooked;
+        if (typeof views === "number" && views > 0 && typeof bookings === "number") {
+          return `${((bookings / views) * 100).toFixed(2)}%`;
+        }
+      }
+      return "—";
+    }
     default:
       return "—";
   }
@@ -173,6 +206,8 @@ export function useScorecard(month: string = DEFAULT_MONTH) {
   const notion = useNotion();
   const ga = useGoogleAnalytics();
   const bitly = useBitly();
+  const calendly = useCalendly();
+  const close = useClose();
 
   // Load from Supabase
   useEffect(() => {
@@ -212,14 +247,14 @@ export function useScorecard(month: string = DEFAULT_MONTH) {
       const source = API_METRIC_MAP[m.name];
       if (!source) return m;
 
-      const apiVal = resolveApiValue(source, cwi, { kit, notion, ga, bitly });
+      const apiVal = resolveApiValue(source, cwi, { kit, notion, ga, bitly, calendly, close });
       if (apiVal === "—") return m;
 
       const updated = { ...m, weeks: [...m.weeks] };
       updated.weeks[cwi] = { ...updated.weeks[cwi], actual: apiVal };
       return updated;
     });
-  }, [supabaseMetrics, kit, notion, ga.weeklyViews, bitly.weeklyClicks]);
+  }, [supabaseMetrics, kit, notion, ga.weeklyViews, bitly.weeklyClicks, calendly.salesBooked, close.wonCount, close.showRate, close.callsAnswered, close.winRate]);
 
   // Auto-calculate statuses from most recent week's actual vs target
   const metricsWithStatus = useMemo(() => {

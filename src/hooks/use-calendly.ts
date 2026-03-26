@@ -108,6 +108,12 @@ export function useCalendly() {
   const salesCanceled = salesEvents.filter((e) => e.status === "canceled");
 
   const salesBooked = salesEvents.length;
+  const emailBooked = salesEvents.filter(
+    (e) => e.name === "AAA Accelerator Business Call (Email)" || e.name === "AAA Accelerator Business Call (Welcome Email)"
+  ).length;
+  const websiteBooked = salesEvents.filter(
+    (e) => e.name === "AAA Accelerator Business Call (Website)"
+  ).length;
   const cancellationRate =
     salesBooked > 0 ? Math.round((salesCanceled.length / salesBooked) * 100) : null;
 
@@ -156,6 +162,8 @@ export function useCalendly() {
   return {
     // Sales
     salesBooked,
+    emailBooked,
+    websiteBooked,
     salesActive: salesActive.length,
     salesCanceled: salesCanceled.length,
     cancellationRate,
