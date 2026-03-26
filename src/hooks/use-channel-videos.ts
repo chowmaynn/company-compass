@@ -1,6 +1,6 @@
 import { useState, useEffect, useCallback } from "react";
-const SUPABASE_URL = import.meta.env.VITE_SUPABASE_URL;
-const SUPABASE_KEY = import.meta.env.VITE_SUPABASE_ANON_KEY;
+const SUPABASE_URL = import.meta.env.VITE_OPSHUB_SUPABASE_URL;
+const SUPABASE_KEY = import.meta.env.VITE_OPSHUB_SUPABASE_ANON_KEY;
 
 const headers = {
   apikey: SUPABASE_KEY,
