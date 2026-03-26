@@ -1,0 +1,719 @@
+import { useState, useMemo, useRef, useEffect } from "react";
+import {
+  AreaChart, Area, BarChart, Bar, XAxis, YAxis, CartesianGrid,
+  Tooltip, ResponsiveContainer, Cell, PieChart, Pie,
+} from "recharts";
+import {
+  Loader2, Mail, Globe, BookOpen, ChevronDown,
+} from "lucide-react";
+import { Calendar } from "@/components/ui/calendar";
+import type { DateRange } from "react-day-picker";
+import { useSupabaseMetrics } from "@/hooks/use-supabase-metrics";
+import { useKitMarketing } from "@/hooks/use-kit-marketing";
+import { useGoogleAnalytics } from "@/hooks/use-google-analytics";
+import { isAuthorized } from "@/lib/youtube-auth";
+import { useSkoolScorecard } from "@/hooks/use-skool-scorecard";
+
+// ── Date range helpers ───────────────────────────────────────────────────────
+
+type Preset = "MTD" | "7d" | "30d" | "3m" | "custom";
+
+function presetToRange(preset: Exclude<Preset, "custom">): { from: Date; to: Date } {
+  const now = new Date();
+  if (preset === "MTD") return { from: new Date(now.getFullYear(), now.getMonth(), 1), to: now };
+  if (preset === "7d")  return { from: new Date(now.getTime() - 7  * 86400000), to: now };
+  if (preset === "30d") return { from: new Date(now.getTime() - 30 * 86400000), to: now };
+  return { from: new Date(now.getFullYear(), now.getMonth() - 3, now.getDate()), to: now };
+}
+
+function rangeToStrings(from: Date, to: Date) {
+  return {
+    start:     from.toISOString(),
+    end:       to.toISOString(),
+    startDate: from.toISOString().slice(0, 10),
+    endDate:   to.toISOString().slice(0, 10),
+  };
+}
+
+function fmtDateLabel(d: Date): string {
+  return d.toLocaleDateString("en-NZ", { day: "numeric", month: "short", year: "numeric" });
+}
+
+// ── Small helpers ────────────────────────────────────────────────────────────
+
+function fmt(n: number | null | undefined): string {
+  if (n == null) return "—";
+  return n.toLocaleString();
+}
+
+function pct(n: number | null | undefined): string {
+  if (n == null) return "—";
+  return `${n}%`;
+}
+
+// KIT returns open_rate and click_rate already as percentages (e.g. 38.53 = 38.53%)
+function fmtRate(r: number | null | undefined): string {
+  if (r == null) return "—";
+  return `${r.toFixed(1)}%`;
+}
+
+function fmtDate(iso: string): string {
+  return new Date(iso).toLocaleDateString("en-NZ", { day: "numeric", month: "short" });
+}
+
+// ── Source colours ───────────────────────────────────────────────────────────
+
+const SOURCE_COLORS: Record<string, string> = {
+  Email:            "#6366f1",
+  "Welcome Email":  "#8b5cf6",
+  Website:          "#06b6d4",
+  "Skool A":        "#10b981",
+  "Skool C":        "#34d399",
+  "Skool P":        "#6ee7b7",
+  Masterclass:      "#f59e0b",
+  Google:           "#ef4444",
+};
+const DEFAULT_COLOR = "#94a3b8";
+
+
+// ── Tooltips ─────────────────────────────────────────────────────────────────
+
+function CountTooltip({ active, payload, label }: any) {
+  if (!active || !payload?.length) return null;
+  return (
+    <div className="bg-card border border-border rounded-lg px-3 py-2 shadow-lg text-xs">
+      <p className="text-muted-foreground mb-1">{label}</p>
+      <p className="font-semibold" style={{ color: payload[0].color }}>{payload[0].value} bookings</p>
+    </div>
+  );
+}
+
+function SourceTooltip({ active, payload, label }: any) {
+  if (!active || !payload?.length) return null;
+  return (
+    <div className="bg-card border border-border rounded-lg px-3 py-2 shadow-lg text-xs">
+      <p className="text-muted-foreground mb-1">{label}</p>
+      <p className="font-semibold text-foreground">{payload[0]?.value} qualified bookings</p>
+    </div>
+  );
+}
+
+// ── Stat card ─────────────────────────────────────────────────────────────────
+
+function StatCard({
+  label, value, sub, icon: Icon, color = "text-foreground",
+}: {
+  label: string; value: string; sub?: string; icon: React.ElementType; color?: string;
+}) {
+  return (
+    <div className="bg-card border border-border rounded-xl p-4 flex flex-col gap-2">
+      <div className="flex items-center justify-between">
+        <span className="text-xs text-muted-foreground font-medium uppercase tracking-wider">{label}</span>
+        <Icon className={`h-4 w-4 ${color}`} />
+      </div>
+      <p className={`text-2xl font-bold ${color}`}>{value}</p>
+      {sub && <p className="text-xs text-muted-foreground">{sub}</p>}
+    </div>
+  );
+}
+
+// ── Section header ────────────────────────────────────────────────────────────
+
+function SectionHeader({ icon: Icon, title, sub }: { icon: React.ElementType; title: string; sub?: string }) {
+  return (
+    <div className="flex items-center gap-2 mb-4">
+      <div className="rounded-lg bg-primary/10 p-1.5">
+        <Icon className="h-4 w-4 text-primary" />
+      </div>
+      <div>
+        <h3 className="text-sm font-semibold text-foreground">{title}</h3>
+        {sub && <p className="text-xs text-muted-foreground">{sub}</p>}
+      </div>
+    </div>
+  );
+}
+
+// ── Date range picker ─────────────────────────────────────────────────────────
+
+function DateRangePicker({
+  preset,
+  setPreset,
+  customRange,
+  setCustomRange,
+}: {
+  preset: Preset;
+  setPreset: (p: Preset) => void;
+  customRange: DateRange | undefined;
+  setCustomRange: (r: DateRange | undefined) => void;
+}) {
+  const [open, setOpen] = useState(false);
+  const ref = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    if (!open) return;
+    const handler = (e: MouseEvent) => {
+      if (ref.current && !ref.current.contains(e.target as Node)) setOpen(false);
+    };
+    document.addEventListener("mousedown", handler);
+    return () => document.removeEventListener("mousedown", handler);
+  }, [open]);
+
+  const customLabel = useMemo(() => {
+    if (customRange?.from && customRange?.to) {
+      return `${fmtDateLabel(customRange.from)} – ${fmtDateLabel(customRange.to)}`;
+    }
+    if (customRange?.from) return `${fmtDateLabel(customRange.from)} – …`;
+    return "Custom range";
+  }, [customRange]);
+
+  const presets: { id: Preset; label: string }[] = [
+    { id: "MTD", label: "This Month" },
+    { id: "7d",  label: "7 days" },
+    { id: "30d", label: "30 days" },
+    { id: "3m",  label: "3 months" },
+  ];
+
+  return (
+    <div className="relative" ref={ref}>
+      <div className="flex items-center gap-1 bg-muted rounded-lg p-1">
+        {presets.map((p) => (
+          <button
+            key={p.id}
+            onClick={() => { setPreset(p.id); setOpen(false); }}
+            className={`px-3 py-1.5 rounded-md text-xs font-medium transition-all ${
+              preset === p.id
+                ? "bg-card text-foreground shadow-sm"
+                : "text-muted-foreground hover:text-foreground"
+            }`}
+          >
+            {p.label}
+          </button>
+        ))}
+
+        {/* Custom button */}
+        <button
+          onClick={() => { setPreset("custom"); setOpen((o) => !o); }}
+          className={`flex items-center gap-1 px-3 py-1.5 rounded-md text-xs font-medium transition-all ${
+            preset === "custom"
+              ? "bg-card text-foreground shadow-sm"
+              : "text-muted-foreground hover:text-foreground"
+          }`}
+        >
+          {preset === "custom" ? customLabel : "Custom"}
+          <ChevronDown className={`h-3 w-3 transition-transform ${open ? "rotate-180" : ""}`} />
+        </button>
+      </div>
+
+      {/* Calendar popover */}
+      {open && (
+        <div className="absolute right-0 top-full mt-2 z-50 bg-card border border-border rounded-xl shadow-xl p-3">
+          <Calendar
+            mode="range"
+            selected={customRange}
+            onSelect={(r) => {
+              setCustomRange(r);
+              if (r?.from && r?.to) setOpen(false);
+            }}
+            numberOfMonths={2}
+            disabled={{ after: new Date() }}
+            defaultMonth={customRange?.from ?? new Date()}
+          />
+        </div>
+      )}
+    </div>
+  );
+}
+
+// ── Main ──────────────────────────────────────────────────────────────────────
+
+export default function MarketingDashboard() {
+  const [preset, setPreset] = useState<Preset>("MTD");
+  const [customRange, setCustomRange] = useState<DateRange | undefined>();
+
+  const [emailPreset, setEmailPreset] = useState<Preset>("MTD");
+  const [emailCustomRange, setEmailCustomRange] = useState<DateRange | undefined>();
+
+  const range = useMemo(() => {
+    if (preset === "custom" && customRange?.from && customRange?.to) {
+      return rangeToStrings(customRange.from, customRange.to);
+    }
+    const { from, to } = presetToRange(preset as Exclude<Preset, "custom">);
+    return rangeToStrings(from, to);
+  }, [preset, customRange]);
+
+  const emailRange = useMemo(() => {
+    if (emailPreset === "custom" && emailCustomRange?.from && emailCustomRange?.to) {
+      return rangeToStrings(emailCustomRange.from, emailCustomRange.to);
+    }
+    const { from, to } = presetToRange(emailPreset as Exclude<Preset, "custom">);
+    return rangeToStrings(from, to);
+  }, [emailPreset, emailCustomRange]);
+
+  const daysInRange = useMemo(() => {
+    const ms = new Date(range.end).getTime() - new Date(range.start).getTime();
+    return Math.max(1, Math.round(ms / 86400000));
+  }, [range]);
+
+  // Skool scorecard metrics
+  const skoolScorecard = useSkoolScorecard();
+
+  // Data
+  const supabase = useSupabaseMetrics(range.start, range.end);
+  const emailSupabase = useSupabaseMetrics(emailRange.start, emailRange.end);
+  const kit = useKitMarketing(emailRange.startDate, emailRange.endDate);
+  const ga = useGoogleAnalytics();
+  const gaAuthed = isAuthorized();
+
+  // Derived booking counts
+  const skoolBookings = useMemo(() => {
+    const skoolA = supabase.salesEventBreakdown.find((e) => e.name === "Skool A")?.qualified ?? 0;
+    const skoolC = supabase.salesEventBreakdown.find((e) => e.name === "Skool C")?.qualified ?? 0;
+    const skoolP = supabase.salesEventBreakdown.find((e) => e.name === "Skool P")?.qualified ?? 0;
+    return { skoolA, skoolC, skoolP, total: skoolA + skoolC + skoolP };
+  }, [supabase.salesEventBreakdown]);
+
+  const websiteBookings = supabase.salesEventBreakdown.find((e) => e.name === "Website")?.qualified ?? 0;
+  const emailBookings =
+    (emailSupabase.salesEventBreakdown.find((e) => e.name === "Email")?.qualified ?? 0) +
+    (emailSupabase.salesEventBreakdown.find((e) => e.name === "Welcome Email")?.qualified ?? 0);
+
+  const avgPerDay = supabase.totalBookings > 0
+    ? (supabase.totalBookings / daysInRange).toFixed(1)
+    : "—";
+
+  const totalWebViews = useMemo(() => {
+    const views = ga.weeklyViews.filter((v): v is number => v !== "—");
+    return views.reduce((s, v) => s + v, 0);
+  }, [ga.weeklyViews]);
+
+  const websiteBookingRate =
+    totalWebViews > 0 && websiteBookings > 0
+      ? ((websiteBookings / totalWebViews) * 100).toFixed(2) + "%"
+      : "—";
+
+  const totalBooked = supabase.totalBookings + supabase.caseyCancel;
+
+  return (
+    <div className="p-6 max-w-7xl mx-auto space-y-8">
+
+      {/* ══ Unified Booking Card ═══════════════════════════════════════════ */}
+      <div className="bg-card border border-border rounded-xl overflow-hidden">
+
+        {/* Card header with date picker */}
+        <div className="flex items-center justify-between px-6 py-4 border-b border-border">
+          <div>
+            <h3 className="text-sm font-semibold text-foreground">Booking Overview</h3>
+            <p className="text-xs text-muted-foreground mt-0.5">
+              All marketing channels · {avgPerDay} per day avg
+            </p>
+          </div>
+          <DateRangePicker
+            preset={preset}
+            setPreset={setPreset}
+            customRange={customRange}
+            setCustomRange={setCustomRange}
+          />
+        </div>
+
+        {supabase.isLoading ? (
+          <div className="flex items-center gap-2 text-muted-foreground text-sm p-8">
+            <Loader2 className="h-4 w-4 animate-spin" /> Loading booking data…
+          </div>
+        ) : (
+          <>
+            {/* ── KPI row ─────────────────────────────────────────────── */}
+            <div className="grid grid-cols-3 divide-x divide-border border-b border-border">
+              {/* Qualified */}
+              <div className="px-6 py-5">
+                <p className="text-[10px] text-muted-foreground uppercase tracking-wider font-semibold mb-1">Qualified Bookings</p>
+                <p className="text-3xl font-bold text-foreground">{fmt(supabase.totalBookings)}</p>
+                <p className="text-xs text-muted-foreground mt-1">Passed country qualification</p>
+                <div className="mt-3 h-1 bg-muted rounded-full overflow-hidden">
+                  <div className="h-full bg-primary rounded-full w-full" />
+                </div>
+              </div>
+
+              {/* Country disqualified */}
+              <div className="px-6 py-5">
+                <p className="text-[10px] text-muted-foreground uppercase tracking-wider font-semibold mb-1">Country Disqualified</p>
+                <p className="text-3xl font-bold text-status-red">{fmt(supabase.caseyCancel)}</p>
+                <p className="text-xs text-muted-foreground mt-1">
+                  {totalBooked > 0
+                    ? `${Math.round((supabase.caseyCancel / totalBooked) * 100)}% of total booked`
+                    : "of total booked"}
+                </p>
+                <div className="mt-3 h-1 bg-muted rounded-full overflow-hidden">
+                  <div
+                    className="h-full bg-status-red rounded-full"
+                    style={{ width: totalBooked > 0 ? `${Math.round((supabase.caseyCancel / totalBooked) * 100)}%` : "0%" }}
+                  />
+                </div>
+              </div>
+
+              {/* Invitee cancellations */}
+              <div className="px-6 py-5">
+                <p className="text-[10px] text-muted-foreground uppercase tracking-wider font-semibold mb-1">Invitee Cancellations</p>
+                <p className="text-3xl font-bold text-status-yellow">{fmt(supabase.inviteeCancel)}</p>
+                <p className="text-xs text-muted-foreground mt-1">
+                  {pct(supabase.cancellationRate)} cancellation rate
+                </p>
+                <div className="mt-3 h-1 bg-muted rounded-full overflow-hidden">
+                  <div
+                    className="h-full bg-status-yellow rounded-full"
+                    style={{ width: supabase.cancellationRate != null ? `${supabase.cancellationRate}%` : "0%" }}
+                  />
+                </div>
+              </div>
+            </div>
+
+            {/* ── Charts row ──────────────────────────────────────────── */}
+            <div className="grid grid-cols-1 lg:grid-cols-2 divide-x divide-border">
+
+              {/* Bookings by source */}
+              <div className="p-6">
+                <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wider mb-4">Bookings by Source</p>
+                {supabase.salesEventBreakdown.length === 0 ? (
+                  <p className="text-sm text-muted-foreground py-8 text-center">No bookings in this period</p>
+                ) : (
+                  <ResponsiveContainer width="100%" height={220}>
+                    <BarChart
+                      data={supabase.salesEventBreakdown}
+                      layout="vertical"
+                      margin={{ left: 8, right: 24, top: 4, bottom: 4 }}
+                    >
+                      <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--border))" horizontal={false} />
+                      <XAxis type="number" tick={{ fontSize: 11, fill: "hsl(var(--muted-foreground))" }} axisLine={false} tickLine={false} />
+                      <YAxis dataKey="name" type="category" tick={{ fontSize: 11, fill: "hsl(var(--muted-foreground))" }} axisLine={false} tickLine={false} width={90} />
+                      <Tooltip content={<SourceTooltip />} />
+                      <Bar dataKey="qualified" radius={[0, 4, 4, 0]}>
+                        {supabase.salesEventBreakdown.map((entry) => (
+                          <Cell key={entry.name} fill={SOURCE_COLORS[entry.name] ?? DEFAULT_COLOR} />
+                        ))}
+                      </Bar>
+                    </BarChart>
+                  </ResponsiveContainer>
+                )}
+              </div>
+
+              {/* Daily trend */}
+              <div className="p-6">
+                <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wider mb-4">Daily Booking Trend</p>
+                {supabase.dailyBookings.length === 0 ? (
+                  <p className="text-sm text-muted-foreground py-8 text-center">No bookings in this period</p>
+                ) : (
+                  <ResponsiveContainer width="100%" height={220}>
+                    <AreaChart data={supabase.dailyBookings} margin={{ left: 0, right: 8, top: 4, bottom: 4 }}>
+                      <defs>
+                        <linearGradient id="bookingGrad" x1="0" y1="0" x2="0" y2="1">
+                          <stop offset="5%" stopColor="#6366f1" stopOpacity={0.25} />
+                          <stop offset="95%" stopColor="#6366f1" stopOpacity={0} />
+                        </linearGradient>
+                      </defs>
+                      <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--border))" />
+                      <XAxis
+                        dataKey="date"
+                        tickFormatter={fmtDate}
+                        tick={{ fontSize: 10, fill: "hsl(var(--muted-foreground))" }}
+                        axisLine={false}
+                        tickLine={false}
+                        interval="preserveStartEnd"
+                      />
+                      <YAxis
+                        allowDecimals={false}
+                        tick={{ fontSize: 11, fill: "hsl(var(--muted-foreground))" }}
+                        axisLine={false}
+                        tickLine={false}
+                        width={24}
+                      />
+                      <Tooltip content={<CountTooltip />} />
+                      <Area
+                        type="monotone"
+                        dataKey="bookings"
+                        stroke="#6366f1"
+                        strokeWidth={2}
+                        fill="url(#bookingGrad)"
+                        dot={false}
+                        activeDot={{ r: 4 }}
+                      />
+                    </AreaChart>
+                  </ResponsiveContainer>
+                )}
+              </div>
+            </div>
+          </>
+        )}
+      </div>
+
+      {/* ══ Email Channel Card ════════════════════════════════════════════ */}
+      <div className="bg-card border border-border rounded-xl overflow-hidden">
+
+        {/* Header */}
+        <div className="flex items-center justify-between px-6 py-4 border-b border-border">
+          <div className="flex items-center gap-2">
+            <div className="rounded-lg bg-primary/10 p-1.5">
+              <Mail className="h-4 w-4 text-primary" />
+            </div>
+            <div>
+              <h3 className="text-sm font-semibold text-foreground">Email Channel</h3>
+              <p className="text-xs text-muted-foreground">Kit broadcast performance</p>
+            </div>
+          </div>
+          <DateRangePicker
+            preset={emailPreset}
+            setPreset={setEmailPreset}
+            customRange={emailCustomRange}
+            setCustomRange={setEmailCustomRange}
+          />
+        </div>
+
+        {kit.loading ? (
+          <div className="flex items-center gap-2 text-muted-foreground text-sm p-6">
+            <Loader2 className="h-4 w-4 animate-spin" /> Loading email data…
+          </div>
+        ) : (
+          <>
+            {/* ── Top row: True Active + Email → Bookings ──────────────── */}
+            <div className="grid grid-cols-2 divide-x divide-border border-b border-border">
+
+              {/* True Active */}
+              <div className="px-6 py-6 flex flex-col justify-center">
+                <p className="text-[10px] text-muted-foreground uppercase tracking-wider font-semibold mb-3">True Active Subscribers</p>
+                <p className="text-6xl font-bold text-foreground leading-none">{fmt(kit.trueActiveSubscribers)}</p>
+                <p className="text-xs text-muted-foreground mt-3">Engaged subscribers (excl. cold)</p>
+              </div>
+
+              {/* Email → Bookings */}
+              <div className="px-6 py-6 border-l-4 border-l-primary bg-primary/[0.03]">
+                <p className="text-[10px] text-primary uppercase tracking-wider font-semibold mb-4">Email → Bookings</p>
+                {emailBookings > 0 ? (
+                  <div className="grid grid-cols-3 items-center gap-4">
+                    <div>
+                      <p className="text-4xl font-bold text-foreground leading-none">{fmt(emailBookings)}</p>
+                      <p className="text-xs text-muted-foreground mt-2">Qualified bookings from email</p>
+                    </div>
+                    <div className="flex justify-center">
+                      <PieChart width={130} height={130}>
+                        <Pie
+                          data={[
+                            { name: "Email", value: emailSupabase.salesEventBreakdown.find((e) => e.name === "Email")?.qualified ?? 0 },
+                            { name: "Welcome Email", value: emailSupabase.salesEventBreakdown.find((e) => e.name === "Welcome Email")?.qualified ?? 0 },
+                          ].filter((d) => d.value > 0)}
+                          cx="50%" cy="50%"
+                          innerRadius={38} outerRadius={60}
+                          paddingAngle={3} dataKey="value"
+                        >
+                          <Cell fill="#6366f1" />
+                          <Cell fill="#8b5cf6" />
+                        </Pie>
+                        <Tooltip
+                          content={({ active, payload }) => {
+                            if (!active || !payload?.length) return null;
+                            return (
+                              <div className="bg-card border border-border rounded-lg px-3 py-2 shadow-lg text-xs">
+                                <p className="font-semibold text-foreground">{payload[0].name}</p>
+                                <p className="text-muted-foreground">{fmt(payload[0].value as number)} bookings</p>
+                              </div>
+                            );
+                          }}
+                        />
+                      </PieChart>
+                    </div>
+                    <div className="space-y-3">
+                      {[
+                        { label: "Email", value: emailSupabase.salesEventBreakdown.find((e) => e.name === "Email")?.qualified ?? 0, color: "#6366f1" },
+                        { label: "Welcome Email", value: emailSupabase.salesEventBreakdown.find((e) => e.name === "Welcome Email")?.qualified ?? 0, color: "#8b5cf6" },
+                      ].map(({ label, value, color }) => (
+                        <div key={label}>
+                          <div className="flex items-center gap-2 mb-1">
+                            <span className="shrink-0 rounded-sm" style={{ width: 8, height: 8, background: color }} />
+                            <span className="text-xs text-muted-foreground flex-1">{label}</span>
+                            <span className="text-xs font-bold font-mono text-foreground">{fmt(value)}</span>
+                            <span className="text-xs text-muted-foreground w-8 text-right">{Math.round((value / emailBookings) * 100)}%</span>
+                          </div>
+                          <div className="h-1 bg-muted rounded-full overflow-hidden ml-3.5">
+                            <div className="h-full rounded-full" style={{ width: `${Math.round((value / emailBookings) * 100)}%`, background: color }} />
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                ) : (
+                  <p className="text-sm text-muted-foreground py-4">No email bookings in this period.</p>
+                )}
+              </div>
+            </div>
+
+            {/* ── Secondary KPIs ───────────────────────────────────────── */}
+            <div className="grid grid-cols-2 lg:grid-cols-4 divide-x divide-border border-b border-border">
+              <div className="px-5 py-4">
+                <p className="text-[10px] text-muted-foreground uppercase tracking-wider font-semibold mb-1">Cold Subscribers</p>
+                <p className="text-2xl font-bold text-status-yellow">{fmt(kit.coldSubscribers)}</p>
+                <p className="text-xs text-muted-foreground mt-1">~1–2% est. accuracy</p>
+              </div>
+              <div className="px-5 py-4">
+                <p className="text-[10px] text-muted-foreground uppercase tracking-wider font-semibold mb-1">Total List</p>
+                <p className="text-2xl font-bold text-foreground">{fmt(kit.activeSubscribers)}</p>
+                <p className="text-xs text-muted-foreground mt-1">
+                  {kit.newSubscribers != null ? `+${fmt(kit.newSubscribers)} new this period` : "Active subscribers"}
+                </p>
+              </div>
+              <div className="px-5 py-4">
+                <p className="text-[10px] text-muted-foreground uppercase tracking-wider font-semibold mb-1">Avg Open Rate</p>
+                <p className="text-2xl font-bold text-foreground">{fmtRate(kit.avgOpenRate)}</p>
+                <p className="text-xs text-muted-foreground mt-1">{kit.broadcasts.length} broadcasts</p>
+              </div>
+              <div className="px-5 py-4">
+                <p className="text-[10px] text-muted-foreground uppercase tracking-wider font-semibold mb-1">Avg Click Rate</p>
+                <p className="text-2xl font-bold text-foreground">{fmtRate(kit.avgClickRate)}</p>
+                <p className="text-xs text-muted-foreground mt-1">{fmt(kit.totalRecipients)} total recipients</p>
+              </div>
+            </div>
+
+            {/* ── Broadcasts table ─────────────────────────────────────── */}
+            {kit.broadcasts.length > 0 ? (
+              <>
+                <div className="grid grid-cols-[1fr_70px_90px_70px_70px_70px_80px] gap-2 px-5 py-2.5 bg-muted/20 border-b border-border text-[10px] font-semibold text-muted-foreground uppercase tracking-wider">
+                  <span>Subject</span>
+                  <span className="text-center">Sent</span>
+                  <span className="text-right">Recipients</span>
+                  <span className="text-right">Opens</span>
+                  <span className="text-right">Open %</span>
+                  <span className="text-right">Click %</span>
+                  <span className="text-right">Booking Clicks</span>
+                </div>
+                <div className="overflow-y-auto max-h-72">
+                  {kit.broadcasts.map((b) => (
+                    <div
+                      key={b.id}
+                      className="grid grid-cols-[1fr_70px_90px_70px_70px_70px_80px] gap-2 px-5 py-2.5 items-center border-b border-border/30 hover:bg-muted/10 transition-colors last:border-0"
+                    >
+                      <span className="text-sm text-foreground truncate" title={b.subject}>{b.subject}</span>
+                      <span className="text-xs text-muted-foreground text-center">{fmtDate(b.sentAt)}</span>
+                      <span className="text-xs font-mono text-foreground text-right">{fmt(b.recipients)}</span>
+                      <span className="text-xs font-mono text-foreground text-right">{fmt(b.opens)}</span>
+                      <span className="text-xs font-mono text-muted-foreground text-right">{fmtRate(b.openRate)}</span>
+                      <span className="text-xs font-mono text-muted-foreground text-right">{fmtRate(b.clickRate)}</span>
+                      <span className="text-xs font-mono text-right">
+                        {b.calendlyClicks > 0
+                          ? <span className="text-primary font-semibold">{fmt(b.calendlyClicks)}</span>
+                          : <span className="text-muted-foreground">—</span>}
+                      </span>
+                    </div>
+                  ))}
+                </div>
+              </>
+            ) : (
+              <p className="text-sm text-muted-foreground px-6 py-4">No broadcasts sent in this period.</p>
+            )}
+          </>
+        )}
+      </div>
+
+      {/* ══ Website + Skool ═══════════════════════════════════════════════ */}
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+
+        {/* Website */}
+        <div className="bg-card border border-border rounded-xl p-5 space-y-4">
+          <SectionHeader icon={Globe} title="Website Channel" sub="aaaaccelerator.com" />
+          {!gaAuthed ? (
+            <p className="text-sm text-muted-foreground py-4 text-center">
+              Connect Google in the top-right to see website analytics.
+            </p>
+          ) : ga.loading ? (
+            <div className="flex items-center gap-2 text-muted-foreground text-sm">
+              <Loader2 className="h-4 w-4 animate-spin" /> Loading…
+            </div>
+          ) : (
+            <div className="grid grid-cols-2 gap-3">
+              <div className="bg-muted/30 rounded-lg p-3">
+                <p className="text-xs text-muted-foreground uppercase tracking-wider font-medium mb-1">Website Views</p>
+                <p className="text-xl font-bold text-foreground">{fmt(totalWebViews)}</p>
+              </div>
+              <div className="bg-muted/30 rounded-lg p-3">
+                <p className="text-xs text-muted-foreground uppercase tracking-wider font-medium mb-1">Website Bookings</p>
+                <p className="text-xl font-bold text-foreground">{fmt(websiteBookings)}</p>
+              </div>
+              <div className="bg-muted/30 rounded-lg p-3 col-span-2">
+                <p className="text-xs text-muted-foreground uppercase tracking-wider font-medium mb-1">View → Booking Rate</p>
+                <p className="text-xl font-bold text-foreground">{websiteBookingRate}</p>
+              </div>
+            </div>
+          )}
+        </div>
+
+        {/* Skool */}
+        <div className="bg-card border border-border rounded-xl p-5 space-y-4">
+          <SectionHeader icon={BookOpen} title="Skool Channel" sub="learn-ai community" />
+          {supabase.isLoading ? (
+            <div className="flex items-center gap-2 text-muted-foreground text-sm">
+              <Loader2 className="h-4 w-4 animate-spin" /> Loading…
+            </div>
+          ) : (
+            <div className="space-y-3">
+              {/* Live bookings from Calendly */}
+              <div className="bg-muted/30 rounded-lg p-3 flex items-center justify-between">
+                <div>
+                  <p className="text-xs text-muted-foreground uppercase tracking-wider font-medium">Total Skool Bookings</p>
+                  <p className="text-xl font-bold text-foreground mt-0.5">{fmt(skoolBookings.total)}</p>
+                </div>
+                <p className="text-xs text-muted-foreground">
+                  {supabase.totalBookings > 0
+                    ? `${Math.round((skoolBookings.total / supabase.totalBookings) * 100)}% of total`
+                    : ""}
+                </p>
+              </div>
+
+              {/* A / P / C breakdown */}
+              {[
+                { label: "Skool A", value: skoolBookings.skoolA, color: "#10b981" },
+                { label: "Skool C", value: skoolBookings.skoolC, color: "#34d399" },
+                { label: "Skool P", value: skoolBookings.skoolP, color: "#6ee7b7" },
+              ].map(({ label, value, color }) => (
+                <div key={label} className="flex items-center gap-3">
+                  <span className="inline-block rounded-sm shrink-0" style={{ width: 10, height: 10, background: color }} />
+                  <span className="text-sm text-foreground flex-1">{label}</span>
+                  <span className="text-sm font-semibold font-mono text-foreground">{fmt(value)}</span>
+                  <div className="w-24 bg-muted rounded-full h-1.5 overflow-hidden">
+                    <div className="h-full rounded-full" style={{ width: skoolBookings.total > 0 ? `${(value / skoolBookings.total) * 100}%` : "0%", background: color }} />
+                  </div>
+                </div>
+              ))}
+
+              {/* Scorecard metrics */}
+              <div className="pt-2 border-t border-border grid grid-cols-3 gap-3">
+                <div className="bg-muted/30 rounded-lg p-3">
+                  <p className="text-xs text-muted-foreground uppercase tracking-wider font-medium mb-1">Booking Rate</p>
+                  <p className="text-xl font-bold text-foreground">
+                    {skoolScorecard.loading ? "…" : skoolScorecard.bookingRate ?? "—"}
+                  </p>
+                  {skoolScorecard.bookingRateMonth && (
+                    <p className="text-[10px] text-muted-foreground mt-0.5">{skoolScorecard.bookingRateMonth}</p>
+                  )}
+                </div>
+                <div className="bg-muted/30 rounded-lg p-3">
+                  <p className="text-xs text-muted-foreground uppercase tracking-wider font-medium mb-1">Skool Joins</p>
+                  <p className="text-xl font-bold text-foreground">
+                    {skoolScorecard.loading ? "…" : skoolScorecard.joins ?? "—"}
+                  </p>
+                  {skoolScorecard.joinsMonth && (
+                    <p className="text-[10px] text-muted-foreground mt-0.5">{skoolScorecard.joinsMonth}</p>
+                  )}
+                </div>
+                <div className="bg-muted/30 rounded-lg p-3">
+                  <p className="text-xs text-muted-foreground uppercase tracking-wider font-medium mb-1">AAA Bitly Clicks</p>
+                  <p className="text-xl font-bold text-foreground">
+                    {skoolScorecard.loading ? "…" : skoolScorecard.skoolClicks ?? "—"}
+                  </p>
+                  {skoolScorecard.skoolClicksMonth && (
+                    <p className="text-[10px] text-muted-foreground mt-0.5">{skoolScorecard.skoolClicksMonth}</p>
+                  )}
+                </div>
+              </div>
+            </div>
+          )}
+        </div>
+      </div>
+
+    </div>
+  );
+}

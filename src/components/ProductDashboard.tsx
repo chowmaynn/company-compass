@@ -159,10 +159,10 @@ export function ProductDashboard() {
 
           {/* Stat numbers */}
           <div className="grid grid-cols-2 gap-4 mb-6">
-            <div className="rounded-xl bg-blue-50 p-4">
+            <div className="rounded-xl bg-blue-50 dark:bg-blue-950/40 p-4">
               <div className="flex items-center gap-2 mb-2">
-                <div className="h-7 w-7 rounded-lg bg-blue-100 flex items-center justify-center">
-                  <Users className="h-3.5 w-3.5 text-blue-600" />
+                <div className="h-7 w-7 rounded-lg bg-blue-100 dark:bg-blue-900/50 flex items-center justify-center">
+                  <Users className="h-3.5 w-3.5 text-blue-600 dark:text-blue-400" />
                 </div>
                 <span className="text-xs font-medium text-muted-foreground">Total Members</span>
               </div>
@@ -173,10 +173,10 @@ export function ProductDashboard() {
               </p>
               <p className="text-[11px] text-muted-foreground mt-1">All time</p>
             </div>
-            <div className="rounded-xl bg-emerald-50 p-4">
+            <div className="rounded-xl bg-emerald-50 dark:bg-emerald-950/40 p-4">
               <div className="flex items-center gap-2 mb-2">
-                <div className="h-7 w-7 rounded-lg bg-emerald-100 flex items-center justify-center">
-                  <UserPlus className="h-3.5 w-3.5 text-emerald-600" />
+                <div className="h-7 w-7 rounded-lg bg-emerald-100 dark:bg-emerald-900/50 flex items-center justify-center">
+                  <UserPlus className="h-3.5 w-3.5 text-emerald-600 dark:text-emerald-400" />
                 </div>
                 <span className="text-xs font-medium text-muted-foreground">New This Month</span>
               </div>
