@@ -1,4 +1,4 @@
-import { useMemo } from "react";
+import { useMemo, useState } from "react";
 import { useIntercom } from "@/hooks/use-intercom";
 import { Card, CardContent } from "@/components/ui/card";
 import {
@@ -59,12 +59,20 @@ function dayLabel(key: string): string {
 const GRID = "hsl(220, 13%, 91%)";
 const TICK = "hsl(220, 9%, 46%)";
 const TOOLTIP_STYLE = {
-  backgroundColor: "#fff",
-  border: "1px solid hsl(220, 13%, 91%)",
+  backgroundColor: "hsl(var(--card))",
+  border: "1px solid hsl(var(--border))",
   borderRadius: "8px",
   fontSize: "12px",
-  boxShadow: "0 4px 6px -1px rgb(0 0 0 / 0.07)",
+  color: "hsl(var(--foreground))",
 };
+
+const DAY_PRESETS = [
+  { label: "7d", days: 7 },
+  { label: "14d", days: 14 },
+  { label: "30d", days: 30 },
+  { label: "60d", days: 60 },
+  { label: "90d", days: 90 },
+];
 
 // ── Stat card ─────────────────────────────────────────────────
 
@@ -95,7 +103,8 @@ function StatCard({
 // ── Main ──────────────────────────────────────────────────────
 
 export default function SupportDashboard() {
-  const { recent, open, openTotal, loading, error } = useIntercom();
+  const [days, setDays] = useState(30);
+  const { recent, inbox, inboxTotal, loading, error } = useIntercom(days);
 
   // ── Derived stats ─────────────────────────────────────────
 
@@ -103,8 +112,8 @@ export default function SupportDashboard() {
   const openRecent = useMemo(() => recent.filter((c) => c.state === "open").length, [recent]);
 
   const awaitingReply = useMemo(
-    () => open.filter((c) => c.waiting_since !== null).length,
-    [open]
+    () => inbox.filter((c) => c.waiting_since !== null).length,
+    [inbox]
   );
 
   const avgResponseTime = useMemo(() => {
@@ -120,11 +129,10 @@ export default function SupportDashboard() {
     return Math.round((closedRecent / recent.length) * 100);
   }, [recent, closedRecent]);
 
-  // Daily volume (last 30 days) - fill all days
+  // Daily volume — fill all days in range
   const dailyVolume = useMemo(() => {
     const map: Record<string, number> = {};
-    // Pre-fill last 30 days
-    for (let i = 29; i >= 0; i--) {
+    for (let i = days - 1; i >= 0; i--) {
       const d = new Date();
       d.setDate(d.getDate() - i);
       const key = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
@@ -135,7 +143,7 @@ export default function SupportDashboard() {
       if (key in map) map[key]++;
     });
     return Object.entries(map).map(([key, count]) => ({ key, label: dayLabel(key), count }));
-  }, [recent]);
+  }, [recent, days]);
 
   // Response time distribution
   const responseDistribution = useMemo(() => {
@@ -159,19 +167,18 @@ export default function SupportDashboard() {
     });
   }, [recent]);
 
-  // Inbox — open conversations waiting for reply, sorted longest wait first
-  const inbox = useMemo(() =>
-    [...open]
+  // Inbox — sorted longest wait first
+  const sortedInbox = useMemo(() =>
+    [...inbox]
       .sort((a, b) => {
-        // Waiting (customer replied last) first, then by created_at oldest first
         const aWaiting = a.waiting_since ?? 0;
         const bWaiting = b.waiting_since ?? 0;
         if (aWaiting && !bWaiting) return -1;
         if (!aWaiting && bWaiting) return 1;
-        return aWaiting - bWaiting; // oldest wait first
+        return aWaiting - bWaiting;
       })
-      .slice(0, 30),
-    [open]
+      .slice(0, 50),
+    [inbox]
   );
 
   if (loading) {
@@ -195,23 +202,40 @@ export default function SupportDashboard() {
   return (
     <div className="space-y-5">
 
+      {/* ── Date range selector ─────────────────────────────── */}
+      <div className="flex items-center gap-1 bg-muted rounded-lg p-1 w-fit">
+        {DAY_PRESETS.map((p) => (
+          <button
+            key={p.days}
+            onClick={() => setDays(p.days)}
+            className={`px-3 py-1.5 rounded-md text-sm font-medium transition-all ${
+              days === p.days
+                ? "bg-card text-foreground shadow-sm"
+                : "text-muted-foreground hover:text-foreground"
+            }`}
+          >
+            {p.label}
+          </button>
+        ))}
+      </div>
+
       {/* ── Stats row ──────────────────────────────────────── */}
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
         <StatCard
-          label="Total (30 days)"
+          label={`Total (${days}d)`}
           value={recent.length}
           sub={`${closedRecent} resolved · ${openRecent} open`}
           icon={MessageSquare}
           accent="text-indigo-600"
-          bg="bg-indigo-50"
+          bg="bg-indigo-50 dark:bg-indigo-950/40"
         />
         <StatCard
-          label="Open Right Now"
-          value={openTotal}
-          sub="Across all conversations"
+          label="Your Inbox"
+          value={inboxTotal}
+          sub="Open & assigned to you"
           icon={Inbox}
           accent="text-blue-600"
-          bg="bg-blue-50"
+          bg="bg-blue-50 dark:bg-blue-950/40"
         />
         <StatCard
           label="Awaiting Reply"
@@ -219,12 +243,12 @@ export default function SupportDashboard() {
           sub="Customer replied last"
           icon={AlertCircle}
           accent={awaitingReply > 20 ? "text-red-600" : awaitingReply > 10 ? "text-amber-600" : "text-emerald-600"}
-          bg={awaitingReply > 20 ? "bg-red-50" : awaitingReply > 10 ? "bg-amber-50" : "bg-emerald-50"}
+          bg={awaitingReply > 20 ? "bg-red-50 dark:bg-red-950/40" : awaitingReply > 10 ? "bg-amber-50 dark:bg-amber-950/40" : "bg-emerald-50 dark:bg-emerald-950/40"}
         />
         <StatCard
           label="Avg First Response"
           value={avgResponseTime !== null ? fmtDuration(avgResponseTime) : "—"}
-          sub={resolutionRate !== null ? `${resolutionRate}% resolved (30d)` : "30 day window"}
+          sub={resolutionRate !== null ? `${resolutionRate}% resolved (${days}d)` : `${days}d window`}
           icon={Clock}
           accent={
             avgResponseTime === null ? "text-foreground"
@@ -243,9 +267,9 @@ export default function SupportDashboard() {
           <div className="flex items-start justify-between mb-4">
             <div>
               <h3 className="text-sm font-semibold text-foreground">Conversation Volume</h3>
-              <p className="text-xs text-muted-foreground mt-0.5">New conversations per day — last 30 days</p>
+              <p className="text-xs text-muted-foreground mt-0.5">New conversations per day — last {days} days</p>
             </div>
-            <span className="text-xs font-mono text-indigo-600 font-semibold bg-indigo-50 px-2 py-1 rounded-lg">
+            <span className="text-xs font-mono text-indigo-600 font-semibold bg-indigo-50 dark:bg-indigo-950/40 px-2 py-1 rounded-lg">
               {recent.length} total
             </span>
           </div>
@@ -258,12 +282,9 @@ export default function SupportDashboard() {
                 </linearGradient>
               </defs>
               <CartesianGrid strokeDasharray="3 3" stroke={GRID} vertical={false} />
-              <XAxis dataKey="label" tick={{ fontSize: 10, fill: TICK }} axisLine={{ stroke: GRID }} tickLine={false} interval={4} />
+              <XAxis dataKey="label" tick={{ fontSize: 10, fill: TICK }} axisLine={{ stroke: GRID }} tickLine={false} interval={Math.max(1, Math.floor(days / 10))} />
               <YAxis tick={{ fontSize: 10, fill: TICK }} axisLine={false} tickLine={false} allowDecimals={false} />
-              <Tooltip
-                contentStyle={TOOLTIP_STYLE}
-                formatter={(v: number) => [v, "Conversations"]}
-              />
+              <Tooltip contentStyle={TOOLTIP_STYLE} formatter={(v: number) => [v, "Conversations"]} />
               <Area type="monotone" dataKey="count" stroke="#6366f1" strokeWidth={2} fill="url(#volGrad)" dot={false} activeDot={{ r: 4, fill: "#6366f1" }} />
             </AreaChart>
           </ResponsiveContainer>
@@ -298,7 +319,7 @@ export default function SupportDashboard() {
         <Card className="border-border/50">
           <CardContent className="p-5">
             <h3 className="text-sm font-semibold text-foreground mb-0.5">Resolution Overview</h3>
-            <p className="text-xs text-muted-foreground mb-5">Last 30 days · {recent.length} total conversations</p>
+            <p className="text-xs text-muted-foreground mb-5">Last {days} days · {recent.length} total conversations</p>
 
             <div className="space-y-5">
               {/* Resolution rate */}
@@ -330,12 +351,12 @@ export default function SupportDashboard() {
 
               {/* Open vs closed */}
               <div className="grid grid-cols-2 gap-3">
-                <div className="rounded-xl bg-emerald-50 p-3 text-center">
+                <div className="rounded-xl bg-emerald-50 dark:bg-emerald-950/40 p-3 text-center">
                   <p className="text-2xl font-bold text-emerald-600">{closedRecent}</p>
                   <p className="text-[11px] text-muted-foreground mt-0.5">Resolved</p>
                 </div>
-                <div className="rounded-xl bg-red-50 p-3 text-center">
-                  <p className="text-2xl font-bold text-red-500">{openRecent}</p>
+                <div className="rounded-xl bg-red-50 dark:bg-red-950/40 p-3 text-center">
+                  <p className="text-2xl font-bold text-red-500">{inboxTotal}</p>
                   <p className="text-[11px] text-muted-foreground mt-0.5">Still Open</p>
                 </div>
               </div>
@@ -343,7 +364,7 @@ export default function SupportDashboard() {
               {/* Awaiting reply breakdown */}
               <div className="pt-3 border-t border-border">
                 <div className="flex items-center justify-between">
-                  <span className="text-xs text-muted-foreground">Awaiting your reply (of open)</span>
+                  <span className="text-xs text-muted-foreground">Awaiting your reply (of inbox)</span>
                   <span className={`text-xs font-bold ${awaitingReply > 20 ? "text-red-600" : "text-amber-600"}`}>
                     {awaitingReply} conversations
                   </span>
@@ -351,7 +372,7 @@ export default function SupportDashboard() {
                 <div className="h-1.5 rounded-full bg-muted overflow-hidden mt-1.5">
                   <div
                     className="h-full rounded-full bg-amber-400"
-                    style={{ width: `${openTotal > 0 ? Math.min((awaitingReply / openTotal) * 100, 100) : 0}%` }}
+                    style={{ width: `${inboxTotal > 0 ? Math.min((awaitingReply / inboxTotal) * 100, 100) : 0}%` }}
                   />
                 </div>
               </div>
@@ -360,14 +381,14 @@ export default function SupportDashboard() {
         </Card>
       </div>
 
-      {/* ── Open Inbox ─────────────────────────────────────── */}
+      {/* ── Your Inbox ─────────────────────────────────────── */}
       <Card className="border-border/50">
         <CardContent className="p-5">
           <div className="flex items-center justify-between mb-4">
             <div>
-              <h3 className="text-sm font-semibold text-foreground">Open Inbox</h3>
+              <h3 className="text-sm font-semibold text-foreground">Your Inbox</h3>
               <p className="text-xs text-muted-foreground mt-0.5">
-                {openTotal} open conversations · sorted by longest wait first
+                {inboxTotal} open conversations assigned to you · sorted by longest wait first
               </p>
             </div>
             <a
@@ -380,10 +401,10 @@ export default function SupportDashboard() {
             </a>
           </div>
 
-          {inbox.length === 0 ? (
+          {sortedInbox.length === 0 ? (
             <div className="text-center py-10 text-muted-foreground">
               <CheckCircle2 className="h-8 w-8 mx-auto mb-2 opacity-30 text-emerald-500" />
-              <p className="text-sm">Inbox clear — no open conversations</p>
+              <p className="text-sm">Inbox clear — no open conversations assigned to you</p>
             </div>
           ) : (
             <div className="divide-y divide-border/50">
@@ -395,7 +416,7 @@ export default function SupportDashboard() {
                 <span>Status</span>
               </div>
 
-              {inbox.map((c) => {
+              {sortedInbox.map((c) => {
                 const name = c.source?.author?.name ?? "Unknown";
                 const subject = stripHtml(c.source?.subject);
                 const isWaiting = c.waiting_since !== null;
@@ -415,12 +436,12 @@ export default function SupportDashboard() {
                     <span className="text-xs font-mono text-muted-foreground">{openDuration}</span>
                     <div>
                       {isWaiting ? (
-                        <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-semibold bg-amber-100 text-amber-700">
+                        <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-semibold bg-amber-100 dark:bg-amber-950/50 text-amber-700 dark:text-amber-400">
                           <span className="h-1.5 w-1.5 rounded-full bg-amber-500 animate-pulse" />
                           {waitDuration} wait
                         </span>
                       ) : (
-                        <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-semibold bg-blue-100 text-blue-700">
+                        <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-semibold bg-blue-100 dark:bg-blue-950/50 text-blue-700 dark:text-blue-400">
                           Replied
                         </span>
                       )}
@@ -429,10 +450,10 @@ export default function SupportDashboard() {
                 );
               })}
 
-              {openTotal > 30 && (
+              {inboxTotal > 50 && (
                 <div className="pt-3 text-center">
                   <p className="text-xs text-muted-foreground">
-                    Showing 30 of {openTotal} open conversations.{" "}
+                    Showing 50 of {inboxTotal} conversations.{" "}
                     <a href="https://app.intercom.com" target="_blank" rel="noopener noreferrer" className="text-primary hover:underline">
                       View all in Intercom →
                     </a>

@@ -54,6 +54,8 @@ export function EditableCell({ value, onChange, className, isProjection }: Edita
     );
   }
 
+  const isEmpty = value === "—" || value === "" || value === "–";
+
   return (
     <span
       onClick={onChange ? () => {
@@ -64,6 +66,7 @@ export function EditableCell({ value, onChange, className, isProjection }: Edita
         "block rounded px-1.5 py-0.5 font-mono text-sm transition-colors",
         onChange ? "cursor-pointer hover:bg-primary/10" : "",
         isProjection ? "text-muted-foreground" : "text-foreground/80",
+        isEmpty && !isProjection && "bg-yellow-500/10 text-yellow-600 dark:text-yellow-400/70",
         className
       )}
       title={onChange ? "Click to edit" : undefined}

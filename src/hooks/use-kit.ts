@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useQuery } from "@tanstack/react-query";
 import { weekConfigs } from "@/data/scorecardData";
 import { fetchGrowthStats, fetchSubscriberCount, fetchAllBroadcastStats } from "@/lib/kit";
 
@@ -17,59 +17,51 @@ interface KitData {
   weeklyBroadcastCount: (number | "—")[];
 }
 
-export function useKit() {
-  const [data, setData] = useState<KitData>({
-    weeklyNewSubscribers: ["—", "—", "—", "—"],
-    totalSubscribers: "—",
-    weeklyBroadcastsSent: ["—", "—", "—", "—"],
-    weeklyBroadcastOpens: ["—", "—", "—", "—"],
-    weeklyBroadcastClicks: ["—", "—", "—", "—"],
-    weeklyBroadcastCount: ["—", "—", "—", "—"],
+const defaultData: KitData = {
+  weeklyNewSubscribers: ["—", "—", "—", "—"],
+  totalSubscribers: "—",
+  weeklyBroadcastsSent: ["—", "—", "—", "—"],
+  weeklyBroadcastOpens: ["—", "—", "—", "—"],
+  weeklyBroadcastClicks: ["—", "—", "—", "—"],
+  weeklyBroadcastCount: ["—", "—", "—", "—"],
+};
+
+async function fetchKitData(): Promise<KitData> {
+  const weekRanges = weekConfigs.map((wc) => ({
+    start: wc.start,
+    end: wc.end,
+  }));
+
+  const growthPromises = weekConfigs.map((wc) => {
+    const start = wc.start.split("T")[0];
+    const end = wc.end.split("T")[0];
+    return fetchGrowthStats(start, end);
   });
 
-  useEffect(() => {
-    let cancelled = false;
+  const [growthResults, broadcastResults, totalSubs] = await Promise.all([
+    Promise.all(growthPromises),
+    fetchAllBroadcastStats(weekRanges),
+    fetchSubscriberCount(),
+  ]);
 
-    async function load() {
-      try {
-        // Fetch all data in parallel (7 API calls total, well under 120/min limit)
-        const weekRanges = weekConfigs.map((wc) => ({
-          start: wc.start,
-          end: wc.end,
-        }));
+  return {
+    weeklyNewSubscribers: growthResults.map((g) =>
+      g !== null ? g.new_subscribers : "—"
+    ),
+    totalSubscribers: totalSubs ?? "—",
+    weeklyBroadcastsSent: broadcastResults.map((b) => b.count > 0 ? b.totalSent : "—"),
+    weeklyBroadcastOpens: broadcastResults.map((b) => b.count > 0 ? b.totalOpens : "—"),
+    weeklyBroadcastClicks: broadcastResults.map((b) => b.count > 0 ? b.totalClicks : "—"),
+    weeklyBroadcastCount: broadcastResults.map((b) => b.count > 0 ? b.count : "—"),
+  };
+}
 
-        const growthPromises = weekConfigs.map((wc) => {
-          const start = wc.start.split("T")[0];
-          const end = wc.end.split("T")[0];
-          return fetchGrowthStats(start, end);
-        });
+export function useKit(): KitData {
+  const { data } = useQuery({
+    queryKey: ["kit", "broadcasts"],
+    queryFn: fetchKitData,
+    staleTime: 5 * 60 * 1000,
+  });
 
-        const [growthResults, broadcastResults, totalSubs] = await Promise.all([
-          Promise.all(growthPromises),
-          fetchAllBroadcastStats(weekRanges),
-          fetchSubscriberCount(),
-        ]);
-
-        if (cancelled) return;
-
-        setData({
-          weeklyNewSubscribers: growthResults.map((g) =>
-            g !== null ? g.new_subscribers : "—"
-          ),
-          totalSubscribers: totalSubs ?? "—",
-          weeklyBroadcastsSent: broadcastResults.map((b) => b.count > 0 ? b.totalSent : "—"),
-          weeklyBroadcastOpens: broadcastResults.map((b) => b.count > 0 ? b.totalOpens : "—"),
-          weeklyBroadcastClicks: broadcastResults.map((b) => b.count > 0 ? b.totalClicks : "—"),
-          weeklyBroadcastCount: broadcastResults.map((b) => b.count > 0 ? b.count : "—"),
-        });
-      } catch (err) {
-        console.error("Kit fetch error:", err);
-      }
-    }
-
-    load();
-    return () => { cancelled = true; };
-  }, []);
-
-  return data;
+  return data ?? defaultData;
 }

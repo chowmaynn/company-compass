@@ -8,8 +8,8 @@ const ORG_URI = "https://api.calendly.com/organizations/407a1705-c820-4818-b8ec-
 export interface Rep {
   id: string;
   display: string;
-  closeName: string;        // matches user_name in Close.com
-  followupEvent: string;    // Supabase/Calendly event name
+  closeName: string;
+  followupEvent: string;
 }
 
 export const REPS: Rep[] = [
@@ -31,12 +31,41 @@ async function closeFetch(path: string) {
   return res.json();
 }
 
-async function fetchCalendlyEvents(from: string, to: string) {
-  const params = new URLSearchParams({ organization: ORG_URI, min_start_time: `${from}T00:00:00Z`, max_start_time: `${to}T23:59:59Z`, count: "100", status: "active" });
-  const res = await fetch(`${CALENDLY_BASE}/scheduled_events?${params}`);
-  if (!res.ok) throw new Error(`Calendly ${res.status}`);
-  const data = await res.json();
-  return data.collection ?? [];
+async function closePaginateAll(basePath: string, limit = 100): Promise<{ data: any[]; total_results: number }> {
+  const all: any[] = [];
+  let offset = 0;
+  let total = 0;
+  for (let page = 0; page < 10; page++) {
+    const sep = basePath.includes("?") ? "&" : "?";
+    const res = await closeFetch(`${basePath}${sep}_limit=${limit}&_skip=${offset}`);
+    all.push(...(res.data ?? []));
+    total = res.total_results ?? all.length;
+    if (all.length >= total) break;
+    offset = all.length;
+  }
+  return { data: all, total_results: total };
+}
+
+async function fetchAllCalendlyEvents(from: string, to: string) {
+  const all: any[] = [];
+  let pageToken: string | undefined;
+  for (let page = 0; page < 5; page++) {
+    const params = new URLSearchParams({
+      organization: ORG_URI,
+      min_start_time: `${from}T00:00:00Z`,
+      max_start_time: `${to}T23:59:59Z`,
+      count: "100",
+      status: "active",
+    });
+    if (pageToken) params.set("page_token", pageToken);
+    const res = await fetch(`${CALENDLY_BASE}/scheduled_events?${params}`);
+    if (!res.ok) throw new Error(`Calendly ${res.status}`);
+    const data = await res.json();
+    all.push(...(data.collection ?? []));
+    pageToken = data.pagination?.next_page_token;
+    if (!pageToken) break;
+  }
+  return all;
 }
 
 export function useRepMetrics(rep: Rep) {
@@ -44,48 +73,48 @@ export function useRepMetrics(rep: Rep) {
   const today = new Date();
   const toDate = `${today.getFullYear()}-${String(today.getMonth() + 1).padStart(2, "0")}-${String(today.getDate()).padStart(2, "0")}`;
 
-  // ── Close.com — share cache with SalesDashboard ───────
+  // ── Close.com — SHARED cache keys with use-close.ts ───────
   const wonQuery = useQuery({
     queryKey: ["close", "won", som],
-    queryFn: () => closeFetch(`/opportunity/?_limit=100&pipeline_id=${SALES_PIPELINE}&status_type=won&date_won__gte=${som}`),
+    queryFn: () => closePaginateAll(`/opportunity/?pipeline_id=${SALES_PIPELINE}&status_type=won&date_won__gte=${som}`),
     staleTime: 5 * 60 * 1000,
   });
 
-  const lostFullQuery = useQuery({
+  const lostQuery = useQuery({
     queryKey: ["close", "lost-full", som],
-    queryFn: () => closeFetch(`/opportunity/?_limit=100&pipeline_id=${SALES_PIPELINE}&status_type=lost&date_lost__gte=${som}`),
+    queryFn: () => closePaginateAll(`/opportunity/?pipeline_id=${SALES_PIPELINE}&status_type=lost&date_lost__gte=${som}`),
     staleTime: 5 * 60 * 1000,
   });
 
   const pipelineQuery = useQuery({
     queryKey: ["close", "pipeline"],
-    queryFn: () => closeFetch(`/opportunity/?_limit=100&pipeline_id=${SALES_PIPELINE}&status_type=active`),
+    queryFn: () => closePaginateAll(`/opportunity/?pipeline_id=${SALES_PIPELINE}&status_type=active`),
     staleTime: 5 * 60 * 1000,
   });
 
   const callsQuery = useQuery({
     queryKey: ["close", "calls", som],
-    queryFn: () => closeFetch(`/activity/call/?_limit=100&date_created__gte=${som}`),
+    queryFn: () => closePaginateAll(`/activity/call/?date_created__gte=${som}`),
     staleTime: 5 * 60 * 1000,
   });
 
-  // ── Calendly — this rep's hosted bookings ─────────────
+  // ── Calendly — SHARED across all reps (single cache key) ───
   const calendlyQuery = useQuery({
     queryKey: ["calendly", "events", som, toDate],
-    queryFn: () => fetchCalendlyEvents(som, toDate),
+    queryFn: () => fetchAllCalendlyEvents(som, toDate),
     staleTime: 5 * 60 * 1000,
   });
 
   const isLoading =
-    wonQuery.isLoading || lostFullQuery.isLoading ||
+    wonQuery.isLoading || lostQuery.isLoading ||
     pipelineQuery.isLoading || callsQuery.isLoading || calendlyQuery.isLoading;
   const isError =
-    wonQuery.isError || lostFullQuery.isError ||
+    wonQuery.isError || lostQuery.isError ||
     pipelineQuery.isError || callsQuery.isError;
 
-  // ── Filter by rep ─────────────────────────────────────
+  // ── Filter by rep (client-side) ─────────────────────────
   const repWon      = (wonQuery.data?.data      ?? []).filter((d: { user_name: string }) => d.user_name === rep.closeName);
-  const repLost     = (lostFullQuery.data?.data ?? []).filter((d: { user_name: string }) => d.user_name === rep.closeName);
+  const repLost     = (lostQuery.data?.data     ?? []).filter((d: { user_name: string }) => d.user_name === rep.closeName);
   const repPipeline = (pipelineQuery.data?.data ?? []).filter((d: { user_name: string }) => d.user_name === rep.closeName);
   const repCalls    = (callsQuery.data?.data    ?? []).filter((c: { user_name: string }) => c.user_name === rep.closeName);
 
@@ -99,7 +128,6 @@ export function useRepMetrics(rep: Rep) {
   const callsTotal    = repCalls.length;
   const showRate      = callsTotal > 0 ? Math.round((callsAnswered / callsTotal) * 100) : null;
 
-  // Average call duration (seconds → mins)
   const avgCallDuration: number | null = (() => {
     const answered = repCalls.filter((c: { disposition: string; duration: number }) => c.disposition === "answered" && c.duration > 0);
     if (!answered.length) return null;
@@ -107,7 +135,6 @@ export function useRepMetrics(rep: Rep) {
     return Math.round(avg / 60);
   })();
 
-  // Daily wins
   const dailyWins: { date: string; won: number }[] = (() => {
     const map: Record<string, number> = {};
     repWon.forEach((d: { date_won: string }) => {
@@ -117,7 +144,6 @@ export function useRepMetrics(rep: Rep) {
     return Object.entries(map).sort(([a], [b]) => a.localeCompare(b)).map(([date, won]) => ({ date, won }));
   })();
 
-  // Pipeline stage breakdown for this rep
   const pipelineByStage: { label: string; count: number }[] = (() => {
     const map: Record<string, number> = {};
     repPipeline.forEach((d: { status_label: string }) => {
@@ -126,7 +152,7 @@ export function useRepMetrics(rep: Rep) {
     return Object.entries(map).sort(([, a], [, b]) => b - a).map(([label, count]) => ({ label, count }));
   })();
 
-  // ── Calendly: bookings where this rep is the host ─────
+  // ── Calendly: filter from shared cache ─────────────────
   const repBookings = (calendlyQuery.data ?? []).filter(
     (e: { event_memberships: { user_name: string }[] }) =>
       e.event_memberships?.[0]?.user_name === rep.closeName ||

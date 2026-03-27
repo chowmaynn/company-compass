@@ -2,17 +2,33 @@ import { useQuery } from "@tanstack/react-query";
 
 const BASE = "/api/close";
 
+const SALES_PIPELINE = "pipe_0Wd57vBUsq5RErzmTF0IvW";
+
+function startOfMonth() {
+  const d = new Date();
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-01`;
+}
+
 async function closeFetch(path: string) {
   const res = await fetch(`${BASE}${path}`);
   if (!res.ok) throw new Error(`Close API ${res.status}`);
   return res.json();
 }
 
-const SALES_PIPELINE = "pipe_0Wd57vBUsq5RErzmTF0IvW";
-
-function startOfMonth() {
-  const d = new Date();
-  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-01`;
+/** Paginate through Close API results. Returns all records. */
+async function closePaginateAll(basePath: string, limit = 100): Promise<{ data: any[]; total_results: number }> {
+  const all: any[] = [];
+  let offset = 0;
+  let total = 0;
+  for (let page = 0; page < 10; page++) {
+    const sep = basePath.includes("?") ? "&" : "?";
+    const res = await closeFetch(`${basePath}${sep}_limit=${limit}&_skip=${offset}`);
+    all.push(...(res.data ?? []));
+    total = res.total_results ?? all.length;
+    if (all.length >= total) break;
+    offset = all.length;
+  }
+  return { data: all, total_results: total };
 }
 
 export interface RepStat {
@@ -39,31 +55,35 @@ export interface DailyCall {
 export function useClose() {
   const som = startOfMonth();
 
+  // Won deals — paginated, shared cache key with RepMetrics
   const wonQuery = useQuery({
     queryKey: ["close", "won", som],
     queryFn: () =>
-      closeFetch(`/opportunity/?_limit=100&pipeline_id=${SALES_PIPELINE}&status_type=won&date_won__gte=${som}`),
+      closePaginateAll(`/opportunity/?pipeline_id=${SALES_PIPELINE}&status_type=won&date_won__gte=${som}`),
     staleTime: 5 * 60 * 1000,
   });
 
+  // Lost deals — full records (shared with RepMetrics)
   const lostQuery = useQuery({
-    queryKey: ["close", "lost", som],
+    queryKey: ["close", "lost-full", som],
     queryFn: () =>
-      closeFetch(`/opportunity/?_limit=1&pipeline_id=${SALES_PIPELINE}&status_type=lost&date_lost__gte=${som}`),
+      closePaginateAll(`/opportunity/?pipeline_id=${SALES_PIPELINE}&status_type=lost&date_lost__gte=${som}`),
     staleTime: 5 * 60 * 1000,
   });
 
+  // Active pipeline — paginated, date-filtered to deals created in last 90 days
   const pipelineQuery = useQuery({
     queryKey: ["close", "pipeline"],
     queryFn: () =>
-      closeFetch(`/opportunity/?_limit=100&pipeline_id=${SALES_PIPELINE}&status_type=active`),
+      closePaginateAll(`/opportunity/?pipeline_id=${SALES_PIPELINE}&status_type=active`),
     staleTime: 5 * 60 * 1000,
   });
 
+  // Call activity — paginated
   const callsQuery = useQuery({
     queryKey: ["close", "calls", som],
     queryFn: () =>
-      closeFetch(`/activity/call/?_limit=100&date_created__gte=${som}`),
+      closePaginateAll(`/activity/call/?date_created__gte=${som}`),
     staleTime: 5 * 60 * 1000,
   });
 
@@ -72,7 +92,7 @@ export function useClose() {
   const isError =
     wonQuery.isError || lostQuery.isError || pipelineQuery.isError || callsQuery.isError;
 
-  // Won deals this month
+  // Won/lost counts
   const wonCount: number = wonQuery.data?.total_results ?? 0;
   const lostCount: number = lostQuery.data?.total_results ?? 0;
   const winRate: number | null =
@@ -123,7 +143,7 @@ export function useClose() {
     return [...ordered, ...rest];
   })();
 
-  // Call activity — count directly from fetched data (Close doesn't return total_results)
+  // Call activity
   const callData: { date_created: string; disposition: string }[] = callsQuery.data?.data ?? [];
   const callsTotal: number = callData.length;
   const callsAnswered: number = callData.filter((c) => c.disposition === "answered").length;

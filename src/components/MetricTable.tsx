@@ -46,15 +46,15 @@ export function MetricTable({ metrics, onMetricChange, readOnlyMetrics, currency
             <th rowSpan={2} className="px-3 py-2 text-center font-medium text-muted-foreground">Status</th>
             <th rowSpan={2} className="px-3 py-2 text-left font-medium text-muted-foreground">Owner</th>
           </tr>
-          {/* Sub-headers: Actual / Proj */}
+          {/* Sub-headers: Actual / Target */}
           <tr className="border-b border-border bg-muted/30">
             {weekConfigs.map((wc) => (
               <React.Fragment key={`${wc.label}-sub`}>
-                <th className="px-2 py-1.5 text-right text-xs font-medium text-foreground/70 whitespace-nowrap">
+                <th className="px-2 py-1.5 text-right text-xs font-bold text-foreground whitespace-nowrap">
                   Actual
                 </th>
-                <th className="px-2 py-1.5 text-right text-xs font-medium text-muted-foreground/60 whitespace-nowrap bg-muted/40 border-r border-border/30">
-                  Proj
+                <th className="px-2 py-1.5 text-right text-xs font-medium text-muted-foreground/40 whitespace-nowrap bg-muted border-r border-border/50">
+                  Target
                 </th>
               </React.Fragment>
             ))}
@@ -86,7 +86,9 @@ export function MetricTable({ metrics, onMetricChange, readOnlyMetrics, currency
                   <React.Fragment key={wi}>
                     <td className="px-1 py-2 text-right min-w-[70px]">
                       {isReadOnly ? (
-                        <span className="block px-1.5 py-0.5 font-mono text-sm text-foreground/80">
+                        <span className={`block rounded px-1.5 py-0.5 font-mono text-sm ${
+                          String(convert(w.actual)) === "—" ? "bg-yellow-500/10 text-yellow-600 dark:text-yellow-400/70" : "text-foreground"
+                        }`}>
                           {formatValue(convert(w.actual))}
                         </span>
                       ) : (
@@ -96,7 +98,7 @@ export function MetricTable({ metrics, onMetricChange, readOnlyMetrics, currency
                         />
                       )}
                     </td>
-                    <td className="px-1 py-2 text-right bg-muted/20 border-r border-border/20 min-w-[70px]">
+                    <td className="px-1 py-2 text-right bg-muted border-r border-border/50 min-w-[70px]">
                       <EditableCell
                         value={convert(w.projection)}
                         isProjection

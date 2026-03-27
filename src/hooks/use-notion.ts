@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useQuery } from "@tanstack/react-query";
 import { weekConfigs } from "@/data/scorecardData";
 import { fetchBacklogCount, fetchPublishedCount } from "@/lib/notion";
 
@@ -9,45 +9,37 @@ interface NotionData {
   backlogCount: number | "—";
 }
 
-export function useNotion() {
-  const [data, setData] = useState<NotionData>({
-    weeklyPublished: ["—", "—", "—", "—"],
-    backlogCount: "—",
+const defaultData: NotionData = {
+  weeklyPublished: ["—", "—", "—", "—"],
+  backlogCount: "—",
+};
+
+async function fetchNotionData(): Promise<NotionData> {
+  const publishedPromises = weekConfigs.map((wc) => {
+    const start = wc.start.split("T")[0];
+    const end = wc.end.split("T")[0];
+    return fetchPublishedCount(start, end);
   });
 
-  useEffect(() => {
-    let cancelled = false;
+  const backlogPromise = fetchBacklogCount();
 
-    async function load() {
-      try {
-        // Fetch published counts per week in parallel
-        const publishedPromises = weekConfigs.map((wc) => {
-          const start = wc.start.split("T")[0]; // "2026-03-01"
-          const end = wc.end.split("T")[0];     // "2026-03-08"
-          return fetchPublishedCount(start, end);
-        });
+  const [published, backlog] = await Promise.all([
+    Promise.all(publishedPromises),
+    backlogPromise,
+  ]);
 
-        const backlogPromise = fetchBacklogCount();
+  return {
+    weeklyPublished: published,
+    backlogCount: backlog,
+  };
+}
 
-        const [published, backlog] = await Promise.all([
-          Promise.all(publishedPromises),
-          backlogPromise,
-        ]);
+export function useNotion(): NotionData {
+  const { data } = useQuery({
+    queryKey: ["notion", "content"],
+    queryFn: fetchNotionData,
+    staleTime: 5 * 60 * 1000,
+  });
 
-        if (cancelled) return;
-
-        setData({
-          weeklyPublished: published,
-          backlogCount: backlog,
-        });
-      } catch (err) {
-        console.error("Notion fetch error:", err);
-      }
-    }
-
-    load();
-    return () => { cancelled = true; };
-  }, []);
-
-  return data;
+  return data ?? defaultData;
 }

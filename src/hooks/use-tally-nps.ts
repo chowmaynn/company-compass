@@ -27,7 +27,15 @@ function calculateNps(submissions: TallySubmission[]): Pick<NpsResult, "promoter
   let detractors = 0;
   let scored = 0;
 
-  for (const s of submissions) {
+  // Deduplicate by respondentId — keep first submission per respondent
+  const seenRespondents = new Set<string>();
+  const deduped = submissions.filter((s) => {
+    if (seenRespondents.has(s.respondentId)) return false;
+    seenRespondents.add(s.respondentId);
+    return true;
+  });
+
+  for (const s of deduped) {
     const score = detectNpsScore(s);
     if (score === null) continue;
     scored++;

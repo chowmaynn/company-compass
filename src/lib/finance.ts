@@ -37,11 +37,14 @@ export interface Transaction {
   subscriptionType: string;
 }
 
-export async function fetchTransactions(): Promise<Transaction[]> {
+export async function fetchTransactions(afterDate?: string): Promise<Transaction[]> {
   const params = new URLSearchParams();
-  params.set("maxRecords", "600"); // ~1 year of data, avoids full pagination
+  params.set("maxRecords", "600");
   params.append("sort[0][field]", "Payment Date");
   params.append("sort[0][direction]", "desc");
+  if (afterDate) {
+    params.set("filterByFormula", `IS_AFTER({Payment Date}, '${afterDate}')`);
+  }
   [
     "Customer Name",
     "Payment Date",
@@ -150,11 +153,14 @@ export interface CancellationRequest {
   dateOfSubmission: string;
 }
 
-export async function fetchCancellationRequests(): Promise<CancellationRequest[]> {
+export async function fetchCancellationRequests(afterDate?: string): Promise<CancellationRequest[]> {
   const params = new URLSearchParams();
   params.set("maxRecords", "300");
   params.append("sort[0][field]", "Date of Submission");
   params.append("sort[0][direction]", "desc");
+  if (afterDate) {
+    params.set("filterByFormula", `IS_AFTER({Date of Submission}, '${afterDate}')`);
+  }
   ["Full Name", "Cancellation Reason", "Status", "Date of Submission"]
     .forEach((f) => params.append("fields[]", f));
 
@@ -203,11 +209,10 @@ function dayLabel(ts: number): string {
   return d.toLocaleDateString("en-NZ", { day: "numeric", month: "short" });
 }
 
-async function paginateStripe(path: string, limit = 100): Promise<Record<string, unknown>[]> {
+async function paginateStripe(path: string, limit = 100, maxPages = 3): Promise<Record<string, unknown>[]> {
   const all: Record<string, unknown>[] = [];
   let url = `${path}&limit=${limit}`;
-  // cap at 5 pages to avoid slow loads
-  for (let i = 0; i < 5; i++) {
+  for (let i = 0; i < maxPages; i++) {
     const data = await stripeFetch(url);
     all.push(...(data.data ?? []));
     if (!data.has_more) break;
@@ -220,10 +225,11 @@ async function paginateStripe(path: string, limit = 100): Promise<Record<string,
 export async function fetchStripeOverview(startTs: number, endTs: number): Promise<StripeOverview> {
   const range = `created%5Bgte%5D=${startTs}&created%5Blte%5D=${endTs}`;
 
-  const [balanceTxns, charges, customerPages] = await Promise.all([
-    paginateStripe(`/v1/balance_transactions?type=charge&${range}`),
-    paginateStripe(`/v1/charges?${range}`),
-    paginateStripe(`/v1/customers?${range}`, 100),
+  // Parallel: balance txns (paginated), charges (paginated), customers (count only)
+  const [balanceTxns, charges, customerRes] = await Promise.all([
+    paginateStripe(`/v1/balance_transactions?type=charge&${range}`, 100, 2),
+    paginateStripe(`/v1/charges?${range}`, 100, 2),
+    stripeFetch(`/v1/customers?${range}&limit=1`),
   ]);
 
   // Gross / net from balance transactions
@@ -242,7 +248,6 @@ export async function fetchStripeOverview(startTs: number, endTs: number): Promi
     dayMap[label].net += net;
   }
 
-  // Stripe returns newest-first; reverse so chart reads left→right (oldest first)
   const dailyVolume: DailyVolume[] = Object.entries(dayMap)
     .reverse()
     .map(([date, v]) => ({ date, gross: Math.round(v.gross), net: Math.round(v.net) }));
@@ -274,7 +279,7 @@ export async function fetchStripeOverview(startTs: number, endTs: number): Promi
     failed: Math.round(failed),
     refunded: Math.round(refunded),
     blocked: Math.round(blocked),
-    newCustomers: customerPages.length,
+    newCustomers: customerRes.total_count ?? customerRes.data?.length ?? 0,
     dailyVolume,
   };
 }

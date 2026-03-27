@@ -1,42 +1,14 @@
-const ACCESS_TOKEN = "2a5c70f0612f7fbe8baa0790acb7ce5d588bba35";
-const BASE_URL = "https://api-ssl.bitly.com/v4";
-const GROUP_GUID = "Bp76mCSlRsw";
+const BITLY_TOKEN = "2a5c70f0612f7fbe8baa0790acb7ce5d588bba35";
+const BITLY_BASE = "https://api-ssl.bitly.com/v4";
+
+const SUPABASE_URL = import.meta.env.VITE_OPSHUB_SUPABASE_URL;
+const SUPABASE_KEY = import.meta.env.VITE_OPSHUB_SUPABASE_ANON_KEY;
+
+export type BitlyCategory = "yt-skool" | "yt-accelerator" | "skool-accelerator" | "aios-webinar";
 
 interface ClicksByDay {
-  date: string; // YYYY-MM-DDT00:00:00+0000
+  date: string;
   clicks: number;
-}
-
-export type BitlyCategory = "yt-skool" | "yt-accelerator" | "skool-accelerator";
-
-/** Known bitlink IDs by category — avoids paginating through all links to find them */
-const KNOWN_LINKS: Record<BitlyCategory, string[]> = {
-  "yt-skool": [],
-  "yt-accelerator": [],
-  "skool-accelerator": [
-    "bit.ly/Consultant-Fast-Lane-Accelerator",
-    "bit.ly/Builder-Fast-Lane-Accelerator",
-    "bit.ly/Accelerator-Alignment",
-    "bit.ly/sk-success-accelerator",
-  ],
-};
-
-async function fetchJSON<T>(url: string): Promise<T> {
-  const res = await fetch(url, {
-    headers: { Authorization: `Bearer ${ACCESS_TOKEN}` },
-  });
-  if (!res.ok) {
-    throw new Error(`Bitly API error: ${res.status} ${res.statusText}`);
-  }
-  return res.json();
-}
-
-/** Fetch daily clicks for a single bitlink over a date range */
-async function fetchDailyClicks(bitlink: string, units: number): Promise<ClicksByDay[]> {
-  const data = await fetchJSON<{ link_clicks: ClicksByDay[] }>(
-    `${BASE_URL}/bitlinks/${bitlink}/clicks?unit=day&units=${units}`
-  );
-  return data.link_clicks || [];
 }
 
 export interface DailyClickRow {
@@ -44,34 +16,82 @@ export interface DailyClickRow {
   clicks: number;
 }
 
+// ── Supabase: fetch link IDs by category ──────────────────────
+
+async function fetchLinkIdsByCategory(category: string): Promise<string[]> {
+  const res = await fetch(
+    `${SUPABASE_URL}/rest/v1/bitly_links?select=bitly_shortlink&category=eq.${category}`,
+    {
+      headers: {
+        apikey: SUPABASE_KEY,
+        Authorization: `Bearer ${SUPABASE_KEY}`,
+      },
+    }
+  );
+  if (!res.ok) return [];
+  const rows: { bitly_shortlink: string }[] = await res.json();
+  return rows.map((r) => r.bitly_shortlink);
+}
+
+// ── Bitly API ─────────────────────────────────────────────────
+
+async function bitlyFetch<T>(url: string): Promise<T> {
+  const res = await fetch(url, {
+    headers: { Authorization: `Bearer ${BITLY_TOKEN}` },
+  });
+  if (!res.ok) throw new Error(`Bitly API error: ${res.status}`);
+  return res.json();
+}
+
+async function fetchDailyClicks(bitlink: string, units: number): Promise<ClicksByDay[]> {
+  const data = await bitlyFetch<{ link_clicks: ClicksByDay[] }>(
+    `${BITLY_BASE}/bitlinks/${bitlink}/clicks?unit=day&units=${units}`
+  );
+  return data.link_clicks || [];
+}
+
+// ── Main: fetch + aggregate ───────────────────────────────────
+
 /**
- * Fetches all bitlinks, categorizes them, and returns aggregated daily clicks
- * for each category over the specified number of days.
+ * Fetches link IDs from Supabase bitly_links table by category,
+ * then fetches daily clicks from Bitly API for each link.
+ * Processes links in batches of 10 to avoid rate limits.
  */
 export async function getCategorizedClicks(
   days: number = 31
 ): Promise<Map<BitlyCategory, DailyClickRow[]>> {
-  // Use only known/hardcoded links — no auto-discovery pagination
-  const categorized = new Map<BitlyCategory, string[]>();
-  for (const [cat, ids] of Object.entries(KNOWN_LINKS) as [BitlyCategory, string[]][]) {
-    if (ids.length > 0) categorized.set(cat, [...ids]);
-  }
-
+  const categories: BitlyCategory[] = ["yt-skool", "yt-accelerator", "skool-accelerator", "aios-webinar"];
   const result = new Map<BitlyCategory, DailyClickRow[]>();
 
-  for (const [category, bitlinks] of categorized) {
-    // Fetch clicks for all links in this category concurrently
-    const allClicks = await Promise.all(
-      bitlinks.map((id) => fetchDailyClicks(id, days))
-    );
+  // Fetch all link IDs from Supabase in parallel
+  const linkIdsByCategory = await Promise.all(
+    categories.map(async (cat) => ({
+      category: cat,
+      links: await fetchLinkIdsByCategory(cat),
+    }))
+  );
 
-    // Aggregate clicks by date
+  // For each category, fetch clicks in batches of 10 concurrent requests
+  for (const { category, links } of linkIdsByCategory) {
+    if (links.length === 0) {
+      result.set(category, []);
+      continue;
+    }
+
     const byDate = new Map<string, number>();
-    for (const linkClicks of allClicks) {
-      for (const entry of linkClicks) {
-        // Bitly returns dates like "2026-03-15T00:00:00+0000"
-        const date = entry.date.slice(0, 10);
-        byDate.set(date, (byDate.get(date) || 0) + entry.clicks);
+    const BATCH_SIZE = 10;
+
+    for (let i = 0; i < links.length; i += BATCH_SIZE) {
+      const batch = links.slice(i, i + BATCH_SIZE);
+      const batchResults = await Promise.all(
+        batch.map((id) => fetchDailyClicks(id, days).catch(() => [] as ClicksByDay[]))
+      );
+
+      for (const linkClicks of batchResults) {
+        for (const entry of linkClicks) {
+          const date = entry.date.slice(0, 10);
+          byDate.set(date, (byDate.get(date) || 0) + entry.clicks);
+        }
       }
     }
 
@@ -87,7 +107,6 @@ export async function getCategorizedClicks(
 
 /**
  * Buckets daily click data into weekly totals based on week boundaries.
- * Returns "—" for future weeks.
  */
 export function bucketClicksByWeek(
   rows: DailyClickRow[],
@@ -98,7 +117,6 @@ export function bucketClicksByWeek(
   return weekConfigs.map((wc) => {
     const start = new Date(wc.start);
     if (start > now) return "—";
-    // Convert week boundaries to NZ dates for comparison
     const startDate = toNZDate(wc.start);
     const endDate = toNZDate(wc.end);
     return rows

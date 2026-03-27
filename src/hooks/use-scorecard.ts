@@ -5,9 +5,10 @@ import { calculateStatus, invertedMetrics } from "@/lib/calculateStatus";
 import { useKit } from "@/hooks/use-kit";
 import { useNotion } from "@/hooks/use-notion";
 import { useGoogleAnalytics } from "@/hooks/use-google-analytics";
-import { useBitly, type BitlyWeeklyData } from "@/hooks/use-bitly";
 import { useCalendly } from "@/hooks/use-calendly";
 import { useClose } from "@/hooks/use-close";
+import { useIntercom } from "@/hooks/use-intercom";
+import { useTallyNps } from "@/hooks/use-tally-nps";
 
 // Define display order for metrics within each department
 const METRIC_ORDER: string[] = [
@@ -118,7 +119,7 @@ const DEFAULT_MONTH = `${new Date().getFullYear()}-${String(new Date().getMonth(
 
 // Metrics sourced from live APIs — only the current week gets overlaid
 type ApiSource = {
-  hook: "kit" | "notion" | "ga" | "bitly" | "calendly" | "close" | "computed";
+  hook: "kit" | "notion" | "ga" | "calendly" | "close" | "intercom" | "tally" | "computed";
   field: string;
 };
 
@@ -128,9 +129,7 @@ const API_METRIC_MAP: Record<string, ApiSource> = {
   "Videos posted last week":              { hook: "notion",    field: "weeklyPublished" },
   "Videos in the backlog":                { hook: "notion",    field: "backlogCount" },
   "Website Views":                        { hook: "ga",        field: "weeklyViews" },
-  "Clicks: YouTube > Skool":              { hook: "bitly",     field: "yt-skool" },
-  "Clicks: YouTube > Accelerator":        { hook: "bitly",     field: "yt-accelerator" },
-  "Clicks: Skool > Accelerator":          { hook: "bitly",     field: "skool-accelerator" },
+  // Bitly clicks are written to scorecard by the bitly-daily edge function — no live overlay needed
   "Total Bookings":                       { hook: "calendly",  field: "salesBooked" },
   "Email Bookings":                       { hook: "calendly",  field: "emailBooked" },
   "Closing Calls Booked":                 { hook: "calendly",  field: "salesBooked" },
@@ -138,6 +137,9 @@ const API_METRIC_MAP: Record<string, ApiSource> = {
   "Closing Call Show Rate":               { hook: "close",     field: "showRate" },
   "Closing Calls Taken":                  { hook: "close",     field: "callsAnswered" },
   "Closing Call Close Rate":              { hook: "close",     field: "winRate" },
+  "Customer support complaints":          { hook: "intercom",  field: "inboxTotal" },
+  "NPS Score - 2 months":                 { hook: "tally",     field: "2 months" },
+  "NPS Score - 6 Months":                 { hook: "tally",     field: "6 Months" },
 };
 
 /** Set of metric names that are API-sourced (read-only for current week) */
@@ -150,9 +152,10 @@ function resolveApiValue(
     kit: ReturnType<typeof useKit>;
     notion: ReturnType<typeof useNotion>;
     ga: { weeklyViews: (number | "—")[] };
-    bitly: { weeklyClicks: BitlyWeeklyData };
     calendly: ReturnType<typeof useCalendly>;
     close: ReturnType<typeof useClose>;
+    intercom: ReturnType<typeof useIntercom>;
+    tallyNps: ReturnType<typeof useTallyNps>;
   }
 ): number | string | "—" {
   switch (source.hook) {
@@ -167,18 +170,26 @@ function resolveApiValue(
     }
     case "ga":
       return apis.ga.weeklyViews[weekIndex] ?? "—";
-    case "bitly":
-      return apis.bitly.weeklyClicks[source.field as keyof BitlyWeeklyData]?.[weekIndex] ?? "—";
     case "calendly": {
-      // Calendly returns monthly totals, not weekly — use salesBooked as the monthly actual
       const val = apis.calendly[source.field as keyof ReturnType<typeof useCalendly>];
       return typeof val === "number" ? val : "—";
     }
     case "close": {
       const val = apis.close[source.field as keyof ReturnType<typeof useClose>];
-      if (typeof val === "number") {
-        return val;
-      }
+      if (typeof val === "number") return val;
+      return "—";
+    }
+    case "intercom": {
+      // Inbox conversations = complaints count (monthly, not weekly)
+      if (source.field === "inboxTotal") return apis.intercom.inboxTotal ?? "—";
+      return "—";
+    }
+    case "tally": {
+      // Match NPS form by name fragment (e.g., "2 months", "6 Months")
+      const match = apis.tallyNps.results.find((r) =>
+        r.formName.toLowerCase().includes(source.field.toLowerCase())
+      );
+      if (match && !match.loading) return match.score;
       return "—";
     }
     case "computed": {
@@ -205,9 +216,10 @@ export function useScorecard(month: string = DEFAULT_MONTH) {
   const kit = useKit();
   const notion = useNotion();
   const ga = useGoogleAnalytics();
-  const bitly = useBitly();
   const calendly = useCalendly();
   const close = useClose();
+  const intercom = useIntercom();
+  const tallyNps = useTallyNps();
 
   // Load from Supabase
   useEffect(() => {
@@ -243,18 +255,60 @@ export function useScorecard(month: string = DEFAULT_MONTH) {
     // No overlay needed if before month or past all weeks
     if (cwi < 0 || cwi >= 4) return supabaseMetrics;
 
+    const parseWeekVal = (raw: number | string): number | null => {
+      if (typeof raw === "number") return raw;
+      const s = String(raw).replace(/,/g, "").trim();
+      if (s === "—" || s === "") return null;
+      const lower = s.toLowerCase();
+      if (lower.endsWith("k")) { const n = parseFloat(lower); return isNaN(n) ? null : n * 1000; }
+      if (lower.endsWith("m")) { const n = parseFloat(lower); return isNaN(n) ? null : n * 1000000; }
+      if (lower.endsWith("%")) { const n = parseFloat(lower); return isNaN(n) ? null : n; }
+      const n = parseFloat(s);
+      return isNaN(n) ? null : n;
+    };
+
+    // Metrics that should show average instead of sum
+    const averagedMetrics = new Set(["Videos in the backlog", "Website Booking Rate", "Skool Booking Rate", "Closing Call Show Rate", "Closing Call Close Rate"]);
+    // Metrics where monthly is manually entered (don't auto-calculate)
+    const manualMonthlyMetrics = new Set(["Revenue", "Cash Collected"]);
+
     return supabaseMetrics.map((m) => {
+      // Step 1: Apply API overlay for current week
       const source = API_METRIC_MAP[m.name];
-      if (!source) return m;
+      let updated = m;
 
-      const apiVal = resolveApiValue(source, cwi, { kit, notion, ga, bitly, calendly, close });
-      if (apiVal === "—") return m;
+      if (source) {
+        const apiVal = resolveApiValue(source, cwi, { kit, notion, ga, calendly, close, intercom, tallyNps });
+        if (apiVal !== "—") {
+          updated = { ...m, weeks: [...m.weeks] };
+          updated.weeks[cwi] = { ...updated.weeks[cwi], actual: apiVal };
+        }
+      }
 
-      const updated = { ...m, weeks: [...m.weeks] };
-      updated.weeks[cwi] = { ...updated.weeks[cwi], actual: apiVal };
+      // Step 2: Auto-calculate monthly from week actuals (for all non-manual metrics)
+      if (!manualMonthlyMetrics.has(m.name)) {
+        const weekVals = updated.weeks
+          .map((w) => parseWeekVal(w.actual))
+          .filter((v): v is number => v !== null);
+
+        if (weekVals.length > 0) {
+          const isAvg = averagedMetrics.has(m.name);
+          const raw = isAvg
+            ? weekVals.reduce((a, b) => a + b, 0) / weekVals.length
+            : weekVals.reduce((a, b) => a + b, 0);
+
+          // Check if the metric uses percentage format
+          const isPercent = updated.weeks.some((w) => String(w.actual).includes("%"));
+          const newMonthly = isPercent ? `${raw.toFixed(2)}%` : Math.round(raw);
+
+          if (updated === m) updated = { ...m };
+          updated.monthlyActual = newMonthly;
+        }
+      }
+
       return updated;
     });
-  }, [supabaseMetrics, kit, notion, ga.weeklyViews, bitly.weeklyClicks, calendly.salesBooked, close.wonCount, close.showRate, close.callsAnswered, close.winRate]);
+  }, [supabaseMetrics, kit, notion, ga.weeklyViews, calendly.salesBooked, close.wonCount, close.showRate, close.callsAnswered, close.winRate, intercom.inboxTotal, tallyNps.results]);
 
   // Auto-calculate statuses from most recent week's actual vs target
   const metricsWithStatus = useMemo(() => {

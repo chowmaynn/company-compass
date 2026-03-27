@@ -1,4 +1,6 @@
-import { useState, useEffect, useCallback } from "react";
+import { useState } from "react";
+import { useQuery } from "@tanstack/react-query";
+
 const SUPABASE_URL = import.meta.env.VITE_OPSHUB_SUPABASE_URL;
 const SUPABASE_KEY = import.meta.env.VITE_OPSHUB_SUPABASE_ANON_KEY;
 
@@ -7,6 +9,23 @@ const headers = {
   Authorization: `Bearer ${SUPABASE_KEY}`,
   "Content-Type": "application/json",
 };
+
+export interface ChannelSummary {
+  id: number;
+  month: string;
+  total_videos: number;
+  outlier_count: number;
+  avg_views: number;
+  summary: {
+    performance_insights: string[];
+    audience_wants: string[];
+    pain_points: string[];
+    what_worked: string[];
+    title_analysis: string[];
+    recommendations: string[];
+  };
+  created_at: string;
+}
 
 export interface LiamVideo {
   id: number;
@@ -42,35 +61,49 @@ function generateRecentMonths(count = 6): string[] {
   return months;
 }
 
+async function fetchVideosForMonth(month: string): Promise<LiamVideo[]> {
+  const { start, end } = getMonthBounds(month);
+  const url = `${SUPABASE_URL}/rest/v1/liam_videos?published_at=gte.${start}&published_at=lt.${end}&order=published_at.desc&limit=100`;
+  const res = await fetch(url, { headers });
+  if (!res.ok) throw new Error(`Fetch error: ${res.status}`);
+  return res.json();
+}
+
+async function fetchChannelSummary(month: string): Promise<ChannelSummary | null> {
+  const url = `${SUPABASE_URL}/rest/v1/channel_summaries?month=eq.${month}&limit=1`;
+  const res = await fetch(url, { headers });
+  if (!res.ok) return null;
+  const rows = await res.json();
+  return rows[0] || null;
+}
+
 export function useChannelVideos() {
   const [month, setMonth] = useState(() => {
     const now = new Date();
     return `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, "0")}`;
   });
-  const [videos, setVideos] = useState<LiamVideo[]>([]);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
 
   const availableMonths = generateRecentMonths(6);
 
-  const load = useCallback(async () => {
-    setLoading(true);
-    setError(null);
-    try {
-      const { start, end } = getMonthBounds(month);
-      const url = `${SUPABASE_URL}/rest/v1/liam_videos?published_at=gte.${start}&published_at=lt.${end}&order=published_at.desc&limit=100`;
-      const res = await fetch(url, { headers });
-      if (!res.ok) throw new Error(`Fetch error: ${res.status}`);
-      setVideos(await res.json());
-    } catch (err) {
-      console.error("Channel videos load error:", err);
-      setError(String(err));
-    } finally {
-      setLoading(false);
-    }
-  }, [month]);
+  const query = useQuery({
+    queryKey: ["channel-videos", month],
+    queryFn: () => fetchVideosForMonth(month),
+    staleTime: 5 * 60 * 1000,
+  });
 
-  useEffect(() => { load(); }, [load]);
+  const summaryQuery = useQuery({
+    queryKey: ["channel-summary", month],
+    queryFn: () => fetchChannelSummary(month),
+    staleTime: 5 * 60 * 1000,
+  });
 
-  return { videos, loading, error, month, setMonth, availableMonths };
+  return {
+    videos: query.data ?? [],
+    summary: summaryQuery.data ?? null,
+    loading: query.isLoading,
+    error: query.error ? String(query.error) : null,
+    month,
+    setMonth,
+    availableMonths,
+  };
 }

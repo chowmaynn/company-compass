@@ -33,7 +33,8 @@ function formatYearMonth(ym: string): string {
 type Preset = "mtd" | "7d" | "30d" | "3m";
 
 function getRange(preset: Preset): { startTs: number; endTs: number; label: string } {
-  const now = Math.floor(Date.now() / 1000);
+  // Round to the nearest hour so remounts within the same hour hit the React Query cache
+  const now = Math.floor(Date.now() / 1000 / 3600) * 3600;
   const d = new Date();
   switch (preset) {
     case "mtd": {

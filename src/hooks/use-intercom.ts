@@ -1,7 +1,8 @@
-import { useState, useEffect } from "react";
+import { useQuery } from "@tanstack/react-query";
 import {
+  fetchAdminMe,
   fetchRecentConversations,
-  fetchOpenConversations,
+  fetchYourInboxConversations,
   type IntercomConversation,
 } from "@/lib/intercom";
 
@@ -10,31 +11,44 @@ export type { IntercomConversation };
 export interface IntercomData {
   recent: IntercomConversation[];
   recentTotal: number;
-  open: IntercomConversation[];
-  openTotal: number;
+  inbox: IntercomConversation[];
+  inboxTotal: number;
   loading: boolean;
   error: string | null;
 }
 
-export function useIntercom(): IntercomData {
-  const [recent, setRecent] = useState<IntercomConversation[]>([]);
-  const [recentTotal, setRecentTotal] = useState(0);
-  const [open, setOpen] = useState<IntercomConversation[]>([]);
-  const [openTotal, setOpenTotal] = useState(0);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
+async function fetchIntercomData(days: number) {
+  const admin = await fetchAdminMe();
+  const adminId = admin?.id ?? "";
 
-  useEffect(() => {
-    Promise.all([fetchRecentConversations(30), fetchOpenConversations()])
-      .then(([r, o]) => {
-        setRecent(r.conversations);
-        setRecentTotal(r.total_count);
-        setOpen(o.conversations);
-        setOpenTotal(o.total_count);
-      })
-      .catch((e) => setError(String(e)))
-      .finally(() => setLoading(false));
-  }, []);
+  const [r, i] = await Promise.all([
+    fetchRecentConversations(days, adminId || undefined),
+    adminId
+      ? fetchYourInboxConversations(adminId)
+      : Promise.resolve({ conversations: [] as IntercomConversation[], total_count: 0 }),
+  ]);
 
-  return { recent, recentTotal, open, openTotal, loading, error };
+  return {
+    recent: r.conversations,
+    recentTotal: r.total_count,
+    inbox: i.conversations,
+    inboxTotal: i.total_count,
+  };
+}
+
+export function useIntercom(days = 30): IntercomData {
+  const query = useQuery({
+    queryKey: ["intercom", "conversations", days],
+    queryFn: () => fetchIntercomData(days),
+    staleTime: 5 * 60 * 1000,
+  });
+
+  return {
+    recent: query.data?.recent ?? [],
+    recentTotal: query.data?.recentTotal ?? 0,
+    inbox: query.data?.inbox ?? [],
+    inboxTotal: query.data?.inboxTotal ?? 0,
+    loading: query.isLoading,
+    error: query.error ? String(query.error) : null,
+  };
 }

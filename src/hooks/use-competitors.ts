@@ -1,4 +1,5 @@
-import { useState, useEffect, useMemo, useCallback } from "react";
+import { useState, useMemo } from "react";
+import { useQuery } from "@tanstack/react-query";
 import {
   fetchCompetitorChannels,
   fetchCompetitorVideos,
@@ -10,38 +11,30 @@ import {
 
 export type SortBy = "newest" | "most-views" | "most-engagement";
 
-export function useCompetitors() {
-  const [channels, setChannels] = useState<CompetitorChannel[]>([]);
-  const [videos, setVideos] = useState<CompetitorVideo[]>([]);
-  const [summary, setSummary] = useState<CompetitorSummary | null>(null);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
+async function fetchCompetitorData() {
+  const [ch, vid, sum] = await Promise.all([
+    fetchCompetitorChannels(),
+    fetchCompetitorVideos(),
+    fetchLatestSummary(),
+  ]);
+  return { channels: ch, videos: vid, summary: sum };
+}
 
+export function useCompetitors() {
   // Filters
   const [selectedChannel, setSelectedChannel] = useState<number | null>(null);
   const [sortBy, setSortBy] = useState<SortBy>("newest");
   const [showOutliersOnly, setShowOutliersOnly] = useState(false);
 
-  const load = useCallback(async () => {
-    try {
-      setLoading(true);
-      const [ch, vid, sum] = await Promise.all([
-        fetchCompetitorChannels(),
-        fetchCompetitorVideos(),
-        fetchLatestSummary(),
-      ]);
-      setChannels(ch);
-      setVideos(vid);
-      setSummary(sum);
-    } catch (err) {
-      console.error("Competitors load error:", err);
-      setError(String(err));
-    } finally {
-      setLoading(false);
-    }
-  }, []);
+  const query = useQuery({
+    queryKey: ["competitors", "all"],
+    queryFn: fetchCompetitorData,
+    staleTime: 5 * 60 * 1000,
+  });
 
-  useEffect(() => { load(); }, [load]);
+  const channels: CompetitorChannel[] = query.data?.channels ?? [];
+  const videos: CompetitorVideo[] = query.data?.videos ?? [];
+  const summary: CompetitorSummary | null = query.data?.summary ?? null;
 
   // Filtered and sorted videos
   const filteredVideos = useMemo(() => {
@@ -78,8 +71,8 @@ export function useCompetitors() {
     channels,
     videos,
     summary,
-    loading,
-    error,
+    loading: query.isLoading,
+    error: query.error ? String(query.error) : null,
     selectedChannel,
     setSelectedChannel,
     sortBy,

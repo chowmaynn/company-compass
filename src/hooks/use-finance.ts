@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useQuery } from "@tanstack/react-query";
 import {
   fetchTransactions,
   fetchFailedPayments,
@@ -21,40 +21,33 @@ export interface FinanceData {
 }
 
 export function useFinance(startTs: number, endTs: number): FinanceData {
-  const [transactions, setTransactions] = useState<Transaction[]>([]);
-  const [failedPayments, setFailedPayments] = useState<FailedPayment[]>([]);
-  const [cancellationRequests, setCancellationRequests] = useState<CancellationRequest[]>([]);
-  const [stripeOverview, setStripeOverview] = useState<StripeOverview | null>(null);
-  const [loading, setLoading] = useState(true);
-  const [stripeLoading, setStripeLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
+  const afterDate = new Date(startTs * 1000).toISOString().split("T")[0];
 
-  // Airtable data — load once
-  useEffect(() => {
-    let cancelled = false;
-    setLoading(true);
-    Promise.all([fetchTransactions(), fetchFailedPayments(), fetchCancellationRequests()])
-      .then(([txns, failed, cancels]) => {
-        if (cancelled) return;
-        setTransactions(txns);
-        setFailedPayments(failed);
-        setCancellationRequests(cancels);
-      })
-      .catch((err) => { if (!cancelled) setError(String(err)); })
-      .finally(() => { if (!cancelled) setLoading(false); });
-    return () => { cancelled = true; };
-  }, []);
+  const airtableQuery = useQuery({
+    queryKey: ["finance", "airtable", afterDate],
+    queryFn: () => Promise.all([
+      fetchTransactions(afterDate),
+      fetchFailedPayments(),
+      fetchCancellationRequests(afterDate),
+    ]),
+    staleTime: 5 * 60 * 1000,
+  });
 
-  // Stripe data — reload when date range changes
-  useEffect(() => {
-    let cancelled = false;
-    setStripeLoading(true);
-    fetchStripeOverview(startTs, endTs)
-      .then((data) => { if (!cancelled) setStripeOverview(data); })
-      .catch((err) => { if (!cancelled) setError(String(err)); })
-      .finally(() => { if (!cancelled) setStripeLoading(false); });
-    return () => { cancelled = true; };
-  }, [startTs, endTs]);
+  const stripeQuery = useQuery({
+    queryKey: ["finance", "stripe", startTs, endTs],
+    queryFn: () => fetchStripeOverview(startTs, endTs),
+    staleTime: 5 * 60 * 1000,
+  });
 
-  return { transactions, failedPayments, cancellationRequests, stripeOverview, loading, stripeLoading, error };
+  const [transactions, failedPayments, cancellationRequests] = airtableQuery.data ?? [[], [], []];
+
+  return {
+    transactions,
+    failedPayments,
+    cancellationRequests,
+    stripeOverview: stripeQuery.data ?? null,
+    loading: airtableQuery.isLoading,
+    stripeLoading: stripeQuery.isLoading,
+    error: airtableQuery.error ? String(airtableQuery.error) : stripeQuery.error ? String(stripeQuery.error) : null,
+  };
 }

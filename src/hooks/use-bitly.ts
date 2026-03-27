@@ -6,6 +6,7 @@ export interface BitlyWeeklyData {
   "yt-skool": (number | "—")[];
   "yt-accelerator": (number | "—")[];
   "skool-accelerator": (number | "—")[];
+  "aios-webinar": (number | "—")[];
 }
 
 export function useBitly() {
@@ -13,6 +14,7 @@ export function useBitly() {
     "yt-skool": ["—", "—", "—", "—"],
     "yt-accelerator": ["—", "—", "—", "—"],
     "skool-accelerator": ["—", "—", "—", "—"],
+    "aios-webinar": ["—", "—", "—", "—"],
   });
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -28,9 +30,10 @@ export function useBitly() {
         "yt-skool": ["—", "—", "—", "—"],
         "yt-accelerator": ["—", "—", "—", "—"],
         "skool-accelerator": ["—", "—", "—", "—"],
+        "aios-webinar": ["—", "—", "—", "—"],
       };
 
-      const categories: BitlyCategory[] = ["yt-skool", "yt-accelerator", "skool-accelerator"];
+      const categories: BitlyCategory[] = ["yt-skool", "yt-accelerator", "skool-accelerator", "aios-webinar"];
       for (const cat of categories) {
         const rows = categorized.get(cat) || [];
         result[cat] = bucketClicksByWeek(rows, weekConfigs);
