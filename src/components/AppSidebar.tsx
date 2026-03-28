@@ -51,8 +51,8 @@ export function AppSidebar() {
             </div>
           ) : (
             <div className="flex justify-center">
-              <div className="rounded-lg bg-primary p-1.5">
-                <Compass className="h-5 w-5 text-white" />
+              <div className="rounded-md bg-primary p-1">
+                <Compass className="h-4 w-4 text-white" />
               </div>
             </div>
           )}

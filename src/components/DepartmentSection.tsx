@@ -15,11 +15,11 @@ const departmentIcons: Record<Department, React.ElementType> = {
 };
 
 const departmentColors: Record<Department, string> = {
-  "Finance": "from-status-green/20 to-transparent border-status-green/30",
-  Content: "from-orange-500/20 to-transparent border-orange-500/30",
-  Marketing: "from-status-yellow/20 to-transparent border-status-yellow/30",
+  "Finance": "from-primary/20 to-transparent border-primary/30",
+  Content: "from-primary/20 to-transparent border-primary/30",
+  Marketing: "from-primary/20 to-transparent border-primary/30",
   Sales: "from-primary/20 to-transparent border-primary/30",
-  "Product": "from-pink-500/20 to-transparent border-pink-500/30",
+  "Product": "from-primary/20 to-transparent border-primary/30",
 };
 
 interface DepartmentSectionProps {
