@@ -48,7 +48,7 @@ function getCurrentMonthWeek(): { from: Date; to: Date; weekNum: number } {
   return { from: weekStart, to: weekEnd, weekNum: weekIdx + 1 };
 }
 
-function presetToRange(preset: Exclude<Preset, "custom">): { from: Date; to: Date } {
+export function presetToRange(preset: Exclude<Preset, "custom">): { from: Date; to: Date } {
   const now = new Date();
   if (preset === "today") {
     // Use NZ date for both start and end so GA4 gets a single-day range
@@ -66,7 +66,7 @@ function presetToRange(preset: Exclude<Preset, "custom">): { from: Date; to: Dat
   return { from: new Date(now.getFullYear(), now.getMonth() - 3, now.getDate()), to: now };
 }
 
-function rangeToStrings(from: Date, to: Date): DateRangeValue {
+export function rangeToStrings(from: Date, to: Date): DateRangeValue {
   return {
     start: from.toISOString(),
     end: to.toISOString(),
@@ -86,7 +86,7 @@ interface Props {
   onChange: (range: DateRangeValue) => void;
 }
 
-export function DateRangePicker({ defaultPreset = "MTD", onChange }: Props) {
+export function DateRangePicker({ defaultPreset = "TW", onChange }: Props) {
   const [preset, setPreset] = useState<Preset>(defaultPreset);
   const [customRange, setCustomRange] = useState<DateRange | undefined>();
   const [open, setOpen] = useState(false);
@@ -180,5 +180,5 @@ export function DateRangePicker({ defaultPreset = "MTD", onChange }: Props) {
   );
 }
 
-// Re-export for consumers that need the range computation without the UI
-export { rangeToStrings, presetToRange, toNZDate, getCurrentMonthWeek };
+// Re-export helpers not already exported inline
+export { getCurrentMonthWeek };

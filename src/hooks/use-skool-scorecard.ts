@@ -1,5 +1,4 @@
-import { useState, useEffect } from "react";
-
+import { useQuery } from "@tanstack/react-query";
 import { SUPABASE_URL, supabaseHeaders as headers } from "@/lib/supabase";
 
 async function fetchLatest(metric: string): Promise<{ value: string; month: string } | null> {
@@ -23,31 +22,38 @@ export interface SkoolScorecardData {
   loading: boolean;
 }
 
+async function fetchSkoolScorecardData() {
+  const [rate, joins, clicks] = await Promise.all([
+    fetchLatest("Skool Booking Rate"),
+    fetchLatest("Skool Joins"),
+    fetchLatest("Clicks: Skool > Accelerator"),
+  ]);
+  return { rate, joins, clicks };
+}
+
 export function useSkoolScorecard(): SkoolScorecardData {
-  const [data, setData] = useState<SkoolScorecardData>({
-    bookingRate: null, bookingRateMonth: null,
-    joins: null, joinsMonth: null,
-    skoolClicks: null, skoolClicksMonth: null,
-    loading: true,
+  const query = useQuery({
+    queryKey: ["skool-scorecard"],
+    queryFn: fetchSkoolScorecardData,
   });
 
-  useEffect(() => {
-    Promise.all([
-      fetchLatest("Skool Booking Rate"),
-      fetchLatest("Skool Joins"),
-      fetchLatest("Clicks: Skool > Accelerator"),
-    ]).then(([rate, joins, clicks]) => {
-      setData({
-        bookingRate: rate?.value ?? null,
-        bookingRateMonth: rate?.month ?? null,
-        joins: joins?.value ?? null,
-        joinsMonth: joins?.month ?? null,
-        skoolClicks: clicks?.value ?? null,
-        skoolClicksMonth: clicks?.month ?? null,
-        loading: false,
-      });
-    });
-  }, []);
+  if (!query.data) {
+    return {
+      bookingRate: null, bookingRateMonth: null,
+      joins: null, joinsMonth: null,
+      skoolClicks: null, skoolClicksMonth: null,
+      loading: query.isLoading,
+    };
+  }
 
-  return data;
+  const { rate, joins, clicks } = query.data;
+  return {
+    bookingRate: rate?.value ?? null,
+    bookingRateMonth: rate?.month ?? null,
+    joins: joins?.value ?? null,
+    joinsMonth: joins?.month ?? null,
+    skoolClicks: clicks?.value ?? null,
+    skoolClicksMonth: clicks?.month ?? null,
+    loading: false,
+  };
 }

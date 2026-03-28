@@ -8,24 +8,15 @@ export interface DashboardShellProps {
 }
 
 /**
- * Shared wrapper for dashboard pages that shows a loading spinner
- * or error message before rendering children.
+ * Shared wrapper for dashboard pages. Always renders children (skeleton-first).
+ * Shows a subtle loading indicator inline, not blocking the UI.
+ * Only blocks on error.
  */
 export function DashboardShell({
   loading,
   error,
-  loadingMessage = "Loading data\u2026",
   children,
 }: DashboardShellProps) {
-  if (loading) {
-    return (
-      <div className="flex items-center justify-center h-64 text-muted-foreground">
-        <Loader2 className="h-6 w-6 animate-spin mr-2" />
-        <span className="text-sm">{loadingMessage}</span>
-      </div>
-    );
-  }
-
   if (error) {
     return (
       <div className="flex items-center justify-center h-64 gap-2 text-red-600">
@@ -35,5 +26,15 @@ export function DashboardShell({
     );
   }
 
-  return <>{children}</>;
+  return (
+    <div className="relative">
+      {loading && (
+        <div className="absolute top-0 right-0 z-10 flex items-center gap-1.5 text-muted-foreground bg-card/80 backdrop-blur-sm rounded-md px-2 py-1">
+          <Loader2 className="h-3.5 w-3.5 animate-spin" />
+          <span className="text-xs">Loading...</span>
+        </div>
+      )}
+      {children}
+    </div>
+  );
 }

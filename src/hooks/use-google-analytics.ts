@@ -1,28 +1,42 @@
 import { useQuery } from "@tanstack/react-query";
 import { fetchPageSessions } from "@/lib/google-analytics";
-import { weekConfigs } from "@/data/scorecardData";
+import { getCurrentWeekIndex, weekConfigs } from "@/data/scorecardData";
 import { toNZDate } from "@/lib/dates";
 
 async function fetchGA4Data(): Promise<{ weekly: (number | "—")[]; monthly: number | "—" }> {
   const today = toNZDate(new Date().toISOString());
   const monthStart = today.slice(0, 7) + "-01";
+  const cwi = getCurrentWeekIndex();
 
-  const [w1, w2, w3, w4, month] = await Promise.all([
-    ...weekConfigs.map(async (wc) => {
-      try { return await fetchPageSessions(toNZDate(wc.start), toNZDate(wc.end)); }
-      catch { return "—" as const; }
-    }),
-    fetchPageSessions(monthStart, today).catch(() => "—" as const),
-  ]);
+  // Only fetch current week + monthly (historical weeks are in Supabase scorecard table)
+  const weekly: (number | "—")[] = ["—", "—", "—", "—"];
+  const calls: Promise<void>[] = [];
 
-  return { weekly: [w1, w2, w3, w4], monthly: month };
+  // Current week
+  if (cwi >= 0 && cwi < 4) {
+    calls.push(
+      fetchPageSessions(toNZDate(weekConfigs[cwi].start), toNZDate(weekConfigs[cwi].end))
+        .then((v) => { weekly[cwi] = v; })
+        .catch(() => {})
+    );
+  }
+
+  // Monthly (single deduplicated query)
+  let monthly: number | "—" = "—";
+  calls.push(
+    fetchPageSessions(monthStart, today)
+      .then((v) => { monthly = v; })
+      .catch(() => {})
+  );
+
+  await Promise.all(calls);
+  return { weekly, monthly };
 }
 
 export function useGoogleAnalytics() {
   const query = useQuery({
     queryKey: ["google-analytics", "weekly-views"],
     queryFn: fetchGA4Data,
-    staleTime: 5 * 60 * 1000,
   });
 
   return {

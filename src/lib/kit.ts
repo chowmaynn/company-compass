@@ -264,14 +264,8 @@ export async function fetchBroadcastsInRange(
     })
     .sort((a, b) => new Date(b.sentAt).getTime() - new Date(a.sentAt).getTime());
 
-  // Fetch Calendly link clicks per broadcast in parallel
-  const CALENDLY_URL = "aaa-accelerator-alignment-email";
-  const calendlyResults = await Promise.all(
-    filtered.map((b) => fetchCalendlyClicksForBroadcast(b.id, CALENDLY_URL))
-  );
-
   return {
-    broadcasts: filtered.map((b, i) => ({ ...b, calendlyClicks: calendlyResults[i] })),
+    broadcasts: filtered,
     fullListRecipientCounts,
   };
 }

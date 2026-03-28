@@ -5,7 +5,6 @@ import { calculateStatus, invertedMetrics } from "@/lib/calculateStatus";
 import { useKit } from "@/hooks/use-kit";
 import { useNotion } from "@/hooks/use-notion";
 import { useGoogleAnalytics } from "@/hooks/use-google-analytics";
-import { useCalendly } from "@/hooks/use-calendly";
 import { useClose } from "@/hooks/use-close";
 import { useIntercom } from "@/hooks/use-intercom";
 import { useTallyNps } from "@/hooks/use-tally-nps";
@@ -120,7 +119,7 @@ const DEFAULT_MONTH = `${new Date().getFullYear()}-${String(new Date().getMonth(
 
 // Metrics sourced from live APIs — only the current week gets overlaid
 type ApiSource = {
-  hook: "kit" | "notion" | "ga" | "calendly" | "close" | "intercom" | "tally" | "computed";
+  hook: "kit" | "notion" | "ga" | "close" | "intercom" | "tally" | "computed";
   field: string;
 };
 
@@ -153,7 +152,6 @@ function resolveApiValue(
     kit: ReturnType<typeof useKit>;
     notion: ReturnType<typeof useNotion>;
     ga: { weeklyViews: (number | "—")[] };
-    calendly: ReturnType<typeof useCalendly>;
     close: ReturnType<typeof useClose>;
     salesMetrics: ReturnType<typeof useSupabaseMetrics>;
     intercom: ReturnType<typeof useIntercom>;
@@ -172,10 +170,6 @@ function resolveApiValue(
     }
     case "ga":
       return apis.ga.weeklyViews[weekIndex] ?? "—";
-    case "calendly": {
-      const val = apis.calendly[source.field as keyof ReturnType<typeof useCalendly>];
-      return typeof val === "number" ? val : "—";
-    }
     case "close": {
       const val = apis.close[source.field as keyof ReturnType<typeof useClose>];
       if (typeof val === "number") return val;
@@ -260,7 +254,6 @@ export function useScorecard(month: string = DEFAULT_MONTH) {
   const kit = useKit();
   const notion = useNotion();
   const ga = useGoogleAnalytics();
-  const calendly = useCalendly();
   const close = useClose();
   const intercom = useIntercom();
   const tallyNps = useTallyNps();
@@ -332,7 +325,7 @@ export function useScorecard(month: string = DEFAULT_MONTH) {
       let updated = m;
 
       if (source) {
-        const apiVal = resolveApiValue(source, cwi, { kit, notion, ga, calendly, close, intercom, tallyNps, salesMetrics });
+        const apiVal = resolveApiValue(source, cwi, { kit, notion, ga, close, intercom, tallyNps, salesMetrics });
         if (apiVal !== "—") {
           updated = { ...m, weeks: [...m.weeks] };
           updated.weeks[cwi] = { ...updated.weeks[cwi], actual: apiVal };
@@ -381,7 +374,7 @@ export function useScorecard(month: string = DEFAULT_MONTH) {
 
       return updated;
     });
-  }, [supabaseMetrics, kit, notion, ga.weeklyViews, ga.monthlyViews, calendly.salesBooked, close.wonCount, close.showRate, close.callsAnswered, close.winRate, intercom.inboxTotal, tallyNps.results, salesMetrics.salesEventBreakdown, salesMetrics.cube, salesMetrics.dates]);
+  }, [supabaseMetrics, kit, notion, ga.weeklyViews, ga.monthlyViews, close.wonCount, close.showRate, close.callsAnswered, close.winRate, intercom.inboxTotal, tallyNps.results, salesMetrics.salesEventBreakdown, salesMetrics.cube, salesMetrics.dates]);
 
   // Auto-calculate statuses from most recent week's actual vs target
   const metricsWithStatus = useMemo(() => {

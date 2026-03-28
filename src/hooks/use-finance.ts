@@ -23,6 +23,10 @@ export interface FinanceData {
 export function useFinance(startTs: number, endTs: number): FinanceData {
   const afterDate = new Date(startTs * 1000).toISOString().split("T")[0];
 
+  // Round timestamps to day boundaries for stable query keys
+  const startDay = Math.floor(startTs / 86400) * 86400;
+  const endDay = Math.floor(endTs / 86400) * 86400 + 86399;
+
   const airtableQuery = useQuery({
     queryKey: ["finance", "airtable", afterDate],
     queryFn: () => Promise.all([
@@ -30,13 +34,11 @@ export function useFinance(startTs: number, endTs: number): FinanceData {
       fetchFailedPayments(),
       fetchCancellationRequests(afterDate),
     ]),
-    staleTime: 5 * 60 * 1000,
   });
 
   const stripeQuery = useQuery({
-    queryKey: ["finance", "stripe", startTs, endTs],
+    queryKey: ["finance", "stripe", startDay, endDay],
     queryFn: () => fetchStripeOverview(startTs, endTs),
-    staleTime: 5 * 60 * 1000,
   });
 
   const [transactions, failedPayments, cancellationRequests] = airtableQuery.data ?? [[], [], []];

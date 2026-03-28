@@ -8,7 +8,7 @@ import {
   Loader2, AlertTriangle, XCircle, CreditCard, RefreshCw,
 } from "lucide-react";
 import { DashboardShell } from "@/components/DashboardShell";
-import { DateRangePicker, type DateRangeValue } from "@/components/DateRangePicker";
+import { DateRangePicker, presetToRange, rangeToStrings, type DateRangeValue } from "@/components/DateRangePicker";
 import { useCurrency } from "@/components/AppLayout";
 import { formatYearMonth } from "@/lib/dates";
 import { fmtCurrency } from "@/lib/formatNumber";
@@ -34,9 +34,21 @@ export default function SubscriptionDashboard() {
   const { convert, symbol, label: currencyLabel } = useCurrency();
   const cfmt = (n: number) => fmtCurrency(convert(n), symbol);
 
-  const [dateRange, setDateRange] = useState<DateRangeValue>({ start: "", end: "", startDate: "", endDate: "" });
-  const startTs = useMemo(() => dateRange.start ? Math.floor(new Date(dateRange.start).getTime() / 1000) : Math.floor(new Date(new Date().getFullYear(), new Date().getMonth(), 1).getTime() / 1000), [dateRange.start]);
-  const endTs = useMemo(() => dateRange.end ? Math.floor(new Date(dateRange.end).getTime() / 1000) : Math.floor(Date.now() / 1000), [dateRange.end]);
+  const [dateRange, setDateRange] = useState<DateRangeValue>(() => {
+    const { from, to } = presetToRange("TW");
+    return rangeToStrings(from, to);
+  });
+  // Round to day boundaries so query keys are stable across remounts
+  const startTs = useMemo(() => {
+    if (!dateRange.startDate) return Math.floor(new Date(new Date().getFullYear(), new Date().getMonth(), 1).getTime() / 1000);
+    const d = new Date(dateRange.startDate + "T00:00:00");
+    return Math.floor(d.getTime() / 1000);
+  }, [dateRange.startDate]);
+  const endTs = useMemo(() => {
+    if (!dateRange.endDate) return Math.floor(new Date(new Date().getFullYear(), new Date().getMonth() + 1, 0, 23, 59, 59).getTime() / 1000);
+    const d = new Date(dateRange.endDate + "T23:59:59");
+    return Math.floor(d.getTime() / 1000);
+  }, [dateRange.endDate]);
   const { transactions, failedPayments, cancellationRequests, stripeOverview, loading, stripeLoading, error } = useFinance(startTs, endTs);
 
   // ── Airtable-derived stats ─────────────────────────────────────────────────
@@ -88,7 +100,7 @@ export default function SubscriptionDashboard() {
     <>
     {/* ── Date range filter (outside DashboardShell so it persists during loading) */}
     <div className="flex items-center gap-2 mb-6">
-      <DateRangePicker defaultPreset="MTD" onChange={setDateRange} />
+      <DateRangePicker onChange={setDateRange} />
       {stripeLoading && <RefreshCw className="h-3.5 w-3.5 text-muted-foreground animate-spin" />}
     </div>
 

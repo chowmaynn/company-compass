@@ -172,7 +172,7 @@ export function SalesDashboard() {
       <div>
         <div className="flex flex-wrap items-center justify-between gap-3 mb-4">
           <SectionLabel dot="bg-indigo-500 animate-pulse" label="Bookings" />
-          <DateRangePicker defaultPreset="MTD" onChange={setBookingsRange} />
+          <DateRangePicker onChange={setBookingsRange} />
         </div>
         <BookingsDashboard from={from} to={to} showRate={showRate} />
       </div>
