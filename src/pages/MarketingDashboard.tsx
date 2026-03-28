@@ -1,43 +1,22 @@
-import { useState, useMemo, useRef, useEffect } from "react";
+import { useState, useMemo } from "react";
 import {
   AreaChart, Area, BarChart, Bar, XAxis, YAxis, CartesianGrid,
-  Tooltip, ResponsiveContainer, Cell, PieChart, Pie,
+  Tooltip, ResponsiveContainer, Cell, PieChart, Pie, LabelList,
 } from "recharts";
-import {
-  Loader2, Mail, Globe, BookOpen, ChevronDown,
-} from "lucide-react";
-import { Calendar } from "@/components/ui/calendar";
-import type { DateRange } from "react-day-picker";
+import { Loader2, Mail, BookOpen } from "lucide-react";
 import { useSupabaseMetrics } from "@/hooks/use-supabase-metrics";
 import { useKitMarketing } from "@/hooks/use-kit-marketing";
 import { useGoogleAnalytics } from "@/hooks/use-google-analytics";
-import { isAuthorized } from "@/lib/youtube-auth";
 import { useSkoolScorecard } from "@/hooks/use-skool-scorecard";
+import { WebsiteChannelCard } from "@/components/WebsiteChannelCard";
+import { useCalendly } from "@/hooks/use-calendly";
+import { DateRangePicker as SharedDateRangePicker, type DateRangeValue } from "@/components/DateRangePicker";
 
 // ── Date range helpers ───────────────────────────────────────────────────────
 
-type Preset = "MTD" | "7d" | "30d" | "3m" | "custom";
+// Date range helpers moved to shared DateRangePicker component
 
-function presetToRange(preset: Exclude<Preset, "custom">): { from: Date; to: Date } {
-  const now = new Date();
-  if (preset === "MTD") return { from: new Date(now.getFullYear(), now.getMonth(), 1), to: now };
-  if (preset === "7d")  return { from: new Date(now.getTime() - 7  * 86400000), to: now };
-  if (preset === "30d") return { from: new Date(now.getTime() - 30 * 86400000), to: now };
-  return { from: new Date(now.getFullYear(), now.getMonth() - 3, now.getDate()), to: now };
-}
-
-function rangeToStrings(from: Date, to: Date) {
-  return {
-    start:     from.toISOString(),
-    end:       to.toISOString(),
-    startDate: from.toISOString().slice(0, 10),
-    endDate:   to.toISOString().slice(0, 10),
-  };
-}
-
-function fmtDateLabel(d: Date): string {
-  return d.toLocaleDateString("en-NZ", { day: "numeric", month: "short", year: "numeric" });
-}
+import { fmtPercent } from "@/lib/formatNumber";
 
 // ── Small helpers ────────────────────────────────────────────────────────────
 
@@ -46,10 +25,7 @@ function fmt(n: number | null | undefined): string {
   return n.toLocaleString();
 }
 
-function pct(n: number | null | undefined): string {
-  if (n == null) return "—";
-  return `${n}%`;
-}
+const pct = fmtPercent;
 
 // KIT returns open_rate and click_rate already as percentages (e.g. 38.53 = 38.53%)
 function fmtRate(r: number | null | undefined): string {
@@ -75,47 +51,19 @@ const SOURCE_COLORS: Record<string, string> = {
 };
 const DEFAULT_COLOR = "#94a3b8";
 
-
-// ── Tooltips ─────────────────────────────────────────────────────────────────
-
-function CountTooltip({ active, payload, label }: any) {
-  if (!active || !payload?.length) return null;
-  return (
-    <div className="bg-card border border-border rounded-lg px-3 py-2 shadow-lg text-xs">
-      <p className="text-muted-foreground mb-1">{label}</p>
-      <p className="font-semibold" style={{ color: payload[0].color }}>{payload[0].value} bookings</p>
-    </div>
-  );
+/** Display-friendly names for booking sources */
+const SOURCE_LABELS: Record<string, string> = {
+  "Welcome Email": "Welcome Series",
+  "Skool C": "Skool Classroom",
+  "Skool P": "Skool Post",
+  "Skool A": "Skool DM",
+};
+function sourceLabel(name: string): string {
+  return SOURCE_LABELS[name] ?? name;
 }
 
-function SourceTooltip({ active, payload, label }: any) {
-  if (!active || !payload?.length) return null;
-  return (
-    <div className="bg-card border border-border rounded-lg px-3 py-2 shadow-lg text-xs">
-      <p className="text-muted-foreground mb-1">{label}</p>
-      <p className="font-semibold text-foreground">{payload[0]?.value} qualified bookings</p>
-    </div>
-  );
-}
 
-// ── Stat card ─────────────────────────────────────────────────────────────────
-
-function StatCard({
-  label, value, sub, icon: Icon, color = "text-foreground",
-}: {
-  label: string; value: string; sub?: string; icon: React.ElementType; color?: string;
-}) {
-  return (
-    <div className="bg-card border border-border rounded-xl p-4 flex flex-col gap-2">
-      <div className="flex items-center justify-between">
-        <span className="text-xs text-muted-foreground font-medium uppercase tracking-wider">{label}</span>
-        <Icon className={`h-4 w-4 ${color}`} />
-      </div>
-      <p className={`text-2xl font-bold ${color}`}>{value}</p>
-      {sub && <p className="text-xs text-muted-foreground">{sub}</p>}
-    </div>
-  );
-}
+import { ChartTooltip } from "@/components/ChartTooltip";
 
 // ── Section header ────────────────────────────────────────────────────────────
 
@@ -133,121 +81,14 @@ function SectionHeader({ icon: Icon, title, sub }: { icon: React.ElementType; ti
   );
 }
 
-// ── Date range picker ─────────────────────────────────────────────────────────
-
-function DateRangePicker({
-  preset,
-  setPreset,
-  customRange,
-  setCustomRange,
-}: {
-  preset: Preset;
-  setPreset: (p: Preset) => void;
-  customRange: DateRange | undefined;
-  setCustomRange: (r: DateRange | undefined) => void;
-}) {
-  const [open, setOpen] = useState(false);
-  const ref = useRef<HTMLDivElement>(null);
-
-  useEffect(() => {
-    if (!open) return;
-    const handler = (e: MouseEvent) => {
-      if (ref.current && !ref.current.contains(e.target as Node)) setOpen(false);
-    };
-    document.addEventListener("mousedown", handler);
-    return () => document.removeEventListener("mousedown", handler);
-  }, [open]);
-
-  const customLabel = useMemo(() => {
-    if (customRange?.from && customRange?.to) {
-      return `${fmtDateLabel(customRange.from)} – ${fmtDateLabel(customRange.to)}`;
-    }
-    if (customRange?.from) return `${fmtDateLabel(customRange.from)} – …`;
-    return "Custom range";
-  }, [customRange]);
-
-  const presets: { id: Preset; label: string }[] = [
-    { id: "MTD", label: "This Month" },
-    { id: "7d",  label: "7 days" },
-    { id: "30d", label: "30 days" },
-    { id: "3m",  label: "3 months" },
-  ];
-
-  return (
-    <div className="relative" ref={ref}>
-      <div className="flex items-center gap-1 bg-muted rounded-lg p-1">
-        {presets.map((p) => (
-          <button
-            key={p.id}
-            onClick={() => { setPreset(p.id); setOpen(false); }}
-            className={`px-3 py-1.5 rounded-md text-xs font-medium transition-all ${
-              preset === p.id
-                ? "bg-card text-foreground shadow-sm"
-                : "text-muted-foreground hover:text-foreground"
-            }`}
-          >
-            {p.label}
-          </button>
-        ))}
-
-        {/* Custom button */}
-        <button
-          onClick={() => { setPreset("custom"); setOpen((o) => !o); }}
-          className={`flex items-center gap-1 px-3 py-1.5 rounded-md text-xs font-medium transition-all ${
-            preset === "custom"
-              ? "bg-card text-foreground shadow-sm"
-              : "text-muted-foreground hover:text-foreground"
-          }`}
-        >
-          {preset === "custom" ? customLabel : "Custom"}
-          <ChevronDown className={`h-3 w-3 transition-transform ${open ? "rotate-180" : ""}`} />
-        </button>
-      </div>
-
-      {/* Calendar popover */}
-      {open && (
-        <div className="absolute right-0 top-full mt-2 z-50 bg-card border border-border rounded-xl shadow-xl p-3">
-          <Calendar
-            mode="range"
-            selected={customRange}
-            onSelect={(r) => {
-              setCustomRange(r);
-              if (r?.from && r?.to) setOpen(false);
-            }}
-            numberOfMonths={2}
-            disabled={{ after: new Date() }}
-            defaultMonth={customRange?.from ?? new Date()}
-          />
-        </div>
-      )}
-    </div>
-  );
-}
 
 // ── Main ──────────────────────────────────────────────────────────────────────
 
 export default function MarketingDashboard() {
-  const [preset, setPreset] = useState<Preset>("MTD");
-  const [customRange, setCustomRange] = useState<DateRange | undefined>();
-
-  const [emailPreset, setEmailPreset] = useState<Preset>("MTD");
-  const [emailCustomRange, setEmailCustomRange] = useState<DateRange | undefined>();
-
-  const range = useMemo(() => {
-    if (preset === "custom" && customRange?.from && customRange?.to) {
-      return rangeToStrings(customRange.from, customRange.to);
-    }
-    const { from, to } = presetToRange(preset as Exclude<Preset, "custom">);
-    return rangeToStrings(from, to);
-  }, [preset, customRange]);
-
-  const emailRange = useMemo(() => {
-    if (emailPreset === "custom" && emailCustomRange?.from && emailCustomRange?.to) {
-      return rangeToStrings(emailCustomRange.from, emailCustomRange.to);
-    }
-    const { from, to } = presetToRange(emailPreset as Exclude<Preset, "custom">);
-    return rangeToStrings(from, to);
-  }, [emailPreset, emailCustomRange]);
+  // Each section gets its own date range state via the shared component
+  const [range, setRange] = useState<DateRangeValue>({ start: "", end: "", startDate: "", endDate: "" });
+  const [emailRange, setEmailRange] = useState<DateRangeValue>({ start: "", end: "", startDate: "", endDate: "" });
+  const [skoolRange, setSkoolRange] = useState<DateRangeValue>({ start: "", end: "", startDate: "", endDate: "" });
 
   const daysInRange = useMemo(() => {
     const ms = new Date(range.end).getTime() - new Date(range.start).getTime();
@@ -257,20 +98,21 @@ export default function MarketingDashboard() {
   // Skool scorecard metrics
   const skoolScorecard = useSkoolScorecard();
 
-  // Data
+  // Data — each section uses its own date range
   const supabase = useSupabaseMetrics(range.start, range.end);
   const emailSupabase = useSupabaseMetrics(emailRange.start, emailRange.end);
+  const skoolSupabase = useSupabaseMetrics(skoolRange.start, skoolRange.end);
   const kit = useKitMarketing(emailRange.startDate, emailRange.endDate);
   const ga = useGoogleAnalytics();
-  const gaAuthed = isAuthorized();
+  const gaAuthed = true; // Service account handles auth — always available
 
   // Derived booking counts
   const skoolBookings = useMemo(() => {
-    const skoolA = supabase.salesEventBreakdown.find((e) => e.name === "Skool A")?.qualified ?? 0;
-    const skoolC = supabase.salesEventBreakdown.find((e) => e.name === "Skool C")?.qualified ?? 0;
-    const skoolP = supabase.salesEventBreakdown.find((e) => e.name === "Skool P")?.qualified ?? 0;
+    const skoolA = skoolSupabase.salesEventBreakdown.find((e) => e.name === "Skool A")?.qualified ?? 0;
+    const skoolC = skoolSupabase.salesEventBreakdown.find((e) => e.name === "Skool C")?.qualified ?? 0;
+    const skoolP = skoolSupabase.salesEventBreakdown.find((e) => e.name === "Skool P")?.qualified ?? 0;
     return { skoolA, skoolC, skoolP, total: skoolA + skoolC + skoolP };
-  }, [supabase.salesEventBreakdown]);
+  }, [skoolSupabase.salesEventBreakdown]);
 
   const websiteBookings = supabase.salesEventBreakdown.find((e) => e.name === "Website")?.qualified ?? 0;
   const emailBookings =
@@ -307,12 +149,7 @@ export default function MarketingDashboard() {
               All marketing channels · {avgPerDay} per day avg
             </p>
           </div>
-          <DateRangePicker
-            preset={preset}
-            setPreset={setPreset}
-            customRange={customRange}
-            setCustomRange={setCustomRange}
-          />
+          <SharedDateRangePicker onChange={setRange} />
         </div>
 
         {supabase.isLoading ? (
@@ -377,18 +214,23 @@ export default function MarketingDashboard() {
                 ) : (
                   <ResponsiveContainer width="100%" height={220}>
                     <BarChart
-                      data={supabase.salesEventBreakdown}
+                      data={supabase.salesEventBreakdown.map(e => ({ ...e, name: sourceLabel(e.name) }))}
                       layout="vertical"
                       margin={{ left: 8, right: 24, top: 4, bottom: 4 }}
                     >
                       <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--border))" horizontal={false} />
                       <XAxis type="number" tick={{ fontSize: 11, fill: "hsl(var(--muted-foreground))" }} axisLine={false} tickLine={false} />
                       <YAxis dataKey="name" type="category" tick={{ fontSize: 11, fill: "hsl(var(--muted-foreground))" }} axisLine={false} tickLine={false} width={90} />
-                      <Tooltip content={<SourceTooltip />} />
+                      <Tooltip content={<ChartTooltip formatter={(v) => `${v} qualified bookings`} />} />
                       <Bar dataKey="qualified" radius={[0, 4, 4, 0]}>
                         {supabase.salesEventBreakdown.map((entry) => (
                           <Cell key={entry.name} fill={SOURCE_COLORS[entry.name] ?? DEFAULT_COLOR} />
                         ))}
+                        <LabelList
+                          dataKey="qualified"
+                          position="insideRight"
+                          style={{ fill: "#fff", fontSize: 12, fontWeight: 600 }}
+                        />
                       </Bar>
                     </BarChart>
                   </ResponsiveContainer>
@@ -425,7 +267,7 @@ export default function MarketingDashboard() {
                         tickLine={false}
                         width={24}
                       />
-                      <Tooltip content={<CountTooltip />} />
+                      <Tooltip content={<ChartTooltip formatter={(v) => `${v} bookings`} />} />
                       <Area
                         type="monotone"
                         dataKey="bookings"
@@ -444,6 +286,84 @@ export default function MarketingDashboard() {
         )}
       </div>
 
+      {/* ══ Website ═══════════════════════════════════════════════════════ */}
+      <WebsiteChannelCard gaAuthed={gaAuthed} />
+
+      {/* ══ Skool ════════════════════════════════════════════════════════ */}
+      <div className="bg-card border border-border rounded-xl p-5 space-y-4">
+          <div className="flex items-center justify-between">
+            <SectionHeader icon={BookOpen} title="Skool Channel" sub="learn-ai community" />
+            <SharedDateRangePicker onChange={setSkoolRange} />
+          </div>
+          {skoolSupabase.isLoading ? (
+            <div className="flex items-center gap-2 text-muted-foreground text-sm">
+              <Loader2 className="h-4 w-4 animate-spin" /> Loading…
+            </div>
+          ) : (
+            <div className="space-y-3">
+              {/* Live bookings from Supabase */}
+              <div className="bg-muted/30 rounded-lg p-3 flex items-center justify-between">
+                <div>
+                  <p className="text-xs text-muted-foreground uppercase tracking-wider font-medium">Total Skool Bookings</p>
+                  <p className="text-xl font-bold text-foreground mt-0.5">{fmt(skoolBookings.total)}</p>
+                </div>
+                <p className="text-xs text-muted-foreground">
+                  {skoolSupabase.totalBookings > 0
+                    ? `${Math.round((skoolBookings.total / skoolSupabase.totalBookings) * 100)}% of total`
+                    : ""}
+                </p>
+              </div>
+
+              {/* A / P / C breakdown */}
+              {[
+                { label: "Skool DM", value: skoolBookings.skoolA, color: "#10b981" },
+                { label: "Skool Classroom", value: skoolBookings.skoolC, color: "#34d399" },
+                { label: "Skool Post", value: skoolBookings.skoolP, color: "#6ee7b7" },
+              ].map(({ label, value, color }) => (
+                <div key={label} className="flex items-center gap-3">
+                  <span className="inline-block rounded-sm shrink-0" style={{ width: 10, height: 10, background: color }} />
+                  <span className="text-sm text-foreground flex-1">{label}</span>
+                  <span className="text-sm font-semibold font-mono text-foreground">{fmt(value)}</span>
+                  <div className="w-24 bg-muted rounded-full h-1.5 overflow-hidden">
+                    <div className="h-full rounded-full" style={{ width: skoolBookings.total > 0 ? `${(value / skoolBookings.total) * 100}%` : "0%", background: color }} />
+                  </div>
+                </div>
+              ))}
+
+              {/* Scorecard metrics */}
+              <div className="pt-2 border-t border-border grid grid-cols-3 gap-3">
+                <div className="bg-muted/30 rounded-lg p-3">
+                  <p className="text-xs text-muted-foreground uppercase tracking-wider font-medium mb-1">Booking Rate</p>
+                  <p className="text-xl font-bold text-foreground">
+                    {skoolScorecard.loading ? "…" : skoolScorecard.bookingRate ?? "—"}
+                  </p>
+                  {skoolScorecard.bookingRateMonth && (
+                    <p className="text-[10px] text-muted-foreground mt-0.5">{skoolScorecard.bookingRateMonth}</p>
+                  )}
+                </div>
+                <div className="bg-muted/30 rounded-lg p-3">
+                  <p className="text-xs text-muted-foreground uppercase tracking-wider font-medium mb-1">Skool Joins</p>
+                  <p className="text-xl font-bold text-foreground">
+                    {skoolScorecard.loading ? "…" : skoolScorecard.joins ?? "—"}
+                  </p>
+                  {skoolScorecard.joinsMonth && (
+                    <p className="text-[10px] text-muted-foreground mt-0.5">{skoolScorecard.joinsMonth}</p>
+                  )}
+                </div>
+                <div className="bg-muted/30 rounded-lg p-3">
+                  <p className="text-xs text-muted-foreground uppercase tracking-wider font-medium mb-1">AAA Bitly Clicks</p>
+                  <p className="text-xl font-bold text-foreground">
+                    {skoolScorecard.loading ? "…" : skoolScorecard.skoolClicks ?? "—"}
+                  </p>
+                  {skoolScorecard.skoolClicksMonth && (
+                    <p className="text-[10px] text-muted-foreground mt-0.5">{skoolScorecard.skoolClicksMonth}</p>
+                  )}
+                </div>
+              </div>
+            </div>
+          )}
+        </div>
+
       {/* ══ Email Channel Card ════════════════════════════════════════════ */}
       <div className="bg-card border border-border rounded-xl overflow-hidden">
 
@@ -458,12 +378,7 @@ export default function MarketingDashboard() {
               <p className="text-xs text-muted-foreground">Kit broadcast performance</p>
             </div>
           </div>
-          <DateRangePicker
-            preset={emailPreset}
-            setPreset={setEmailPreset}
-            customRange={emailCustomRange}
-            setCustomRange={setEmailCustomRange}
-          />
+          <SharedDateRangePicker onChange={setEmailRange} />
         </div>
 
         {kit.loading ? (
@@ -496,7 +411,7 @@ export default function MarketingDashboard() {
                         <Pie
                           data={[
                             { name: "Email", value: emailSupabase.salesEventBreakdown.find((e) => e.name === "Email")?.qualified ?? 0 },
-                            { name: "Welcome Email", value: emailSupabase.salesEventBreakdown.find((e) => e.name === "Welcome Email")?.qualified ?? 0 },
+                            { name: "Welcome Series", value: emailSupabase.salesEventBreakdown.find((e) => e.name === "Welcome Email")?.qualified ?? 0 },
                           ].filter((d) => d.value > 0)}
                           cx="50%" cy="50%"
                           innerRadius={38} outerRadius={60}
@@ -521,7 +436,7 @@ export default function MarketingDashboard() {
                     <div className="space-y-3">
                       {[
                         { label: "Email", value: emailSupabase.salesEventBreakdown.find((e) => e.name === "Email")?.qualified ?? 0, color: "#6366f1" },
-                        { label: "Welcome Email", value: emailSupabase.salesEventBreakdown.find((e) => e.name === "Welcome Email")?.qualified ?? 0, color: "#8b5cf6" },
+                        { label: "Welcome Series", value: emailSupabase.salesEventBreakdown.find((e) => e.name === "Welcome Email")?.qualified ?? 0, color: "#8b5cf6" },
                       ].map(({ label, value, color }) => (
                         <div key={label}>
                           <div className="flex items-center gap-2 mb-1">
@@ -609,111 +524,7 @@ export default function MarketingDashboard() {
         )}
       </div>
 
-      {/* ══ Website + Skool ═══════════════════════════════════════════════ */}
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-
-        {/* Website */}
-        <div className="bg-card border border-border rounded-xl p-5 space-y-4">
-          <SectionHeader icon={Globe} title="Website Channel" sub="aaaaccelerator.com" />
-          {!gaAuthed ? (
-            <p className="text-sm text-muted-foreground py-4 text-center">
-              Connect Google in the top-right to see website analytics.
-            </p>
-          ) : ga.loading ? (
-            <div className="flex items-center gap-2 text-muted-foreground text-sm">
-              <Loader2 className="h-4 w-4 animate-spin" /> Loading…
-            </div>
-          ) : (
-            <div className="grid grid-cols-2 gap-3">
-              <div className="bg-muted/30 rounded-lg p-3">
-                <p className="text-xs text-muted-foreground uppercase tracking-wider font-medium mb-1">Website Views</p>
-                <p className="text-xl font-bold text-foreground">{fmt(totalWebViews)}</p>
-              </div>
-              <div className="bg-muted/30 rounded-lg p-3">
-                <p className="text-xs text-muted-foreground uppercase tracking-wider font-medium mb-1">Website Bookings</p>
-                <p className="text-xl font-bold text-foreground">{fmt(websiteBookings)}</p>
-              </div>
-              <div className="bg-muted/30 rounded-lg p-3 col-span-2">
-                <p className="text-xs text-muted-foreground uppercase tracking-wider font-medium mb-1">View → Booking Rate</p>
-                <p className="text-xl font-bold text-foreground">{websiteBookingRate}</p>
-              </div>
-            </div>
-          )}
-        </div>
-
-        {/* Skool */}
-        <div className="bg-card border border-border rounded-xl p-5 space-y-4">
-          <SectionHeader icon={BookOpen} title="Skool Channel" sub="learn-ai community" />
-          {supabase.isLoading ? (
-            <div className="flex items-center gap-2 text-muted-foreground text-sm">
-              <Loader2 className="h-4 w-4 animate-spin" /> Loading…
-            </div>
-          ) : (
-            <div className="space-y-3">
-              {/* Live bookings from Calendly */}
-              <div className="bg-muted/30 rounded-lg p-3 flex items-center justify-between">
-                <div>
-                  <p className="text-xs text-muted-foreground uppercase tracking-wider font-medium">Total Skool Bookings</p>
-                  <p className="text-xl font-bold text-foreground mt-0.5">{fmt(skoolBookings.total)}</p>
-                </div>
-                <p className="text-xs text-muted-foreground">
-                  {supabase.totalBookings > 0
-                    ? `${Math.round((skoolBookings.total / supabase.totalBookings) * 100)}% of total`
-                    : ""}
-                </p>
-              </div>
-
-              {/* A / P / C breakdown */}
-              {[
-                { label: "Skool A", value: skoolBookings.skoolA, color: "#10b981" },
-                { label: "Skool C", value: skoolBookings.skoolC, color: "#34d399" },
-                { label: "Skool P", value: skoolBookings.skoolP, color: "#6ee7b7" },
-              ].map(({ label, value, color }) => (
-                <div key={label} className="flex items-center gap-3">
-                  <span className="inline-block rounded-sm shrink-0" style={{ width: 10, height: 10, background: color }} />
-                  <span className="text-sm text-foreground flex-1">{label}</span>
-                  <span className="text-sm font-semibold font-mono text-foreground">{fmt(value)}</span>
-                  <div className="w-24 bg-muted rounded-full h-1.5 overflow-hidden">
-                    <div className="h-full rounded-full" style={{ width: skoolBookings.total > 0 ? `${(value / skoolBookings.total) * 100}%` : "0%", background: color }} />
-                  </div>
-                </div>
-              ))}
-
-              {/* Scorecard metrics */}
-              <div className="pt-2 border-t border-border grid grid-cols-3 gap-3">
-                <div className="bg-muted/30 rounded-lg p-3">
-                  <p className="text-xs text-muted-foreground uppercase tracking-wider font-medium mb-1">Booking Rate</p>
-                  <p className="text-xl font-bold text-foreground">
-                    {skoolScorecard.loading ? "…" : skoolScorecard.bookingRate ?? "—"}
-                  </p>
-                  {skoolScorecard.bookingRateMonth && (
-                    <p className="text-[10px] text-muted-foreground mt-0.5">{skoolScorecard.bookingRateMonth}</p>
-                  )}
-                </div>
-                <div className="bg-muted/30 rounded-lg p-3">
-                  <p className="text-xs text-muted-foreground uppercase tracking-wider font-medium mb-1">Skool Joins</p>
-                  <p className="text-xl font-bold text-foreground">
-                    {skoolScorecard.loading ? "…" : skoolScorecard.joins ?? "—"}
-                  </p>
-                  {skoolScorecard.joinsMonth && (
-                    <p className="text-[10px] text-muted-foreground mt-0.5">{skoolScorecard.joinsMonth}</p>
-                  )}
-                </div>
-                <div className="bg-muted/30 rounded-lg p-3">
-                  <p className="text-xs text-muted-foreground uppercase tracking-wider font-medium mb-1">AAA Bitly Clicks</p>
-                  <p className="text-xl font-bold text-foreground">
-                    {skoolScorecard.loading ? "…" : skoolScorecard.skoolClicks ?? "—"}
-                  </p>
-                  {skoolScorecard.skoolClicksMonth && (
-                    <p className="text-[10px] text-muted-foreground mt-0.5">{skoolScorecard.skoolClicksMonth}</p>
-                  )}
-                </div>
-              </div>
-            </div>
-          )}
-        </div>
-      </div>
-
     </div>
   );
 }
+

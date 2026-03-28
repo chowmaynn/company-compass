@@ -1,6 +1,7 @@
 import { useMemo, useState } from "react";
 import { useIntercom } from "@/hooks/use-intercom";
 import { Card, CardContent } from "@/components/ui/card";
+import { elapsed, fmtDuration } from "@/lib/dates";
 import {
   AreaChart,
   Area,
@@ -30,22 +31,6 @@ function stripHtml(html?: string): string {
   return html.replace(/<[^>]*>/g, "").trim() || "—";
 }
 
-function elapsed(ts: number): string {
-  const secs = Math.floor(Date.now() / 1000) - ts;
-  if (secs < 3600) return `${Math.floor(secs / 60)}m`;
-  if (secs < 86400) return `${Math.floor(secs / 3600)}h ${Math.floor((secs % 3600) / 60)}m`;
-  const d = Math.floor(secs / 86400);
-  const h = Math.floor((secs % 86400) / 3600);
-  return h > 0 ? `${d}d ${h}h` : `${d}d`;
-}
-
-function fmtDuration(secs: number): string {
-  if (secs < 3600) return `${Math.round(secs / 60)}m`;
-  const h = Math.floor(secs / 3600);
-  const m = Math.floor((secs % 3600) / 60);
-  return m > 0 ? `${h}h ${m}m` : `${h}h`;
-}
-
 function dayKey(ts: number): string {
   const d = new Date(ts * 1000);
   return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
@@ -56,9 +41,9 @@ function dayLabel(key: string): string {
   return `${d}/${m}`;
 }
 
-const GRID = "hsl(220, 13%, 91%)";
-const TICK = "hsl(220, 9%, 46%)";
-const TOOLTIP_STYLE = {
+import { GRID, TICK } from "@/lib/chart-theme";
+
+const TOOLTIP_STYLE: React.CSSProperties = {
   backgroundColor: "hsl(var(--card))",
   border: "1px solid hsl(var(--border))",
   borderRadius: "8px",
@@ -74,31 +59,8 @@ const DAY_PRESETS = [
   { label: "90d", days: 90 },
 ];
 
-// ── Stat card ─────────────────────────────────────────────────
-
-function StatCard({
-  label, value, sub, icon: Icon, accent, bg,
-}: {
-  label: string; value: string | number; sub?: string;
-  icon: React.ElementType; accent?: string; bg?: string;
-}) {
-  return (
-    <Card className="border-border/50">
-      <CardContent className="p-5">
-        <div className="flex items-start justify-between">
-          <div className="space-y-1 min-w-0 flex-1">
-            <p className="text-[11px] font-semibold text-muted-foreground uppercase tracking-wider">{label}</p>
-            <p className={`text-3xl font-bold tracking-tight ${accent ?? "text-foreground"}`}>{value}</p>
-            {sub && <p className="text-xs text-muted-foreground">{sub}</p>}
-          </div>
-          <div className={`h-10 w-10 rounded-xl flex items-center justify-center shrink-0 ml-3 ${bg ?? "bg-muted"}`}>
-            <Icon className={`h-5 w-5 ${accent ?? "text-muted-foreground"}`} />
-          </div>
-        </div>
-      </CardContent>
-    </Card>
-  );
-}
+import { StatCard } from "@/components/StatCard";
+import { DashboardShell } from "@/components/DashboardShell";
 
 // ── Main ──────────────────────────────────────────────────────
 
@@ -181,25 +143,8 @@ export default function SupportDashboard() {
     [inbox]
   );
 
-  if (loading) {
-    return (
-      <div className="flex items-center justify-center h-64 text-muted-foreground">
-        <Loader2 className="h-6 w-6 animate-spin mr-2" />
-        <span className="text-sm">Loading Intercom data…</span>
-      </div>
-    );
-  }
-
-  if (error) {
-    return (
-      <div className="flex items-center justify-center h-64 gap-2 text-red-600">
-        <AlertCircle className="h-5 w-5" />
-        <span className="text-sm">{error}</span>
-      </div>
-    );
-  }
-
   return (
+    <DashboardShell loading={loading} error={error} loadingMessage="Loading Intercom data\u2026">
     <div className="space-y-5">
 
       {/* ── Date range selector ─────────────────────────────── */}
@@ -466,5 +411,6 @@ export default function SupportDashboard() {
       </Card>
 
     </div>
+    </DashboardShell>
   );
 }

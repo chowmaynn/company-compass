@@ -3,8 +3,9 @@ import { getChannelStats, getRecentVideos, type ChannelStats, type VideoItem } f
 import { getDailyAnalytics, bucketByWeek } from "@/lib/youtube-analytics";
 import { isAuthorized } from "@/lib/youtube-auth";
 import { weekConfigs } from "@/data/scorecardData";
+import { LIAM_CHANNEL_ID } from "@/lib/constants";
 
-const CHANNEL_ID = "UCui4jxDaMb53Gdh-AZUTPAg"; // Liam Ottley
+const CHANNEL_ID = LIAM_CHANNEL_ID;
 
 export function useYouTube() {
   const [channelStats, setChannelStats] = useState<ChannelStats | null>(null);

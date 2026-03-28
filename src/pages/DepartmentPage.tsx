@@ -11,13 +11,14 @@ import { DepartmentCharts } from "@/components/DepartmentCharts";
 import CoachesDashboard from "@/pages/CoachesDashboard";
 import SuccessTrackingDashboard from "@/pages/SuccessTrackingDashboard";
 import SupportDashboard from "@/pages/SupportDashboard";
-import FinanceDashboard from "@/pages/FinanceDashboard";
+import SubscriptionDashboard from "@/pages/SubscriptionDashboard";
 import MarketingDashboard from "@/pages/MarketingDashboard";
 import { CompetitorsDashboard } from "@/components/CompetitorsDashboard";
 import { ContentOverview } from "@/components/ContentOverview";
 import { LayoutDashboard, BarChart3, Users, Shield, Trophy, HeadphonesIcon, DollarSign, Swords, Megaphone } from "lucide-react";
 
 const slugToDepartment: Record<string, Department> = {
+  "subscriptions": "Finance",
   "finance": "Finance",
   "evergreen-metrics": "Product",
   "content": "Content",
@@ -63,13 +64,13 @@ export default function DepartmentPage() {
   const department = slug ? slugToDepartment[slug] : undefined;
 
   const [activeTab, setActiveTab] = useState<Tab>(
-    slug === "finance" ? "finance" : slug === "marketing" ? "marketing" : "dashboard"
+    slug === "subscriptions" || slug === "finance" ? "finance" : slug === "marketing" ? "marketing" : "dashboard"
   );
   const [metrics, setMetrics] = useState<Metric[]>(initialData);
 
   // Reset tab when navigating between departments
   useEffect(() => {
-    setActiveTab(slug === "finance" ? "finance" : slug === "marketing" ? "marketing" : "dashboard");
+    setActiveTab(slug === "subscriptions" || slug === "finance" ? "finance" : slug === "marketing" ? "marketing" : "dashboard");
   }, [slug]);
 
   if (!department) return <Navigate to="/" replace />;
@@ -116,8 +117,8 @@ export default function DepartmentPage() {
       )}
 
       {/* ── Tab Toggle ────────────────────────────────────── */}
-      {!isMarketing && <div className="flex items-center gap-1 bg-muted rounded-lg p-1 w-fit">
-        {(isFinance ? financeTabs : isSales ? salesTabs : isProduct ? productTabs : isContent ? contentTabs : tabs).map((tab) => {
+      {!isMarketing && !isFinance && <div className="flex items-center gap-1 bg-muted rounded-lg p-1 w-fit">
+        {(isSales ? salesTabs : isProduct ? productTabs : isContent ? contentTabs : tabs).map((tab) => {
           const Icon = tab.icon;
           return (
             <button
@@ -137,7 +138,7 @@ export default function DepartmentPage() {
       </div>}
 
       {/* ── Tab Content ───────────────────────────────────── */}
-      {activeTab === "finance" && <FinanceDashboard />}
+      {activeTab === "finance" && <SubscriptionDashboard />}
 
       {activeTab === "dashboard" && (
         isProduct ? (

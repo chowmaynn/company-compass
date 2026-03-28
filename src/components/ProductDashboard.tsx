@@ -2,6 +2,7 @@ import { useCircle } from "@/hooks/use-circle";
 import { useCircleCharts } from "@/hooks/use-circle-charts";
 import { useTallyNps } from "@/hooks/use-tally-nps";
 import { Card, CardContent } from "@/components/ui/card";
+import { formatDay } from "@/lib/dates";
 import {
   Users,
   UserPlus,
@@ -22,23 +23,7 @@ import {
   ResponsiveContainer,
 } from "recharts";
 
-// ── Shared chart constants ────────────────────────────────────
-
-const GRID = "hsl(220, 13%, 91%)";
-const TICK = "hsl(220, 9%, 46%)";
-const TOOLTIP_STYLE = {
-  backgroundColor: "#ffffff",
-  border: "1px solid hsl(220, 13%, 91%)",
-  borderRadius: "8px",
-  color: "hsl(224, 71%, 4%)",
-  fontSize: "12px",
-  boxShadow: "0 4px 6px -1px rgb(0 0 0 / 0.07)",
-};
-
-function formatDay(dateStr: string) {
-  const d = new Date(dateStr);
-  return `${d.getDate()}/${d.getMonth() + 1}`;
-}
+import { GRID, TICK, TOOLTIP_STYLE } from "@/lib/chart-theme";
 
 function formatTime(iso: string) {
   return new Date(iso).toLocaleTimeString("en-NZ", { hour: "2-digit", minute: "2-digit" });

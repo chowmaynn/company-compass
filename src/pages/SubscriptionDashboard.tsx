@@ -1,122 +1,43 @@
 import { useMemo, useState } from "react";
 import {
   AreaChart, Area, BarChart, Bar, XAxis, YAxis, Tooltip,
-  ResponsiveContainer, CartesianGrid,
+  ResponsiveContainer, CartesianGrid, LabelList,
 } from "recharts";
 import { useFinance } from "@/hooks/use-finance";
 import {
-  Loader2, TrendingUp, AlertTriangle, XCircle, CreditCard,
-  ArrowUpRight, ArrowDownRight, RefreshCw,
+  Loader2, AlertTriangle, XCircle, CreditCard, RefreshCw,
 } from "lucide-react";
+import { DashboardShell } from "@/components/DashboardShell";
+import { DateRangePicker, type DateRangeValue } from "@/components/DateRangePicker";
+import { useCurrency } from "@/components/AppLayout";
+import { formatYearMonth } from "@/lib/dates";
+import { fmtCurrency } from "@/lib/formatNumber";
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
-
-function fmt(n: number) {
-  if (n >= 1_000_000) return `$${(n / 1_000_000).toFixed(2)}m`;
-  if (n >= 1_000) return `$${(n / 1_000).toFixed(1)}k`;
-  return `$${n.toLocaleString()}`;
-}
 
 function getYearMonth(dateStr: string): string {
   const d = new Date(dateStr);
   return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}`;
 }
 
-function formatYearMonth(ym: string): string {
-  const [year, month] = ym.split("-");
-  const names = ["Jan","Feb","Mar","Apr","May","Jun","Jul","Aug","Sep","Oct","Nov","Dec"];
-  return `${names[parseInt(month) - 1]} ${year.slice(2)}`;
-}
-
-// ── Date Range Presets ────────────────────────────────────────────────────────
-
-type Preset = "mtd" | "7d" | "30d" | "3m";
-
-function getRange(preset: Preset): { startTs: number; endTs: number; label: string } {
-  // Round to the nearest hour so remounts within the same hour hit the React Query cache
-  const now = Math.floor(Date.now() / 1000 / 3600) * 3600;
-  const d = new Date();
-  switch (preset) {
-    case "mtd": {
-      const start = new Date(d.getFullYear(), d.getMonth(), 1);
-      return { startTs: Math.floor(start.getTime() / 1000), endTs: now, label: "Month to date" };
-    }
-    case "7d":
-      return { startTs: now - 7 * 86400, endTs: now, label: "Last 7 days" };
-    case "30d":
-      return { startTs: now - 30 * 86400, endTs: now, label: "Last 30 days" };
-    case "3m":
-      return { startTs: now - 90 * 86400, endTs: now, label: "Last 3 months" };
-  }
-}
+// (Date range handled by shared DateRangePicker component)
 
 // ── Components ────────────────────────────────────────────────────────────────
 
-function StatCard({
-  label, value, sub, icon: Icon, color = "text-foreground", trend,
-}: {
-  label: string; value: string; sub?: string; icon: React.ElementType;
-  color?: string; trend?: { value: string; up: boolean };
-}) {
-  return (
-    <div className="bg-card border border-border rounded-xl p-5 flex flex-col gap-3">
-      <div className="flex items-center justify-between">
-        <span className="text-xs font-medium text-muted-foreground uppercase tracking-wider">{label}</span>
-        <div className="rounded-lg bg-muted p-2">
-          <Icon className={`h-4 w-4 ${color}`} />
-        </div>
-      </div>
-      <div>
-        <p className={`text-3xl font-bold ${color}`}>{value}</p>
-        {sub && <p className="text-xs text-muted-foreground mt-1">{sub}</p>}
-      </div>
-      {trend && (
-        <div className={`flex items-center gap-1 text-xs font-medium ${trend.up ? "text-emerald-500" : "text-red-500"}`}>
-          {trend.up ? <ArrowUpRight className="h-3 w-3" /> : <ArrowDownRight className="h-3 w-3" />}
-          {trend.value}
-        </div>
-      )}
-    </div>
-  );
-}
+import { StatCard } from "@/components/StatCard";
 
-function CurrencyTooltip({ active, payload, label }: { active?: boolean; payload?: Array<{value: number; name: string; color: string}>; label?: string }) {
-  if (!active || !payload?.length) return null;
-  return (
-    <div className="bg-popover border border-border rounded-lg p-3 shadow-lg text-xs">
-      <p className="font-semibold text-foreground mb-1">{label}</p>
-      {payload.map((p) => (
-        <p key={p.name} style={{ color: p.color }}>{p.name}: {fmt(p.value)}</p>
-      ))}
-    </div>
-  );
-}
-
-function CountTooltip({ active, payload, label }: { active?: boolean; payload?: Array<{value: number; name: string; color: string}>; label?: string }) {
-  if (!active || !payload?.length) return null;
-  return (
-    <div className="bg-popover border border-border rounded-lg p-3 shadow-lg text-xs">
-      <p className="font-semibold text-foreground mb-1">{label}</p>
-      {payload.map((p) => (
-        <p key={p.name} style={{ color: p.color }}>{p.name}: {p.value}</p>
-      ))}
-    </div>
-  );
-}
+import { ChartTooltip } from "@/components/ChartTooltip";
 
 // ── Main Dashboard ────────────────────────────────────────────────────────────
 
-export default function FinanceDashboard() {
-  const [preset, setPreset] = useState<Preset>("mtd");
-  const range = useMemo(() => getRange(preset), [preset]);
-  const { transactions, failedPayments, cancellationRequests, stripeOverview, loading, stripeLoading, error } = useFinance(range.startTs, range.endTs);
+export default function SubscriptionDashboard() {
+  const { convert, symbol, label: currencyLabel } = useCurrency();
+  const cfmt = (n: number) => fmtCurrency(convert(n), symbol);
 
-  const presets: { id: Preset; label: string }[] = [
-    { id: "mtd", label: "MTD" },
-    { id: "7d",  label: "7d" },
-    { id: "30d", label: "30d" },
-    { id: "3m",  label: "3m" },
-  ];
+  const [dateRange, setDateRange] = useState<DateRangeValue>({ start: "", end: "", startDate: "", endDate: "" });
+  const startTs = useMemo(() => dateRange.start ? Math.floor(new Date(dateRange.start).getTime() / 1000) : Math.floor(new Date(new Date().getFullYear(), new Date().getMonth(), 1).getTime() / 1000), [dateRange.start]);
+  const endTs = useMemo(() => dateRange.end ? Math.floor(new Date(dateRange.end).getTime() / 1000) : Math.floor(Date.now() / 1000), [dateRange.end]);
+  const { transactions, failedPayments, cancellationRequests, stripeOverview, loading, stripeLoading, error } = useFinance(startTs, endTs);
 
   // ── Airtable-derived stats ─────────────────────────────────────────────────
 
@@ -161,44 +82,18 @@ export default function FinanceDashboard() {
 
   // ── Render ────────────────────────────────────────────────────────────────
 
-  if (loading) {
-    return (
-      <div className="flex items-center justify-center py-20">
-        <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
-        <span className="ml-2 text-sm text-muted-foreground">Loading finance data…</span>
-      </div>
-    );
-  }
-
-  if (error) {
-    return <div className="p-6 text-sm text-red-500">Failed to load finance data: {error}</div>;
-  }
-
   const s = stripeOverview;
 
   return (
-    <div className="space-y-6">
+    <>
+    {/* ── Date range filter (outside DashboardShell so it persists during loading) */}
+    <div className="flex items-center gap-2 mb-6">
+      <DateRangePicker defaultPreset="MTD" onChange={setDateRange} />
+      {stripeLoading && <RefreshCw className="h-3.5 w-3.5 text-muted-foreground animate-spin" />}
+    </div>
 
-      {/* ── Date range filter ─────────────────────────────────────────── */}
-      <div className="flex items-center gap-2">
-        <span className="text-xs text-muted-foreground font-medium">Date range</span>
-        <div className="flex items-center gap-1 bg-muted rounded-lg p-1">
-          {presets.map((p) => (
-            <button
-              key={p.id}
-              onClick={() => setPreset(p.id)}
-              className={`px-3 py-1.5 rounded-md text-xs font-medium transition-all ${
-                preset === p.id
-                  ? "bg-card text-foreground shadow-sm"
-                  : "text-muted-foreground hover:text-foreground"
-              }`}
-            >
-              {p.label}
-            </button>
-          ))}
-        </div>
-        {stripeLoading && <RefreshCw className="h-3.5 w-3.5 text-muted-foreground animate-spin" />}
-      </div>
+    <DashboardShell loading={loading} error={error} loadingMessage="Loading finance data\u2026">
+    <div className="space-y-6">
 
       {/* ── Stripe: Gross + Net + Payments ───────────────────────────── */}
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
@@ -207,7 +102,7 @@ export default function FinanceDashboard() {
         <div className="bg-card border border-border rounded-xl p-5">
           <p className="text-xs text-muted-foreground font-medium mb-1">Gross Volume</p>
           <p className="text-2xl font-bold text-foreground">
-            {s ? `NZ${fmt(s.grossVolume)}` : "—"}
+            {s ? `${cfmt(s.grossVolume)}` : "—"}
           </p>
           <p className="text-xs text-muted-foreground mt-1">via Stripe / Payfunnels</p>
           {s && s.dailyVolume.length > 0 && (
@@ -220,7 +115,7 @@ export default function FinanceDashboard() {
                       <stop offset="95%" stopColor="#8b5cf6" stopOpacity={0} />
                     </linearGradient>
                   </defs>
-                  <Tooltip content={<CurrencyTooltip />} />
+                  <Tooltip content={<ChartTooltip formatter={(v, name) => `${name}: ${fmtCurrency(v)}`} />} />
                   <Area type="monotone" dataKey="gross" name="Gross" stroke="#8b5cf6" strokeWidth={1.5} fill="url(#grossGrad)" dot={false} />
                 </AreaChart>
               </ResponsiveContainer>
@@ -232,7 +127,7 @@ export default function FinanceDashboard() {
         <div className="bg-card border border-border rounded-xl p-5">
           <p className="text-xs text-muted-foreground font-medium mb-1">Net Volume</p>
           <p className="text-2xl font-bold text-foreground">
-            {s ? `NZ${fmt(s.netVolume)}` : "—"}
+            {s ? `${cfmt(s.netVolume)}` : "—"}
           </p>
           <p className="text-xs text-muted-foreground mt-1">after Stripe fees</p>
           {s && s.dailyVolume.length > 0 && (
@@ -245,7 +140,7 @@ export default function FinanceDashboard() {
                       <stop offset="95%" stopColor="#10b981" stopOpacity={0} />
                     </linearGradient>
                   </defs>
-                  <Tooltip content={<CurrencyTooltip />} />
+                  <Tooltip content={<ChartTooltip formatter={(v, name) => `${name}: ${fmtCurrency(v)}`} />} />
                   <Area type="monotone" dataKey="net" name="Net" stroke="#10b981" strokeWidth={1.5} fill="url(#netGrad)" dot={false} />
                 </AreaChart>
               </ResponsiveContainer>
@@ -282,7 +177,7 @@ export default function FinanceDashboard() {
                       <div className={`h-2.5 w-2.5 rounded-full ${dot}`} />
                       <span className="text-xs text-muted-foreground">{label}</span>
                     </div>
-                    <span className="text-xs font-semibold text-foreground">NZ{fmt(val)}</span>
+                    <span className="text-xs font-semibold text-foreground">{cfmt(val)}</span>
                   </div>
                 ))}
               </div>
@@ -299,7 +194,7 @@ export default function FinanceDashboard() {
       {s && s.dailyVolume.length > 0 && (
         <div className="bg-card border border-border rounded-xl p-5">
           <h3 className="text-sm font-semibold text-foreground mb-1">Daily Volume</h3>
-          <p className="text-xs text-muted-foreground mb-4">{range.label} — Gross vs Net (NZD)</p>
+          <p className="text-xs text-muted-foreground mb-4">Gross vs Net ({currencyLabel})</p>
           <ResponsiveContainer width="100%" height={220}>
             <AreaChart data={s.dailyVolume} margin={{ top: 4, right: 4, left: 0, bottom: 0 }}>
               <defs>
@@ -314,8 +209,8 @@ export default function FinanceDashboard() {
               </defs>
               <CartesianGrid strokeDasharray="3 3" stroke="var(--border)" vertical={false} />
               <XAxis dataKey="date" tick={{ fontSize: 11, fill: "var(--muted-foreground)" }} axisLine={false} tickLine={false} interval="preserveStartEnd" />
-              <YAxis tick={{ fontSize: 11, fill: "var(--muted-foreground)" }} axisLine={false} tickLine={false} tickFormatter={(v) => fmt(v)} width={60} />
-              <Tooltip content={<CurrencyTooltip />} />
+              <YAxis tick={{ fontSize: 11, fill: "var(--muted-foreground)" }} axisLine={false} tickLine={false} tickFormatter={(v) => cfmt(v)} width={60} />
+              <Tooltip content={<ChartTooltip formatter={(v, name) => `${name}: ${fmtCurrency(v)}`} />} />
               <Area type="monotone" dataKey="gross" name="Gross" stroke="#8b5cf6" strokeWidth={2} fill="url(#g2)" dot={false} />
               <Area type="monotone" dataKey="net" name="Net" stroke="#10b981" strokeWidth={2} fill="url(#n2)" dot={false} />
             </AreaChart>
@@ -330,21 +225,21 @@ export default function FinanceDashboard() {
           value={openFailedPayments.length.toString()}
           sub="Currently in dunning"
           icon={AlertTriangle}
-          color="text-amber-500"
+          accent="text-amber-500"
         />
         <StatCard
           label="Cancellation Requests"
           value={cancellationRequests.length.toString()}
           sub={`${pendingCancellations} pending review`}
           icon={XCircle}
-          color="text-red-500"
+          accent="text-red-500"
         />
         <StatCard
           label="New Customers"
           value={s ? s.newCustomers.toString() : "—"}
-          sub={range.label}
+          sub="Selected period"
           icon={CreditCard}
-          color="text-blue-500"
+          accent="text-blue-500"
         />
       </div>
 
@@ -359,8 +254,9 @@ export default function FinanceDashboard() {
               <BarChart data={monthlyCancellations} margin={{ top: 4, right: 4, left: 0, bottom: 0 }}>
                 <XAxis dataKey="month" tick={{ fontSize: 11, fill: "var(--muted-foreground)" }} axisLine={false} tickLine={false} />
                 <YAxis tick={{ fontSize: 11, fill: "var(--muted-foreground)" }} axisLine={false} tickLine={false} allowDecimals={false} />
-                <Tooltip content={<CountTooltip />} />
-                <Bar dataKey="cancels" name="Cancellations" fill="#ef4444" radius={[4, 4, 0, 0]} />
+                <Bar dataKey="cancels" name="Cancellations" fill="#ef4444" radius={[4, 4, 0, 0]}>
+                  <LabelList dataKey="cancels" position="inside" fill="#fff" fontSize={12} fontWeight={600} />
+                </Bar>
               </BarChart>
             </ResponsiveContainer>
           </div>
@@ -415,5 +311,7 @@ export default function FinanceDashboard() {
       </div>
 
     </div>
+    </DashboardShell>
+    </>
   );
 }

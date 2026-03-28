@@ -1,25 +1,21 @@
 import { useQuery } from "@tanstack/react-query";
-import { fetchWeeklyPageViews, bucketViewsByWeek } from "@/lib/google-analytics";
+import { fetchPageSessions } from "@/lib/google-analytics";
 import { weekConfigs } from "@/data/scorecardData";
-import { isAuthorized } from "@/lib/youtube-auth";
+import { toNZDate } from "@/lib/dates";
 
-function toNZDate(isoString: string): string {
-  const d = new Date(isoString);
-  return d.toLocaleDateString("en-CA", { timeZone: "Pacific/Auckland" });
-}
+async function fetchGA4Data(): Promise<{ weekly: (number | "—")[]; monthly: number | "—" }> {
+  const today = toNZDate(new Date().toISOString());
+  const monthStart = today.slice(0, 7) + "-01";
 
-async function fetchGA4Data(): Promise<(number | "—")[]> {
-  const firstStart = new Date(weekConfigs[0].start);
-  const lastEnd = new Date(weekConfigs[weekConfigs.length - 1].end);
+  const [w1, w2, w3, w4, month] = await Promise.all([
+    ...weekConfigs.map(async (wc) => {
+      try { return await fetchPageSessions(toNZDate(wc.start), toNZDate(wc.end)); }
+      catch { return "—" as const; }
+    }),
+    fetchPageSessions(monthStart, today).catch(() => "—" as const),
+  ]);
 
-  const now = new Date();
-  const effectiveEnd = lastEnd > now ? now : lastEnd;
-
-  const startDate = toNZDate(firstStart.toISOString());
-  const endDate = toNZDate(effectiveEnd.toISOString());
-
-  const dailyViews = await fetchWeeklyPageViews(startDate, endDate);
-  return bucketViewsByWeek(dailyViews, weekConfigs);
+  return { weekly: [w1, w2, w3, w4], monthly: month };
 }
 
 export function useGoogleAnalytics() {
@@ -27,11 +23,11 @@ export function useGoogleAnalytics() {
     queryKey: ["google-analytics", "weekly-views"],
     queryFn: fetchGA4Data,
     staleTime: 5 * 60 * 1000,
-    enabled: isAuthorized(),
   });
 
   return {
-    weeklyViews: query.data ?? ["—", "—", "—", "—"] as (number | "—")[],
+    weeklyViews: query.data?.weekly ?? ["—", "—", "—", "—"] as (number | "—")[],
+    monthlyViews: query.data?.monthly ?? ("—" as number | "—"),
     loading: query.isLoading,
     error: query.error ? (query.error instanceof Error ? query.error.message : "Failed to fetch GA4 data") : null,
     refetch: query.refetch,

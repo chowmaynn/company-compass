@@ -1,12 +1,6 @@
 import { useState, useEffect } from "react";
 
-const SUPABASE_URL = import.meta.env.VITE_OPSHUB_SUPABASE_URL;
-const SUPABASE_KEY = import.meta.env.VITE_OPSHUB_SUPABASE_ANON_KEY;
-
-const headers = {
-  apikey: SUPABASE_KEY,
-  Authorization: `Bearer ${SUPABASE_KEY}`,
-};
+import { SUPABASE_URL, supabaseHeaders as headers } from "@/lib/supabase";
 
 async function fetchLatest(metric: string): Promise<{ value: string; month: string } | null> {
   const res = await fetch(

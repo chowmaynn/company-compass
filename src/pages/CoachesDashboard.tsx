@@ -70,30 +70,8 @@ function formatElapsed(createdStr?: string): string {
 
 // ── Sub-components ────────────────────────────────────────────
 
-function StatCard({
-  label, value, sub, accent, icon: Icon,
-}: {
-  label: string; value: string | number; sub?: string; accent?: string; icon?: React.ElementType;
-}) {
-  return (
-    <Card className="border-border/50">
-      <CardContent className="p-5">
-        <div className="flex items-start justify-between">
-          <div>
-            <p className="text-[11px] font-semibold text-muted-foreground uppercase tracking-wider mb-1">{label}</p>
-            <p className={`text-3xl font-bold tracking-tight ${accent ?? "text-foreground"}`}>{value}</p>
-            {sub && <p className="text-xs text-muted-foreground mt-1">{sub}</p>}
-          </div>
-          {Icon && (
-            <div className="h-9 w-9 rounded-xl bg-muted flex items-center justify-center">
-              <Icon className="h-4 w-4 text-muted-foreground" />
-            </div>
-          )}
-        </div>
-      </CardContent>
-    </Card>
-  );
-}
+import { StatCard } from "@/components/StatCard";
+import { DashboardShell } from "@/components/DashboardShell";
 
 function StatusPill({ status }: { status?: string[] | string }) {
   const s = Array.isArray(status) ? status[0] : status;
@@ -246,28 +224,11 @@ export default function CoachesDashboard() {
   const loading = meetingsLoading || circleLoading;
   const error = meetingsError ?? circleError;
 
-  if (loading) {
-    return (
-      <div className="flex items-center justify-center h-64 text-muted-foreground">
-        <Loader2 className="h-6 w-6 animate-spin mr-2" />
-        <span className="text-sm">Loading coaches data…</span>
-      </div>
-    );
-  }
-
-  if (error) {
-    return (
-      <div className="flex items-center justify-center h-64 gap-2 text-red-600">
-        <AlertCircle className="h-5 w-5" />
-        <span className="text-sm">{error}</span>
-      </div>
-    );
-  }
-
   const monthLabel = now.toLocaleString("en-NZ", { month: "long", year: "numeric" });
   const weekDayLabels = ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"];
 
   return (
+    <DashboardShell loading={loading} error={error} loadingMessage="Loading coaches data\u2026">
     <div className="p-6 space-y-6 max-w-[1440px] mx-auto">
       {/* ── Stats bar ────────────────────────────────────── */}
       <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
@@ -540,5 +501,6 @@ export default function CoachesDashboard() {
         </CardContent>
       </Card>
     </div>
+    </DashboardShell>
   );
 }

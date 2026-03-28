@@ -40,3 +40,35 @@ export function formatValue(value: number | string): string {
   }
   return value.toLocaleString("en-US");
 }
+
+/**
+ * Format a number as currency with compact suffix.
+ * Examples: fmtCurrency(1234) → "$1.2k", fmtCurrency(2500000) → "$2.50m"
+ * Replaces fmtWithSymbol (SubscriptionDashboard), fmtRevenue (SuccessTracking),
+ * and the MarketingDashboard `fmt` for currency formatting.
+ */
+export function fmtCurrency(n: number, symbol = "$"): string {
+  if (n >= 1_000_000) return `${symbol}${(n / 1_000_000).toFixed(2)}m`;
+  if (n >= 1_000) return `${symbol}${(n / 1_000).toFixed(1)}k`;
+  return `${symbol}${n.toLocaleString()}`;
+}
+
+/**
+ * Shorter currency format — fewer decimal places.
+ * Examples: fmtCurrencyShort(1234) → "$1K", fmtCurrencyShort(2500000) → "$2.5M"
+ * Replaces fmtRevenueShort (SuccessTracking).
+ */
+export function fmtCurrencyShort(n: number, symbol = "$"): string {
+  if (n >= 1_000_000) return `${symbol}${(n / 1_000_000).toFixed(1)}M`;
+  if (n >= 1_000) return `${symbol}${Math.round(n / 1_000)}K`;
+  return `${symbol}${n}`;
+}
+
+/**
+ * Format a nullable number as a percentage string.
+ * Returns "—" for null/undefined.
+ */
+export function fmtPercent(n: number | null | undefined): string {
+  if (n == null) return "—";
+  return `${n}%`;
+}

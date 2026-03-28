@@ -1,35 +1,7 @@
 import { useQuery } from "@tanstack/react-query";
-
-const BASE = "/api/close";
-
-const SALES_PIPELINE = "pipe_0Wd57vBUsq5RErzmTF0IvW";
-
-function startOfMonth() {
-  const d = new Date();
-  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-01`;
-}
-
-async function closeFetch(path: string) {
-  const res = await fetch(`${BASE}${path}`);
-  if (!res.ok) throw new Error(`Close API ${res.status}`);
-  return res.json();
-}
-
-/** Paginate through Close API results. Returns all records. */
-async function closePaginateAll(basePath: string, limit = 100): Promise<{ data: any[]; total_results: number }> {
-  const all: any[] = [];
-  let offset = 0;
-  let total = 0;
-  for (let page = 0; page < 10; page++) {
-    const sep = basePath.includes("?") ? "&" : "?";
-    const res = await closeFetch(`${basePath}${sep}_limit=${limit}&_skip=${offset}`);
-    all.push(...(res.data ?? []));
-    total = res.total_results ?? all.length;
-    if (all.length >= total) break;
-    offset = all.length;
-  }
-  return { data: all, total_results: total };
-}
+import { startOfMonthDate } from "@/lib/dates";
+import { SALES_PIPELINE_ID } from "@/lib/constants";
+import { closePaginateAll } from "@/lib/close";
 
 export interface RepStat {
   name: string;
@@ -53,13 +25,13 @@ export interface DailyCall {
 }
 
 export function useClose() {
-  const som = startOfMonth();
+  const som = startOfMonthDate();
 
   // Won deals — paginated, shared cache key with RepMetrics
   const wonQuery = useQuery({
     queryKey: ["close", "won", som],
     queryFn: () =>
-      closePaginateAll(`/opportunity/?pipeline_id=${SALES_PIPELINE}&status_type=won&date_won__gte=${som}`),
+      closePaginateAll(`/opportunity/?pipeline_id=${SALES_PIPELINE_ID}&status_type=won&date_won__gte=${som}`),
     staleTime: 5 * 60 * 1000,
   });
 
@@ -67,7 +39,7 @@ export function useClose() {
   const lostQuery = useQuery({
     queryKey: ["close", "lost-full", som],
     queryFn: () =>
-      closePaginateAll(`/opportunity/?pipeline_id=${SALES_PIPELINE}&status_type=lost&date_lost__gte=${som}`),
+      closePaginateAll(`/opportunity/?pipeline_id=${SALES_PIPELINE_ID}&status_type=lost&date_lost__gte=${som}`),
     staleTime: 5 * 60 * 1000,
   });
 
@@ -75,7 +47,7 @@ export function useClose() {
   const pipelineQuery = useQuery({
     queryKey: ["close", "pipeline"],
     queryFn: () =>
-      closePaginateAll(`/opportunity/?pipeline_id=${SALES_PIPELINE}&status_type=active`),
+      closePaginateAll(`/opportunity/?pipeline_id=${SALES_PIPELINE_ID}&status_type=active`),
     staleTime: 5 * 60 * 1000,
   });
 

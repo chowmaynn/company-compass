@@ -4,6 +4,7 @@
 // and if so, runs AI comment analysis and flags it on competitor_videos.
 
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
+import { fetchYouTubeComments, analyzeComments } from "../_shared/youtube.ts";
 
 const SUPABASE_URL = Deno.env.get("SUPABASE_URL")!;
 const SUPABASE_SERVICE_ROLE_KEY = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
@@ -36,56 +37,6 @@ function computeMedianOutlier(
     trimmed.length % 2 === 0 ? (trimmed[mid - 1] + trimmed[mid]) / 2 : trimmed[mid];
 
   return { typicalMedian, isOutlier: currentViews > typicalMedian * 1.2 };
-}
-
-async function fetchYouTubeComments(videoId: string): Promise<string[]> {
-  const res = await fetch(
-    `https://www.googleapis.com/youtube/v3/commentThreads?part=snippet&videoId=${videoId}&order=relevance&maxResults=50&key=${YOUTUBE_API_KEY}`
-  );
-  if (!res.ok) return [];
-  const data = await res.json();
-  return (data.items || []).map(
-    (item: any) => item.snippet.topLevelComment.snippet.textOriginal
-  );
-}
-
-async function analyzeComments(
-  comments: string[]
-): Promise<{ sentiment: string; pain_points: string; what_resonated: string } | null> {
-  if (comments.length === 0) return null;
-
-  const res = await fetch("https://api.openai.com/v1/chat/completions", {
-    method: "POST",
-    headers: {
-      Authorization: `Bearer ${OPENAI_API_KEY}`,
-      "Content-Type": "application/json",
-    },
-    body: JSON.stringify({
-      model: "gpt-4.1-mini",
-      temperature: 0.5,
-      messages: [
-        {
-          role: "system",
-          content: `You are a senior social media strategist analyzing YouTube video comments.
-Return a JSON object with exactly these keys:
-- "sentiment": overall sentiment (1-2 sentences)
-- "pain_points": key pain points viewers mention (comma-separated)
-- "what_resonated": what viewers liked or found valuable (comma-separated)
-
-Return ONLY valid JSON, no markdown.`,
-        },
-        { role: "user", content: comments.slice(0, 30).join("\n---\n") },
-      ],
-    }),
-  });
-
-  if (!res.ok) return null;
-  const data = await res.json();
-  try {
-    return JSON.parse(data.choices?.[0]?.message?.content || "null");
-  } catch {
-    return null;
-  }
 }
 
 Deno.serve(async (req) => {
@@ -146,8 +97,8 @@ Deno.serve(async (req) => {
     }
 
     // 4. Fetch and analyze comments
-    const ytComments = await fetchYouTubeComments(video.video_id);
-    const analysis = await analyzeComments(ytComments);
+    const ytComments = await fetchYouTubeComments(video.video_id, YOUTUBE_API_KEY);
+    const analysis = await analyzeComments(ytComments, OPENAI_API_KEY);
 
     // 5. Update the video row with outlier flag + analysis
     const { error: updateErr } = await supabase

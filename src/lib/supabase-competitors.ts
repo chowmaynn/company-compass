@@ -1,11 +1,4 @@
-const SUPABASE_URL = import.meta.env.VITE_OPSHUB_SUPABASE_URL;
-const SUPABASE_KEY = import.meta.env.VITE_OPSHUB_SUPABASE_ANON_KEY;
-
-const headers = {
-  apikey: SUPABASE_KEY,
-  Authorization: `Bearer ${SUPABASE_KEY}`,
-  "Content-Type": "application/json",
-};
+import { SUPABASE_URL, supabaseHeaders as headers } from "@/lib/supabase";
 
 // --- Types ---
 

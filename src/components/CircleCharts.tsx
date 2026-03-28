@@ -1,6 +1,7 @@
 import { useCircleCharts } from "@/hooks/use-circle-charts";
 import { Card, CardContent } from "@/components/ui/card";
 import { Loader2, AlertCircle } from "lucide-react";
+import { formatDay } from "@/lib/dates";
 import {
   AreaChart,
   Area,
@@ -14,16 +15,7 @@ import {
   Cell,
 } from "recharts";
 
-const GRID = "hsl(220, 13%, 91%)";
-const TICK = "hsl(220, 9%, 46%)";
-const TOOLTIP_STYLE = {
-  backgroundColor: "#ffffff",
-  border: "1px solid hsl(220, 13%, 91%)",
-  borderRadius: "8px",
-  color: "hsl(224, 71%, 4%)",
-  fontSize: "12px",
-  boxShadow: "0 4px 6px -1px rgb(0 0 0 / 0.07)",
-};
+import { GRID, TICK, TOOLTIP_STYLE } from "@/lib/chart-theme";
 
 function ChartCard({ title, sub, children }: { title: string; sub?: string; children: React.ReactNode }) {
   return (
@@ -45,11 +37,6 @@ function LoadingState() {
       <Loader2 className="h-5 w-5 animate-spin text-muted-foreground" />
     </div>
   );
-}
-
-function formatDay(dateStr: string) {
-  const d = new Date(dateStr);
-  return `${d.getDate()}/${d.getMonth() + 1}`;
 }
 
 export function CircleCharts() {

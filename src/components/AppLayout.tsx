@@ -201,7 +201,7 @@ function NavStatusCards() {
 const pageTitles: Record<string, string> = {
   "/": "Dashboard",
   "/scorecard": "Scorecard",
-  "/departments/finance": "Subscriptions",
+  "/departments/subscriptions": "Subscriptions",
   "/departments/content": "Content",
   "/departments/marketing": "Marketing",
   "/departments/sales": "Sales",

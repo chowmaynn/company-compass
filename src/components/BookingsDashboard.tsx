@@ -1,27 +1,13 @@
 import { useSupabaseMetrics } from "@/hooks/use-supabase-metrics";
 import { Card, CardContent } from "@/components/ui/card";
 import { AlertCircle, Loader2 } from "lucide-react";
+import { formatDay } from "@/lib/dates";
 import {
   AreaChart, Area, BarChart, Bar,
   XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Cell, Legend,
 } from "recharts";
-
-const GRID = "hsl(220, 13%, 91%)";
-const TICK = "hsl(220, 9%, 46%)";
-const TOOLTIP_STYLE = {
-  backgroundColor: "#ffffff",
-  border: "1px solid hsl(220, 13%, 91%)",
-  borderRadius: "8px",
-  color: "hsl(224, 71%, 4%)",
-  fontSize: "12px",
-  boxShadow: "0 4px 6px -1px rgb(0 0 0 / 0.07)",
-};
+import { GRID, TICK, TOOLTIP_STYLE } from "@/lib/chart-theme";
 const SOURCE_COLORS = ["#3b82f6", "#6366f1", "#8b5cf6", "#ec4899", "#10b981", "#f59e0b", "#14b8a6", "#f97316", "#64748b"];
-
-function formatDay(d: string) {
-  const dt = new Date(d);
-  return `${dt.getDate()}/${dt.getMonth() + 1}`;
-}
 
 export function BookingsDashboard({ from, to, showRate }: {
   from: string; to: string; showRate: number | null;

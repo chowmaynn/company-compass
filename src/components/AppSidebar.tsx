@@ -28,7 +28,7 @@ const mainItems = [
 ];
 
 const departmentItems = [
-  { title: "Subscriptions", url: "/departments/finance", icon: DollarSign },
+  { title: "Subscriptions", url: "/departments/subscriptions", icon: DollarSign },
   { title: "Content", url: "/departments/content", icon: Video },
   { title: "Marketing", url: "/departments/marketing", icon: Megaphone },
   { title: "Sales", url: "/departments/sales", icon: Phone },

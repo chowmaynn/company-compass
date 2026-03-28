@@ -1,5 +1,5 @@
 import { useState, useEffect, useCallback, useMemo } from "react";
-import { type Metric, type StatusColor, type Department, scorecardMonth, getCurrentWeekIndex } from "@/data/scorecardData";
+import { type Metric, type StatusColor, type Department, scorecardMonth, getCurrentWeekIndex, weekConfigs } from "@/data/scorecardData";
 import { fetchScorecard, updateScorecardCell, type ScorecardRow } from "@/lib/supabase-scorecard";
 import { calculateStatus, invertedMetrics } from "@/lib/calculateStatus";
 import { useKit } from "@/hooks/use-kit";
@@ -9,6 +9,7 @@ import { useCalendly } from "@/hooks/use-calendly";
 import { useClose } from "@/hooks/use-close";
 import { useIntercom } from "@/hooks/use-intercom";
 import { useTallyNps } from "@/hooks/use-tally-nps";
+import { useSupabaseMetrics } from "@/hooks/use-supabase-metrics";
 
 // Define display order for metrics within each department
 const METRIC_ORDER: string[] = [
@@ -130,14 +131,14 @@ const API_METRIC_MAP: Record<string, ApiSource> = {
   "Videos in the backlog":                { hook: "notion",    field: "backlogCount" },
   "Website Views":                        { hook: "ga",        field: "weeklyViews" },
   // Bitly clicks are written to scorecard by the bitly-daily edge function — no live overlay needed
-  "Total Bookings":                       { hook: "calendly",  field: "salesBooked" },
-  "Email Bookings":                       { hook: "calendly",  field: "emailBooked" },
-  "Closing Calls Booked":                 { hook: "calendly",  field: "salesBooked" },
+  "Total Bookings":                       { hook: "computed",  field: "totalBookings" },
+  "Email Bookings":                       { hook: "computed",  field: "emailBookings" },
+  "Closing Calls Booked":                 { hook: "computed",  field: "totalBookings" },
   "Website Booking Rate":                 { hook: "computed",  field: "websiteBookingRate" },
   "Closing Call Show Rate":               { hook: "close",     field: "showRate" },
   "Closing Calls Taken":                  { hook: "close",     field: "callsAnswered" },
   "Closing Call Close Rate":              { hook: "close",     field: "winRate" },
-  "Customer support complaints":          { hook: "intercom",  field: "inboxTotal" },
+  // Customer support complaints: manual entry (Intercom has no clean "complaint" classification)
   "NPS Score - 2 months":                 { hook: "tally",     field: "2 months" },
   "NPS Score - 6 Months":                 { hook: "tally",     field: "6 Months" },
 };
@@ -154,6 +155,7 @@ function resolveApiValue(
     ga: { weeklyViews: (number | "—")[] };
     calendly: ReturnType<typeof useCalendly>;
     close: ReturnType<typeof useClose>;
+    salesMetrics: ReturnType<typeof useSupabaseMetrics>;
     intercom: ReturnType<typeof useIntercom>;
     tallyNps: ReturnType<typeof useTallyNps>;
   }
@@ -193,13 +195,55 @@ function resolveApiValue(
       return "—";
     }
     case "computed": {
+      // Helper: sum qualified bookings from Casey's Supabase cube for a specific week and event(s)
+      const wc = weekConfigs[weekIndex];
+      if (!wc) return "—";
+      const toNZ = (iso: string) => new Date(iso).toLocaleDateString("en-CA", { timeZone: "Pacific/Auckland" });
+      const weekStart = toNZ(wc.start);
+      const weekEnd = toNZ(wc.end);
+
+      const sumWeekBookings = (eventNames: string[]) => {
+        let total = 0;
+        for (const date of apis.salesMetrics.dates) {
+          if (date >= weekStart && date < weekEnd) {
+            for (const name of eventNames) {
+              total += apis.salesMetrics.cube[date]?.[`event_${name}`]?.qualified ?? 0;
+            }
+          }
+        }
+        return total;
+      };
+
+      if (source.field === "totalBookings") {
+        const total = sumWeekBookings([
+          "AAA Accelerator Business Call (Website)",
+          "AAA Accelerator Business Call (Skool A)",
+          "AAA Accelerator Business Call (Skool C)",
+          "AAA Accelerator Business Call (Skool P)",
+          "AAA Accelerator Business Call (Welcome Email)",
+          "AAA Accelerator Business Call (Email)",
+          "AAA Accelerator Business Call (Masterclass)",
+        ]);
+        return total > 0 ? total : "—";
+      }
+
+      if (source.field === "emailBookings") {
+        const total = sumWeekBookings([
+          "AAA Accelerator Business Call (Email)",
+          "AAA Accelerator Business Call (Welcome Email)",
+        ]);
+        return total > 0 ? total : "—";
+      }
+
       if (source.field === "websiteBookingRate") {
         const views = apis.ga.weeklyViews[weekIndex];
-        const bookings = apis.calendly.websiteBooked;
-        if (typeof views === "number" && views > 0 && typeof bookings === "number") {
+        if (typeof views !== "number" || views <= 0) return "—";
+        const bookings = sumWeekBookings(["AAA Accelerator Business Call (Website)"]);
+        if (bookings > 0) {
           return `${((bookings / views) * 100).toFixed(2)}%`;
         }
       }
+
       return "—";
     }
     default:
@@ -220,6 +264,12 @@ export function useScorecard(month: string = DEFAULT_MONTH) {
   const close = useClose();
   const intercom = useIntercom();
   const tallyNps = useTallyNps();
+
+  // Casey's Supabase for qualified booking counts
+  const [mYear, mMonth] = month.split("-").map(Number);
+  const sbFrom = useMemo(() => new Date(mYear, mMonth - 1, 1).toISOString(), [mYear, mMonth]);
+  const sbTo = useMemo(() => new Date(mYear, mMonth, 0, 23, 59, 59).toISOString(), [mYear, mMonth]);
+  const salesMetrics = useSupabaseMetrics(sbFrom, sbTo);
 
   // Load from Supabase
   useEffect(() => {
@@ -268,9 +318,13 @@ export function useScorecard(month: string = DEFAULT_MONTH) {
     };
 
     // Metrics that should show average instead of sum
-    const averagedMetrics = new Set(["Videos in the backlog", "Website Booking Rate", "Skool Booking Rate", "Closing Call Show Rate", "Closing Call Close Rate"]);
+    const averagedMetrics = new Set(["Videos in the backlog", "Skool Booking Rate", "Closing Call Show Rate", "Closing Call Close Rate"]);
+    // Metrics where monthly is computed from totals (not averaged weekly percentages)
+    const ratioMetrics = new Set(["Website Booking Rate"]);
     // Metrics where monthly is manually entered (don't auto-calculate)
     const manualMonthlyMetrics = new Set(["Revenue", "Cash Collected"]);
+    // Metrics where monthly comes from a dedicated full-range query (not sum of weeks)
+    const dedicatedMonthlyMetrics = new Set(["Website Views"]);
 
     return supabaseMetrics.map((m) => {
       // Step 1: Apply API overlay for current week
@@ -278,7 +332,7 @@ export function useScorecard(month: string = DEFAULT_MONTH) {
       let updated = m;
 
       if (source) {
-        const apiVal = resolveApiValue(source, cwi, { kit, notion, ga, calendly, close, intercom, tallyNps });
+        const apiVal = resolveApiValue(source, cwi, { kit, notion, ga, calendly, close, intercom, tallyNps, salesMetrics });
         if (apiVal !== "—") {
           updated = { ...m, weeks: [...m.weeks] };
           updated.weeks[cwi] = { ...updated.weeks[cwi], actual: apiVal };
@@ -287,28 +341,47 @@ export function useScorecard(month: string = DEFAULT_MONTH) {
 
       // Step 2: Auto-calculate monthly from week actuals (for all non-manual metrics)
       if (!manualMonthlyMetrics.has(m.name)) {
-        const weekVals = updated.weeks
-          .map((w) => parseWeekVal(w.actual))
-          .filter((v): v is number => v !== null);
+        if (dedicatedMonthlyMetrics.has(m.name)) {
+          // Use dedicated full-month query (avoids sum-of-weeks discrepancy)
+          if (m.name === "Website Views" && typeof ga.monthlyViews === "number") {
+            if (updated === m) updated = { ...m };
+            updated.monthlyActual = ga.monthlyViews;
+          }
+        } else if (ratioMetrics.has(m.name)) {
+          // Ratio metrics: compute from total numerator / total denominator
+          if (m.name === "Website Booking Rate") {
+            const totalViews = typeof ga.monthlyViews === "number" ? ga.monthlyViews : 0;
+            const websiteEvent = salesMetrics.salesEventBreakdown.find((e) => e.name === "Website");
+            const totalBookings = websiteEvent?.qualified ?? 0;
+            if (totalViews > 0 && totalBookings > 0) {
+              if (updated === m) updated = { ...m };
+              updated.monthlyActual = `${((totalBookings / totalViews) * 100).toFixed(2)}%`;
+            }
+          }
+        } else {
+          const weekVals = updated.weeks
+            .map((w) => parseWeekVal(w.actual))
+            .filter((v): v is number => v !== null);
 
-        if (weekVals.length > 0) {
-          const isAvg = averagedMetrics.has(m.name);
-          const raw = isAvg
-            ? weekVals.reduce((a, b) => a + b, 0) / weekVals.length
-            : weekVals.reduce((a, b) => a + b, 0);
+          if (weekVals.length > 0) {
+            const isAvg = averagedMetrics.has(m.name);
+            const raw = isAvg
+              ? weekVals.reduce((a, b) => a + b, 0) / weekVals.length
+              : weekVals.reduce((a, b) => a + b, 0);
 
-          // Check if the metric uses percentage format
-          const isPercent = updated.weeks.some((w) => String(w.actual).includes("%"));
-          const newMonthly = isPercent ? `${raw.toFixed(2)}%` : Math.round(raw);
+            // Check if the metric uses percentage format
+            const isPercent = updated.weeks.some((w) => String(w.actual).includes("%"));
+            const newMonthly = isPercent ? `${raw.toFixed(2)}%` : Math.round(raw);
 
-          if (updated === m) updated = { ...m };
-          updated.monthlyActual = newMonthly;
+            if (updated === m) updated = { ...m };
+            updated.monthlyActual = newMonthly;
+          }
         }
       }
 
       return updated;
     });
-  }, [supabaseMetrics, kit, notion, ga.weeklyViews, calendly.salesBooked, close.wonCount, close.showRate, close.callsAnswered, close.winRate, intercom.inboxTotal, tallyNps.results]);
+  }, [supabaseMetrics, kit, notion, ga.weeklyViews, ga.monthlyViews, calendly.salesBooked, close.wonCount, close.showRate, close.callsAnswered, close.winRate, intercom.inboxTotal, tallyNps.results, salesMetrics.salesEventBreakdown, salesMetrics.cube, salesMetrics.dates]);
 
   // Auto-calculate statuses from most recent week's actual vs target
   const metricsWithStatus = useMemo(() => {

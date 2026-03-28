@@ -15,21 +15,15 @@ import {
   Cell,
   Legend,
 } from "recharts";
-import { TrendingUp, Trophy, Users, DollarSign, Loader2, AlertCircle } from "lucide-react";
+import { TrendingUp, Trophy, Users, DollarSign } from "lucide-react";
+import { DashboardShell } from "@/components/DashboardShell";
+import { fmtCurrency, fmtCurrencyShort } from "@/lib/formatNumber";
 
 // ── Helpers ───────────────────────────────────────────────────
 
-function fmtRevenue(n: number): string {
-  if (n >= 1_000_000) return `$${(n / 1_000_000).toFixed(2)}M`;
-  if (n >= 1_000) return `$${Math.round(n / 1_000)}K`;
-  return `$${n.toLocaleString()}`;
-}
-
-function fmtRevenueShort(n: number): string {
-  if (n >= 1_000_000) return `$${(n / 1_000_000).toFixed(1)}M`;
-  if (n >= 1_000) return `$${Math.round(n / 1_000)}K`;
-  return `$${n}`;
-}
+// Use shared fmtCurrency as fmtRevenue, fmtCurrencyShort as fmtRevenueShort
+const fmtRevenue = fmtCurrency;
+const fmtRevenueShort = fmtCurrencyShort;
 
 function median(arr: number[]): number {
   if (!arr.length) return 0;
@@ -56,53 +50,9 @@ function monthLabel(key: string): string {
 
 const COLORS = ["#6366f1", "#10b981", "#f59e0b", "#f43f5e", "#3b82f6", "#a855f7", "#14b8a6", "#ef4444", "#84cc16", "#ec4899"];
 
-// ── Stat card ─────────────────────────────────────────────────
+import { StatCard } from "@/components/StatCard";
 
-function StatCard({
-  label, value, sub, icon: Icon, accent, gradient,
-}: {
-  label: string; value: string; sub?: string;
-  icon: React.ElementType; accent?: string; gradient?: string;
-}) {
-  return (
-    <Card className={`border-border/50 overflow-hidden ${gradient ?? ""}`}>
-      <CardContent className="p-5">
-        <div className="flex items-start justify-between">
-          <div className="space-y-1 flex-1 min-w-0">
-            <p className={`text-[11px] font-semibold uppercase tracking-wider ${gradient ? "text-emerald-700/70" : "text-muted-foreground"}`}>{label}</p>
-            <p className={`text-3xl font-bold tracking-tight truncate ${accent ?? "text-foreground"}`}>{value}</p>
-            {sub && <p className={`text-xs ${gradient ? "text-emerald-700/60" : "text-muted-foreground"}`}>{sub}</p>}
-          </div>
-          <div className={`h-10 w-10 rounded-xl flex items-center justify-center shrink-0 ml-3 ${gradient ? "bg-emerald-600/20" : "bg-muted"}`}>
-            <Icon className={`h-5 w-5 ${gradient ? "text-emerald-700" : "text-muted-foreground"}`} />
-          </div>
-        </div>
-      </CardContent>
-    </Card>
-  );
-}
-
-// ── Custom tooltip ────────────────────────────────────────────
-
-function RevenueTooltip({ active, payload, label }: { active?: boolean; payload?: Array<{ value: number }>; label?: string }) {
-  if (!active || !payload?.length) return null;
-  return (
-    <div className="bg-card border border-border rounded-lg shadow-lg px-3 py-2 text-xs">
-      <p className="font-semibold text-foreground mb-1">{label}</p>
-      <p className="text-emerald-600 font-bold">{fmtRevenue(payload[0].value)}</p>
-    </div>
-  );
-}
-
-function CountTooltip({ active, payload, label }: { active?: boolean; payload?: Array<{ value: number }>; label?: string }) {
-  if (!active || !payload?.length) return null;
-  return (
-    <div className="bg-card border border-border rounded-lg shadow-lg px-3 py-2 text-xs">
-      <p className="font-semibold text-foreground mb-1">{label}</p>
-      <p className="text-indigo-600 font-bold">{payload[0].value} wins</p>
-    </div>
-  );
-}
+import { ChartTooltip } from "@/components/ChartTooltip";
 
 // ── Main ──────────────────────────────────────────────────────
 
@@ -184,25 +134,8 @@ export default function SuccessTrackingDashboard() {
       .map(([name, value]) => ({ name, value }));
   }, [wins]);
 
-  if (loading) {
-    return (
-      <div className="flex items-center justify-center h-64 text-muted-foreground">
-        <Loader2 className="h-6 w-6 animate-spin mr-2" />
-        <span className="text-sm">Loading success data…</span>
-      </div>
-    );
-  }
-
-  if (error) {
-    return (
-      <div className="flex items-center justify-center h-64 gap-2 text-red-600">
-        <AlertCircle className="h-5 w-5" />
-        <span className="text-sm">{error}</span>
-      </div>
-    );
-  }
-
   return (
+    <DashboardShell loading={loading} error={error} loadingMessage="Loading success data\u2026">
     <div className="space-y-5">
       {/* ── Row 1: Stats ────────────────────────────────────── */}
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
@@ -259,7 +192,7 @@ export default function SuccessTrackingDashboard() {
               </defs>
               <XAxis dataKey="label" tick={{ fontSize: 10, fill: "#94a3b8" }} axisLine={false} tickLine={false} interval="preserveStartEnd" />
               <YAxis tick={{ fontSize: 10, fill: "#94a3b8" }} axisLine={false} tickLine={false} tickFormatter={fmtRevenueShort} width={55} />
-              <Tooltip content={<RevenueTooltip />} />
+              <Tooltip content={<ChartTooltip formatter={(v) => fmtRevenue(v)} />} />
               <Area type="monotone" dataKey="revenue" stroke="#10b981" strokeWidth={2} fill="url(#revenueGrad)" dot={false} activeDot={{ r: 4, fill: "#10b981" }} />
             </AreaChart>
           </ResponsiveContainer>
@@ -277,7 +210,7 @@ export default function SuccessTrackingDashboard() {
               <BarChart data={monthlyRevenue} barSize={16} margin={{ top: 5, right: 5, left: -10, bottom: 0 }}>
                 <XAxis dataKey="label" tick={{ fontSize: 10, fill: "#94a3b8" }} axisLine={false} tickLine={false} interval="preserveStartEnd" />
                 <YAxis tick={{ fontSize: 10, fill: "#94a3b8" }} axisLine={false} tickLine={false} allowDecimals={false} />
-                <Tooltip content={<CountTooltip />} />
+                <Tooltip content={<ChartTooltip formatter={(v) => `${v} wins`} />} />
                 <Bar dataKey="wins" fill="#6366f1" radius={[3, 3, 0, 0]} />
               </BarChart>
             </ResponsiveContainer>
@@ -289,14 +222,14 @@ export default function SuccessTrackingDashboard() {
           <CardContent className="p-5">
             <h3 className="text-sm font-semibold text-foreground mb-0.5">Solution Type</h3>
             <p className="text-xs text-muted-foreground mb-3">Distribution of win types</p>
-            <ResponsiveContainer width="100%" height={200}>
+            <ResponsiveContainer width="100%" height={260}>
               <PieChart>
                 <Pie
                   data={solutionData}
-                  cx="40%"
+                  cx="35%"
                   cy="50%"
-                  innerRadius={52}
-                  outerRadius={80}
+                  innerRadius={48}
+                  outerRadius={72}
                   paddingAngle={2}
                   dataKey="value"
                 >
@@ -305,7 +238,7 @@ export default function SuccessTrackingDashboard() {
                   ))}
                 </Pie>
                 <Tooltip
-                  contentStyle={{ fontSize: 11, borderRadius: 8, border: "1px solid #e2e8f0" }}
+                  contentStyle={{ fontSize: 11, borderRadius: 8, border: "1px solid hsl(var(--border))", backgroundColor: "hsl(var(--card))", color: "hsl(var(--foreground))" }}
                   formatter={(val, name) => [`${val} wins`, name]}
                 />
                 <Legend
@@ -314,8 +247,9 @@ export default function SuccessTrackingDashboard() {
                   verticalAlign="middle"
                   iconType="circle"
                   iconSize={7}
+                  wrapperStyle={{ fontSize: 11, lineHeight: "20px", paddingLeft: 8 }}
                   formatter={(value, entry: { payload?: { value: number } }) => (
-                    <span style={{ fontSize: 10, color: "#64748b" }}>{value} ({entry.payload?.value})</span>
+                    <span className="text-muted-foreground">{value} ({entry.payload?.value})</span>
                   )}
                 />
               </PieChart>
@@ -392,5 +326,6 @@ export default function SuccessTrackingDashboard() {
       </div>
 
     </div>
+    </DashboardShell>
   );
 }

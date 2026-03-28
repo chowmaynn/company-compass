@@ -1,4 +1,5 @@
 import { useQuery } from "@tanstack/react-query";
+import { PUBLIC_SALES_EVENTS } from "@/lib/constants";
 
 const BASE = "/api/supabase";
 
@@ -46,21 +47,10 @@ export interface EventBreakdown {
   qualified: number;
 }
 
-// Public-facing sales events — these define what counts as a "sales booking"
-const PUBLIC_SALES_EVENTS = [
-  "AAA Accelerator Business Call (Website)",
-  "AAA Accelerator Business Call (Skool A)",
-  "AAA Accelerator Business Call (Skool C)",
-  "AAA Accelerator Business Call (Welcome Email)",
-  "AAA Accelerator Business Call (Email)",
-  "AAA Accelerator Business Call (Masterclass)",
-];
-
 // All sales events (including non-public, for full chart visibility)
 const SALES_EVENTS = [
   ...PUBLIC_SALES_EVENTS,
   "AAA Accelerator Business Call (Google)",
-  "AAA Accelerator Business Call (Skool P)",
   "AAA Accelerator Business Call (Phone)",
 ];
 
@@ -161,6 +151,10 @@ export function useSupabaseMetrics(from: string, to: string) {
     salesEventBreakdown,
     followupBreakdown,
     followupTotal,
+    /** Raw daily data cube — use for slicing by arbitrary date ranges */
+    cube,
+    /** Sorted date strings present in the cube */
+    dates,
     isLoading: query.isLoading,
     isError: query.isError,
   };

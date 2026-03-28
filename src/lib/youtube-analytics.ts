@@ -1,7 +1,9 @@
 import { getValidAccessToken } from "./youtube-auth";
+import { bucketByWeek as genericBucketByWeek } from "@/lib/dates";
+import { LIAM_CHANNEL_ID } from "@/lib/constants";
 
 const ANALYTICS_BASE = "https://youtubeanalytics.googleapis.com/v2/reports";
-const CHANNEL_ID = "UCui4jxDaMb53Gdh-AZUTPAg"; // Liam Ottley
+const CHANNEL_ID = LIAM_CHANNEL_ID;
 
 interface AnalyticsRow {
   date: string; // YYYY-MM-DD
@@ -49,16 +51,6 @@ export async function getDailyAnalytics(
 }
 
 /**
- * Convert a UTC ISO timestamp to a YYYY-MM-DD string in NZ timezone.
- * The weekConfigs store boundaries as UTC timestamps representing NZ midnight,
- * so we convert them to NZ calendar dates for comparison with Analytics API dates.
- */
-function toNZDate(isoString: string): string {
-  const d = new Date(isoString);
-  return d.toLocaleDateString("en-CA", { timeZone: "Pacific/Auckland" }); // en-CA gives YYYY-MM-DD
-}
-
-/**
  * Buckets daily analytics into weekly totals based on provided week boundaries.
  * Each week is { start, end } as ISO strings. Returns "—" for future weeks.
  * Analytics API dates are YYYY-MM-DD in the channel's local timezone (NZ).
@@ -67,27 +59,7 @@ export function bucketByWeek(
   rows: AnalyticsRow[],
   weekConfigs: { start: string; end: string }[]
 ): { views: (number | "—")[]; subscribersNet: (number | "—")[] } {
-  const now = new Date();
-
-  const views: (number | "—")[] = weekConfigs.map((wc) => {
-    const start = new Date(wc.start);
-    if (start > now) return "—";
-    const startDate = toNZDate(wc.start);
-    const endDate = toNZDate(wc.end);
-    return rows
-      .filter((r) => r.date >= startDate && r.date < endDate)
-      .reduce((sum, r) => sum + r.views, 0);
-  });
-
-  const subscribersNet: (number | "—")[] = weekConfigs.map((wc) => {
-    const start = new Date(wc.start);
-    if (start > now) return "—";
-    const startDate = toNZDate(wc.start);
-    const endDate = toNZDate(wc.end);
-    return rows
-      .filter((r) => r.date >= startDate && r.date < endDate)
-      .reduce((sum, r) => sum + r.subscribersGained - r.subscribersLost, 0);
-  });
-
+  const views = genericBucketByWeek(rows, weekConfigs, (r) => r.views);
+  const subscribersNet = genericBucketByWeek(rows, weekConfigs, (r) => r.subscribersGained - r.subscribersLost);
   return { views, subscribersNet };
 }

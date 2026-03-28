@@ -1,7 +1,8 @@
 import { useQuery } from "@tanstack/react-query";
+import { startOfMonthDate } from "@/lib/dates";
+import { SALES_PIPELINE_ID } from "@/lib/constants";
+import { closePaginateAll } from "@/lib/close";
 
-const CLOSE_BASE = "/api/close";
-const SALES_PIPELINE = "pipe_0Wd57vBUsq5RErzmTF0IvW";
 const CALENDLY_BASE = "/api/calendly";
 const ORG_URI = "https://api.calendly.com/organizations/407a1705-c820-4818-b8ec-3e4f96860ba2";
 
@@ -19,32 +20,6 @@ export const REPS: Rep[] = [
   { id: "joel",      display: "Joel",      closeName: "Joel Price",           followupEvent: "AAA Accelerator Follow-up (Joel Price)" },
   { id: "kornelius", display: "Kornelius", closeName: "Kornelius Van Heek",   followupEvent: "AAA Accelerator Follow-up (Kornelius Van Heek)" },
 ];
-
-function startOfMonth() {
-  const d = new Date();
-  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-01`;
-}
-
-async function closeFetch(path: string) {
-  const res = await fetch(`${CLOSE_BASE}${path}`);
-  if (!res.ok) throw new Error(`Close API ${res.status}`);
-  return res.json();
-}
-
-async function closePaginateAll(basePath: string, limit = 100): Promise<{ data: any[]; total_results: number }> {
-  const all: any[] = [];
-  let offset = 0;
-  let total = 0;
-  for (let page = 0; page < 10; page++) {
-    const sep = basePath.includes("?") ? "&" : "?";
-    const res = await closeFetch(`${basePath}${sep}_limit=${limit}&_skip=${offset}`);
-    all.push(...(res.data ?? []));
-    total = res.total_results ?? all.length;
-    if (all.length >= total) break;
-    offset = all.length;
-  }
-  return { data: all, total_results: total };
-}
 
 async function fetchAllCalendlyEvents(from: string, to: string) {
   const all: any[] = [];
@@ -69,26 +44,26 @@ async function fetchAllCalendlyEvents(from: string, to: string) {
 }
 
 export function useRepMetrics(rep: Rep) {
-  const som = startOfMonth();
+  const som = startOfMonthDate();
   const today = new Date();
   const toDate = `${today.getFullYear()}-${String(today.getMonth() + 1).padStart(2, "0")}-${String(today.getDate()).padStart(2, "0")}`;
 
   // ── Close.com — SHARED cache keys with use-close.ts ───────
   const wonQuery = useQuery({
     queryKey: ["close", "won", som],
-    queryFn: () => closePaginateAll(`/opportunity/?pipeline_id=${SALES_PIPELINE}&status_type=won&date_won__gte=${som}`),
+    queryFn: () => closePaginateAll(`/opportunity/?pipeline_id=${SALES_PIPELINE_ID}&status_type=won&date_won__gte=${som}`),
     staleTime: 5 * 60 * 1000,
   });
 
   const lostQuery = useQuery({
     queryKey: ["close", "lost-full", som],
-    queryFn: () => closePaginateAll(`/opportunity/?pipeline_id=${SALES_PIPELINE}&status_type=lost&date_lost__gte=${som}`),
+    queryFn: () => closePaginateAll(`/opportunity/?pipeline_id=${SALES_PIPELINE_ID}&status_type=lost&date_lost__gte=${som}`),
     staleTime: 5 * 60 * 1000,
   });
 
   const pipelineQuery = useQuery({
     queryKey: ["close", "pipeline"],
-    queryFn: () => closePaginateAll(`/opportunity/?pipeline_id=${SALES_PIPELINE}&status_type=active`),
+    queryFn: () => closePaginateAll(`/opportunity/?pipeline_id=${SALES_PIPELINE_ID}&status_type=active`),
     staleTime: 5 * 60 * 1000,
   });
 

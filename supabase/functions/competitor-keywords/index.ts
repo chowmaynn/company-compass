@@ -4,6 +4,7 @@
 // checks engagement thresholds, and saves qualifying ideas.
 
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
+import { parseISO8601Duration, fetchYouTubeComments, analyzeComments, LIAM_CHANNEL_ID } from "../_shared/youtube.ts";
 
 const SUPABASE_URL = Deno.env.get("SUPABASE_URL")!;
 const SUPABASE_SERVICE_ROLE_KEY = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
@@ -12,22 +13,13 @@ const OPENAI_API_KEY = Deno.env.get("OPENAI_API_KEY")!;
 
 const supabase = createClient(SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY);
 
-const OWN_CHANNEL_ID = "UCui4jxDaMb53Gdh-AZUTPAg";
+const OWN_CHANNEL_ID = LIAM_CHANNEL_ID;
 const KEYWORDS = "AI|automation|agency|business|entrepreneurship|automate";
 const REGION = "US";
 
 // Regex patterns for non-Latin scripts
 const FOREIGN_REGEX =
   /[\u0400-\u04FF\u0600-\u06FF\u4E00-\u9FFF\u0370-\u03FF\u3040-\u309F\u30A0-\u30FF\uAC00-\uD7AF]/;
-
-function parseISO8601Duration(duration: string): number {
-  const match = duration.match(/PT(?:(\d+)H)?(?:(\d+)M)?(?:(\d+)S)?/);
-  if (!match) return 0;
-  const hours = parseInt(match[1] || "0");
-  const mins = parseInt(match[2] || "0");
-  const secs = parseInt(match[3] || "0");
-  return hours * 60 + mins + secs / 60;
-}
 
 async function searchYouTube(
   keywords: string,
@@ -127,56 +119,6 @@ Return ONLY a JSON object: {"reasoning": "brief reason", "keep": true/false}`,
   }
 }
 
-async function fetchYouTubeComments(videoId: string): Promise<string[]> {
-  const url = `https://www.googleapis.com/youtube/v3/commentThreads?part=snippet&videoId=${videoId}&order=relevance&maxResults=50&key=${YOUTUBE_API_KEY}`;
-  const res = await fetch(url);
-  if (!res.ok) return [];
-  const data = await res.json();
-  return (data.items || []).map(
-    (item: any) => item.snippet.topLevelComment.snippet.textOriginal
-  );
-}
-
-async function analyzeComments(
-  comments: string[]
-): Promise<{ sentiment: string; pain_points: string; what_resonated: string } | null> {
-  if (comments.length === 0) return null;
-
-  const commentText = comments.slice(0, 30).join("\n---\n");
-  const res = await fetch("https://api.openai.com/v1/chat/completions", {
-    method: "POST",
-    headers: {
-      Authorization: `Bearer ${OPENAI_API_KEY}`,
-      "Content-Type": "application/json",
-    },
-    body: JSON.stringify({
-      model: "gpt-4.1-mini",
-      temperature: 0.5,
-      messages: [
-        {
-          role: "system",
-          content: `You are a senior social media strategist analyzing YouTube video comments.
-Analyze these comments and return a JSON object with exactly these keys:
-- "sentiment": overall sentiment of the audience (1-2 sentences)
-- "pain_points": key pain points or problems viewers mention (comma-separated list)
-- "what_resonated": what viewers liked or found valuable (comma-separated list)
-
-Return ONLY valid JSON, no markdown.`,
-        },
-        { role: "user", content: commentText },
-      ],
-    }),
-  });
-
-  if (!res.ok) return null;
-  const data = await res.json();
-  try {
-    return JSON.parse(data.choices?.[0]?.message?.content || "null");
-  } catch {
-    return null;
-  }
-}
-
 Deno.serve(async (_req) => {
   const logs: string[] = [];
 
@@ -262,8 +204,8 @@ Deno.serve(async (_req) => {
       if (existing) continue;
 
       // Fetch comments & analyze
-      const comments = await fetchYouTubeComments(video.id);
-      const analysis = await analyzeComments(comments);
+      const comments = await fetchYouTubeComments(video.id, YOUTUBE_API_KEY);
+      const analysis = await analyzeComments(comments, OPENAI_API_KEY);
 
       // Save to competitor_videos as an outlier discovery
       const { error: insertErr } = await supabase.from("competitor_videos").insert({

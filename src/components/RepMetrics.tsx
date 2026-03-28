@@ -2,21 +2,13 @@ import { useState } from "react";
 import { useRepMetrics, REPS, type Rep } from "@/hooks/use-rep-metrics";
 import { Card, CardContent } from "@/components/ui/card";
 import { Loader2 } from "lucide-react";
+import { formatDay } from "@/lib/dates";
 import {
   AreaChart, Area, BarChart, Bar,
   XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Cell,
 } from "recharts";
 
-const GRID = "hsl(220, 13%, 91%)";
-const TICK = "hsl(220, 9%, 46%)";
-const TOOLTIP_STYLE = {
-  backgroundColor: "#ffffff",
-  border: "1px solid hsl(220, 13%, 91%)",
-  borderRadius: "8px",
-  color: "hsl(224, 71%, 4%)",
-  fontSize: "12px",
-  boxShadow: "0 4px 6px -1px rgb(0 0 0 / 0.07)",
-};
+import { GRID, TICK, TOOLTIP_STYLE } from "@/lib/chart-theme";
 
 const REP_ACCENT: Record<string, string> = {
   callum:    "#3b82f6",
@@ -32,11 +24,6 @@ const STAGE_COLORS: Record<string, string> = {
   "Call Completed":        "#6366f1",
   "Follow-up In Progress": "#f59e0b",
 };
-
-function formatDay(d: string) {
-  const dt = new Date(d);
-  return `${dt.getDate()}/${dt.getMonth() + 1}`;
-}
 
 // ── Stat panel ────────────────────────────────────────────
 function StatPanel({ items, loading }: {

@@ -2,22 +2,15 @@ import { useState } from "react";
 import { useClose } from "@/hooks/use-close";
 import { BookingsDashboard } from "@/components/BookingsDashboard";
 import { Card, CardContent } from "@/components/ui/card";
-import { AlertCircle, Loader2, CalendarDays } from "lucide-react";
+import { AlertCircle, Loader2 } from "lucide-react";
+import { DateRangePicker, type DateRangeValue } from "@/components/DateRangePicker";
+import { formatDay } from "@/lib/dates";
 import {
   AreaChart, Area, XAxis, YAxis, CartesianGrid,
   Tooltip, ResponsiveContainer,
 } from "recharts";
 
-const GRID = "hsl(220, 13%, 91%)";
-const TICK = "hsl(220, 9%, 46%)";
-const TOOLTIP_STYLE = {
-  backgroundColor: "#ffffff",
-  border: "1px solid hsl(220, 13%, 91%)",
-  borderRadius: "8px",
-  color: "hsl(224, 71%, 4%)",
-  fontSize: "12px",
-  boxShadow: "0 4px 6px -1px rgb(0 0 0 / 0.07)",
-};
+import { GRID, TICK, TOOLTIP_STYLE } from "@/lib/chart-theme";
 
 const STAGE_COLORS: Record<string, string> = {
   "Lead In":               "#94a3b8",
@@ -26,28 +19,14 @@ const STAGE_COLORS: Record<string, string> = {
   "Follow-up In Progress": "#f59e0b",
 };
 
-function formatDay(d: string) {
-  const dt = new Date(d);
-  return `${dt.getDate()}/${dt.getMonth() + 1}`;
-}
-
 // ── Date helpers ─────────────────────────────────────────
-type Preset = "month" | "30d" | "60d" | "custom";
+// Date range handled by shared DateRangePicker component
 
 function fmt(d: Date) {
   return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
 }
 
-function presetDates(preset: Preset) {
-  const today = new Date();
-  const to = fmt(today);
-  if (preset === "month") {
-    return { from: `${today.getFullYear()}-${String(today.getMonth() + 1).padStart(2, "0")}-01`, to };
-  }
-  const from = new Date(today);
-  from.setDate(today.getDate() - (preset === "30d" ? 30 : 60));
-  return { from: fmt(from), to };
-}
+// (presetDates removed — using shared DateRangePicker)
 
 // ── Sub-components ────────────────────────────────────────
 
@@ -85,35 +64,7 @@ function SectionLabel({ dot, label }: { dot: string; label: string }) {
   );
 }
 
-function DateFilter({ preset, from, to, onPreset, onFrom, onTo }: {
-  preset: Preset; from: string; to: string;
-  onPreset: (p: Preset) => void; onFrom: (v: string) => void; onTo: (v: string) => void;
-}) {
-  return (
-    <div className="flex flex-wrap items-center gap-2">
-      <CalendarDays className="h-4 w-4 text-muted-foreground" />
-      <div className="flex items-center gap-0.5 bg-muted rounded-lg p-1">
-        {(["month", "30d", "60d", "custom"] as Preset[]).map((p) => (
-          <button key={p} onClick={() => onPreset(p)}
-            className={`px-3 py-1.5 rounded-md text-xs font-medium transition-all ${
-              preset === p ? "bg-card text-foreground shadow-sm" : "text-muted-foreground hover:text-foreground"
-            }`}>
-            {p === "month" ? "This Month" : p === "30d" ? "Last 30d" : p === "60d" ? "Last 60d" : "Custom"}
-          </button>
-        ))}
-      </div>
-      {preset === "custom" && (
-        <div className="flex items-center gap-2">
-          <input type="date" value={from} onChange={(e) => onFrom(e.target.value)}
-            className="text-xs border border-border rounded-lg px-3 py-1.5 bg-card text-foreground focus:outline-none focus:ring-2 focus:ring-primary/30" />
-          <span className="text-xs text-muted-foreground">→</span>
-          <input type="date" value={to} onChange={(e) => onTo(e.target.value)}
-            className="text-xs border border-border rounded-lg px-3 py-1.5 bg-card text-foreground focus:outline-none focus:ring-2 focus:ring-primary/30" />
-        </div>
-      )}
-    </div>
-  );
-}
+// (DateFilter removed — using shared DateRangePicker)
 
 // ── Main ──────────────────────────────────────────────────
 export function SalesDashboard() {
@@ -124,18 +75,9 @@ export function SalesDashboard() {
     isLoading, isError,
   } = useClose();
 
-  const [preset, setPreset] = useState<Preset>("month");
-  const [customFrom, setCustomFrom] = useState(() => presetDates("month").from);
-  const [customTo,   setCustomTo]   = useState(() => presetDates("month").to);
-
-  const { from, to } = preset === "custom"
-    ? { from: customFrom, to: customTo }
-    : presetDates(preset);
-
-  const handlePreset = (p: Preset) => {
-    setPreset(p);
-    if (p !== "custom") { const d = presetDates(p); setCustomFrom(d.from); setCustomTo(d.to); }
-  };
+  const [bookingsRange, setBookingsRange] = useState<DateRangeValue>({ start: "", end: "", startDate: "", endDate: "" });
+  const from = bookingsRange.start || new Date(new Date().getFullYear(), new Date().getMonth(), 1).toISOString();
+  const to = bookingsRange.end || new Date().toISOString();
 
   if (isError) {
     return (
@@ -230,8 +172,7 @@ export function SalesDashboard() {
       <div>
         <div className="flex flex-wrap items-center justify-between gap-3 mb-4">
           <SectionLabel dot="bg-indigo-500 animate-pulse" label="Bookings" />
-          <DateFilter preset={preset} from={from} to={to}
-            onPreset={handlePreset} onFrom={setCustomFrom} onTo={setCustomTo} />
+          <DateRangePicker defaultPreset="MTD" onChange={setBookingsRange} />
         </div>
         <BookingsDashboard from={from} to={to} showRate={showRate} />
       </div>
