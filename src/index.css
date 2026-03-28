@@ -78,7 +78,7 @@
     --secondary: 0 0% 16%;
     --secondary-foreground: 0 0% 98%;
     --muted: 0 0% 16%;
-    --muted-foreground: 0 0% 54%;
+    --muted-foreground: 0 0% 69%;
     --accent: 0 0% 16%;
     --accent-foreground: 0 0% 98%;
     --destructive: 0 100% 62%;
@@ -110,6 +110,10 @@
 @layer base {
   * {
     @apply border-border;
+  }
+
+  html {
+    font-size: 110%;
   }
 
   body {

@@ -102,17 +102,20 @@ export function DateRangePicker({ defaultPreset = "TW", onChange }: Props) {
     return () => document.removeEventListener("mousedown", handler);
   }, [open]);
 
-  // Compute and emit range on any change
+  // Compute and emit range on any change — skip when custom is selected but no dates picked yet
   const range = useMemo(() => {
-    if (preset === "custom" && customRange?.from && customRange?.to) {
-      return rangeToStrings(customRange.from, customRange.to);
+    if (preset === "custom") {
+      if (customRange?.from && customRange?.to) {
+        return rangeToStrings(customRange.from, customRange.to);
+      }
+      return null; // Don't emit until both dates are selected
     }
     const { from, to } = presetToRange(preset as Exclude<Preset, "custom">);
     return rangeToStrings(from, to);
   }, [preset, customRange]);
 
   useEffect(() => {
-    onChange(range);
+    if (range) onChange(range);
   }, [range]);
 
   const customLabel = useMemo(() => {

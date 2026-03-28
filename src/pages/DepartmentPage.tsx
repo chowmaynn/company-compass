@@ -107,7 +107,7 @@ export default function DepartmentPage() {
     <div className="p-6 max-w-7xl mx-auto space-y-6">
 
       {/* ── Header ────────────────────────────────────────── */}
-      {!isContent && (
+      {!isContent && !isFinance && !isMarketing && (
         <div>
           <h1 className="text-2xl font-bold tracking-tight text-foreground">
             {isFinance ? "Subscriptions" : department}

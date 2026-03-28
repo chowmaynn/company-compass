@@ -7,6 +7,7 @@ import { useFinance } from "@/hooks/use-finance";
 import {
   Loader2, AlertTriangle, XCircle, CreditCard, RefreshCw,
 } from "lucide-react";
+import { Card } from "@/components/ui/card";
 import { DashboardShell } from "@/components/DashboardShell";
 import { DateRangePicker, presetToRange, rangeToStrings, type DateRangeValue } from "@/components/DateRangePicker";
 import { useCurrency } from "@/components/AppLayout";
@@ -108,60 +109,61 @@ export default function SubscriptionDashboard() {
     <div className="space-y-6">
 
       {/* ── Stripe: Gross + Net + Payments ───────────────────────────── */}
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
+      <Card className="overflow-hidden">
+        <div className="flex flex-col lg:flex-row">
 
-        {/* Gross Volume */}
-        <div className="bg-card border border-border rounded-xl p-5">
-          <p className="text-xs text-muted-foreground font-medium mb-1">Gross Volume</p>
-          <p className="text-2xl font-bold text-foreground">
-            {s ? `${cfmt(s.grossVolume)}` : "—"}
-          </p>
-          <p className="text-xs text-muted-foreground mt-1">via Stripe / Payfunnels</p>
-          {s && s.dailyVolume.length > 0 && (
-            <div className="mt-4">
-              <ResponsiveContainer width="100%" height={80}>
-                <AreaChart data={s.dailyVolume} margin={{ top: 2, right: 2, left: 0, bottom: 0 }}>
-                  <defs>
-                    <linearGradient id="grossGrad" x1="0" y1="0" x2="0" y2="1">
-                      <stop offset="5%" stopColor="#8b5cf6" stopOpacity={0.3} />
-                      <stop offset="95%" stopColor="#8b5cf6" stopOpacity={0} />
-                    </linearGradient>
-                  </defs>
-                  <Tooltip content={<ChartTooltip formatter={(v, name) => `${name}: ${fmtCurrency(v)}`} />} />
-                  <Area type="monotone" dataKey="gross" name="Gross" stroke="#8b5cf6" strokeWidth={1.5} fill="url(#grossGrad)" dot={false} />
-                </AreaChart>
-              </ResponsiveContainer>
-            </div>
-          )}
-        </div>
+          {/* Gross Volume */}
+          <div className="flex-1 p-5 lg:border-r border-white/[0.06]">
+            <p className="text-xs text-muted-foreground font-medium mb-1">Gross Volume</p>
+            <p className="text-2xl font-bold text-foreground">
+              {s ? `${cfmt(s.grossVolume)}` : "—"}
+            </p>
+            <p className="text-xs text-muted-foreground mt-1">via Stripe / Payfunnels</p>
+            {s && s.dailyVolume.length > 0 && (
+              <div className="mt-4">
+                <ResponsiveContainer width="100%" height={80}>
+                  <AreaChart data={s.dailyVolume} margin={{ top: 2, right: 2, left: 0, bottom: 0 }}>
+                    <defs>
+                      <linearGradient id="grossGrad" x1="0" y1="0" x2="0" y2="1">
+                        <stop offset="5%" stopColor="#8b5cf6" stopOpacity={0.3} />
+                        <stop offset="95%" stopColor="#8b5cf6" stopOpacity={0} />
+                      </linearGradient>
+                    </defs>
+                    <Tooltip content={<ChartTooltip formatter={(v, name) => `${name}: ${fmtCurrency(v)}`} />} />
+                    <Area type="monotone" dataKey="gross" name="Gross" stroke="#8b5cf6" strokeWidth={1.5} fill="url(#grossGrad)" dot={false} />
+                  </AreaChart>
+                </ResponsiveContainer>
+              </div>
+            )}
+          </div>
 
-        {/* Net Volume */}
-        <div className="bg-card border border-border rounded-xl p-5">
-          <p className="text-xs text-muted-foreground font-medium mb-1">Net Volume</p>
-          <p className="text-2xl font-bold text-foreground">
-            {s ? `${cfmt(s.netVolume)}` : "—"}
-          </p>
-          <p className="text-xs text-muted-foreground mt-1">after Stripe fees</p>
-          {s && s.dailyVolume.length > 0 && (
-            <div className="mt-4">
-              <ResponsiveContainer width="100%" height={80}>
-                <AreaChart data={s.dailyVolume} margin={{ top: 2, right: 2, left: 0, bottom: 0 }}>
-                  <defs>
-                    <linearGradient id="netGrad" x1="0" y1="0" x2="0" y2="1">
-                      <stop offset="5%" stopColor="#10b981" stopOpacity={0.3} />
-                      <stop offset="95%" stopColor="#10b981" stopOpacity={0} />
-                    </linearGradient>
-                  </defs>
-                  <Tooltip content={<ChartTooltip formatter={(v, name) => `${name}: ${fmtCurrency(v)}`} />} />
-                  <Area type="monotone" dataKey="net" name="Net" stroke="#10b981" strokeWidth={1.5} fill="url(#netGrad)" dot={false} />
-                </AreaChart>
-              </ResponsiveContainer>
-            </div>
-          )}
-        </div>
+          {/* Net Volume */}
+          <div className="flex-1 p-5 border-t lg:border-t-0 lg:border-r border-white/[0.06]">
+            <p className="text-xs text-muted-foreground font-medium mb-1">Net Volume</p>
+            <p className="text-2xl font-bold text-foreground">
+              {s ? `${cfmt(s.netVolume)}` : "—"}
+            </p>
+            <p className="text-xs text-muted-foreground mt-1">after Stripe fees</p>
+            {s && s.dailyVolume.length > 0 && (
+              <div className="mt-4">
+                <ResponsiveContainer width="100%" height={80}>
+                  <AreaChart data={s.dailyVolume} margin={{ top: 2, right: 2, left: 0, bottom: 0 }}>
+                    <defs>
+                      <linearGradient id="netGrad" x1="0" y1="0" x2="0" y2="1">
+                        <stop offset="5%" stopColor="#10b981" stopOpacity={0.3} />
+                        <stop offset="95%" stopColor="#10b981" stopOpacity={0} />
+                      </linearGradient>
+                    </defs>
+                    <Tooltip content={<ChartTooltip formatter={(v, name) => `${name}: ${fmtCurrency(v)}`} />} />
+                    <Area type="monotone" dataKey="net" name="Net" stroke="#10b981" strokeWidth={1.5} fill="url(#netGrad)" dot={false} />
+                  </AreaChart>
+                </ResponsiveContainer>
+              </div>
+            )}
+          </div>
 
-        {/* Payments breakdown */}
-        <div className="bg-card border border-border rounded-xl p-5">
+          {/* Payments breakdown */}
+          <div className="flex-1 p-5 border-t lg:border-t-0">
           <p className="text-xs text-muted-foreground font-medium mb-3">Payments</p>
           {s ? (
             <>
@@ -200,7 +202,9 @@ export default function SubscriptionDashboard() {
             </div>
           )}
         </div>
-      </div>
+
+        </div>
+      </Card>
 
       {/* ── Full daily volume chart ───────────────────────────────────── */}
       {s && s.dailyVolume.length > 0 && (
@@ -219,9 +223,9 @@ export default function SubscriptionDashboard() {
                   <stop offset="95%" stopColor="#10b981" stopOpacity={0} />
                 </linearGradient>
               </defs>
-              <CartesianGrid strokeDasharray="3 3" stroke="var(--border)" vertical={false} />
-              <XAxis dataKey="date" tick={{ fontSize: 11, fill: "var(--muted-foreground)" }} axisLine={false} tickLine={false} interval="preserveStartEnd" />
-              <YAxis tick={{ fontSize: 11, fill: "var(--muted-foreground)" }} axisLine={false} tickLine={false} tickFormatter={(v) => cfmt(v)} width={60} />
+              <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--border))" vertical={false} />
+              <XAxis dataKey="date" tick={{ fontSize: 11, fill: "hsl(var(--muted-foreground))" }} axisLine={false} tickLine={false} interval="preserveStartEnd" />
+              <YAxis tick={{ fontSize: 11, fill: "hsl(var(--muted-foreground))" }} axisLine={false} tickLine={false} tickFormatter={(v) => cfmt(v)} width={60} />
               <Tooltip content={<ChartTooltip formatter={(v, name) => `${name}: ${fmtCurrency(v)}`} />} />
               <Area type="monotone" dataKey="gross" name="Gross" stroke="#8b5cf6" strokeWidth={2} fill="url(#g2)" dot={false} />
               <Area type="monotone" dataKey="net" name="Net" stroke="#10b981" strokeWidth={2} fill="url(#n2)" dot={false} />
@@ -264,8 +268,8 @@ export default function SubscriptionDashboard() {
             <p className="text-xs font-medium text-muted-foreground mb-3">Requests per month</p>
             <ResponsiveContainer width="100%" height={200}>
               <BarChart data={monthlyCancellations} margin={{ top: 4, right: 4, left: 0, bottom: 0 }}>
-                <XAxis dataKey="month" tick={{ fontSize: 11, fill: "var(--muted-foreground)" }} axisLine={false} tickLine={false} />
-                <YAxis tick={{ fontSize: 11, fill: "var(--muted-foreground)" }} axisLine={false} tickLine={false} allowDecimals={false} />
+                <XAxis dataKey="month" tick={{ fontSize: 11, fill: "hsl(var(--muted-foreground))" }} axisLine={false} tickLine={false} />
+                <YAxis tick={{ fontSize: 11, fill: "hsl(var(--muted-foreground))" }} axisLine={false} tickLine={false} allowDecimals={false} />
                 <Bar dataKey="cancels" name="Cancellations" fill="#ef4444" radius={[4, 4, 0, 0]}>
                   <LabelList dataKey="cancels" position="inside" fill="#fff" fontSize={12} fontWeight={600} />
                 </Bar>

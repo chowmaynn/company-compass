@@ -146,9 +146,9 @@ function NavStatusCards() {
             className={`flex items-center gap-2 rounded-lg border px-3 py-1.5 transition-all hover:scale-[1.03] cursor-pointer ${c.bg} ${openFilter === c.filter ? "ring-2 ring-offset-1 ring-offset-background" : ""}`}
             style={openFilter === c.filter ? { ringColor: "currentColor" } : undefined}
           >
-            <c.icon className={`h-3.5 w-3.5 ${c.color}`} />
-            <span className={`text-sm font-bold ${c.color}`}>{c.count}</span>
-            <span className="text-[10px] font-medium text-muted-foreground uppercase tracking-wider">{c.label}</span>
+            <c.icon className={`h-3 w-3 ${c.color}`} />
+            <span className={`text-xs font-bold ${c.color}`}>{c.count}</span>
+            <span className="text-[8px] font-medium text-muted-foreground uppercase tracking-wider">{c.label}</span>
           </button>
         ))}
       </div>
