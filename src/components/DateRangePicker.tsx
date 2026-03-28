@@ -133,15 +133,15 @@ export function DateRangePicker({ defaultPreset = "TW", onChange }: Props) {
 
   return (
     <div className="relative" ref={ref}>
-      <div className="flex items-center gap-1 bg-muted rounded-lg p-1">
+      <div className="flex items-center gap-0.5 bg-black/30 backdrop-blur-sm rounded-full p-1 ring-1 ring-white/10">
         {presets.map((p) => (
           <button
             key={p.id}
             onClick={() => { setPreset(p.id); setOpen(false); }}
-            className={`px-2.5 py-1 rounded-md text-[11px] font-medium transition-all ${
+            className={`px-3 py-1.5 rounded-full text-[11px] font-medium transition-all ${
               preset === p.id
-                ? "bg-card text-foreground shadow-sm"
-                : "text-muted-foreground hover:text-foreground"
+                ? "bg-white/15 text-foreground shadow-sm ring-1 ring-white/20"
+                : "text-muted-foreground hover:text-foreground hover:bg-white/5"
             }`}
           >
             {p.label}
@@ -150,10 +150,10 @@ export function DateRangePicker({ defaultPreset = "TW", onChange }: Props) {
 
         <button
           onClick={() => { setPreset("custom"); setOpen((o) => !o); }}
-          className={`flex items-center gap-1 px-2.5 py-1 rounded-md text-[11px] font-medium transition-all ${
+          className={`flex items-center gap-1 px-3 py-1.5 rounded-full text-[11px] font-medium transition-all ${
             preset === "custom"
-              ? "bg-card text-foreground shadow-sm"
-              : "text-muted-foreground hover:text-foreground"
+              ? "bg-white/15 text-foreground shadow-sm ring-1 ring-white/20"
+              : "text-muted-foreground hover:text-foreground hover:bg-white/5"
           }`}
         >
           {preset === "custom" ? customLabel : "Custom"}

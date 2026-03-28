@@ -251,7 +251,7 @@ export function FunnelSankey({ metrics, formatCurrency }: Props) {
         <h2 className="text-sm font-semibold text-foreground uppercase tracking-wider">Conversion Funnel</h2>
       </div>
 
-      <Card className="p-3 overflow-hidden">
+      <div className="p-3 overflow-hidden">
         <svg viewBox="0 0 960 270" className="w-full" preserveAspectRatio="xMidYMid meet">
           {/* Flows */}
           {flows.map((flow) => {
@@ -376,7 +376,7 @@ export function FunnelSankey({ metrics, formatCurrency }: Props) {
             );
           })}
         </svg>
-      </Card>
+      </div>
     </div>
   );
 }

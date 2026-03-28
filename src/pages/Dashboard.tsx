@@ -76,18 +76,13 @@ const revPct = pctOfTarget(revenue?.monthlyActual ?? 0, revenue?.monthlyTarget ?
 
       {/* Status cards moved to navbar */}
 
-      {/* ── Financial Overview + Revenue Chart ──────────────── */}
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
-        {/* Revenue Card */}
-        <Card className="lg:col-span-1 border-primary/20 overflow-hidden">
-          <CardContent className="p-0">
+      {/* ── Financial Overview + Revenue Chart (single card) ── */}
+      <Card className="overflow-hidden" data-glass-padding="4px">
+        <div className="flex flex-col lg:flex-row">
+          {/* Left: Summary stats */}
+          <div className="lg:w-[280px] shrink-0 lg:border-r border-white/[0.06]">
             <div className="p-5 pb-3">
-              <div className="flex items-center gap-2 mb-4">
-                <div className="h-8 w-8 rounded-lg bg-primary/15 flex items-center justify-center">
-                  <DollarSign className="h-4 w-4 text-primary" />
-                </div>
-                <span className="text-sm font-medium text-muted-foreground">Revenue</span>
-              </div>
+              <span className="text-sm font-medium text-muted-foreground mb-2 block">Revenue</span>
               <p className="text-3xl font-bold tracking-tight text-foreground">
                 {formatCurrency(revenue?.monthlyActual)}
               </p>
@@ -107,13 +102,8 @@ const revPct = pctOfTarget(revenue?.monthlyActual ?? 0, revenue?.monthlyTarget ?
                 </div>
               )}
             </div>
-            <div className="border-t border-border/50 p-5 pt-3">
-              <div className="flex items-center gap-2 mb-3">
-                <div className="h-8 w-8 rounded-lg bg-accent/15 flex items-center justify-center">
-                  <TrendingUp className="h-4 w-4 text-accent" />
-                </div>
-                <span className="text-sm font-medium text-muted-foreground">Cash Collected</span>
-              </div>
+            <div className="border-t border-white/[0.06] p-5 pt-3">
+              <span className="text-sm font-medium text-muted-foreground mb-2 block">Cash Collected</span>
               <p className="text-3xl font-bold tracking-tight text-foreground">
                 {formatCurrency(cash?.monthlyActual)}
               </p>
@@ -133,12 +123,14 @@ const revPct = pctOfTarget(revenue?.monthlyActual ?? 0, revenue?.monthlyTarget ?
                 </div>
               )}
             </div>
-          </CardContent>
-        </Card>
+          </div>
 
-        {/* Revenue Trend */}
-        <RevenueTrendChart convert={convert} symbol={symbol} fallbackData={revenueWeekly} />
-      </div>
+          {/* Right: Revenue Trend chart */}
+          <div className="flex-1 min-w-0">
+            <RevenueTrendChart convert={convert} symbol={symbol} fallbackData={revenueWeekly} embedded />
+          </div>
+        </div>
+      </Card>
 
       {/* ── Conversion Funnel ─────────────────────────────── */}
       <FunnelSankey metrics={scorecardData} formatCurrency={formatCurrency} />
@@ -269,10 +261,12 @@ function RevenueTrendChart({
   convert,
   symbol,
   fallbackData,
+  embedded,
 }: {
   convert: (n: number) => number;
   symbol: string;
   fallbackData: { week: string; actual: number; projection: number }[];
+  embedded?: boolean;
 }) {
   const [range, setRange] = useState<RevenueRange>("month");
   const [historyRows, setHistoryRows] = useState<ScorecardRow[]>([]);
@@ -318,23 +312,18 @@ function RevenueTrendChart({
     }));
   }, [range, historyRows, fallbackData, convert]);
 
-  return (
-    <Card className="lg:col-span-2 border-border/50">
-      <CardContent className="p-5">
-        <div className="flex items-center justify-between mb-4">
-          <div className="flex items-center gap-2">
-            <BarChart3 className="h-4 w-4 text-primary" />
-            <h3 className="text-sm font-semibold text-foreground">Revenue Trend</h3>
-          </div>
-          <div className="flex items-center gap-1 bg-muted rounded-lg p-0.5">
+  const content = (
+    <div className="p-5">
+      <div className="flex items-center justify-end mb-4">
+          <div className="flex items-center gap-0.5 bg-black/30 backdrop-blur-sm rounded-full p-1 ring-1 ring-white/10">
             {RANGE_LABELS.map((r) => (
               <button
                 key={r.id}
                 onClick={() => setRange(r.id)}
-                className={`px-2 py-1 rounded-md text-[10px] font-medium transition-all ${
+                className={`px-3 py-1.5 rounded-full text-[11px] font-medium transition-all ${
                   range === r.id
-                    ? "bg-card text-foreground shadow-sm"
-                    : "text-muted-foreground hover:text-foreground"
+                    ? "bg-white/15 text-foreground shadow-sm ring-1 ring-white/20"
+                    : "text-muted-foreground hover:text-foreground hover:bg-white/5"
                 }`}
               >
                 {r.label}
@@ -402,7 +391,14 @@ function RevenueTrendChart({
             </AreaChart>
           </ResponsiveContainer>
         )}
-      </CardContent>
+    </div>
+  );
+
+  if (embedded) return content;
+
+  return (
+    <Card className="lg:col-span-2 border-border/50">
+      <CardContent className="p-0">{content}</CardContent>
     </Card>
   );
 }
