@@ -43,17 +43,21 @@ export function AppSidebar() {
   const location = useLocation();
   const [openFilter, setOpenFilter] = useState<StatusFilter | null>(null);
   const containerRef = useRef<HTMLDivElement>(null);
+  const buttonRefs = useRef<Record<string, HTMLButtonElement | null>>({});
 
   // Close on route change
   useEffect(() => { setOpenFilter(null); }, [location.pathname]);
 
-  // Close on outside click
+  // Close on outside click (check both sidebar and the fixed dropdown panel)
   useEffect(() => {
     if (!openFilter) return;
     const handler = (e: MouseEvent) => {
-      if (containerRef.current && !containerRef.current.contains(e.target as Node)) {
-        setOpenFilter(null);
-      }
+      const target = e.target as Node;
+      if (containerRef.current?.contains(target)) return;
+      // Check if click is inside the fixed dropdown panel
+      const panel = document.querySelector("[data-status-panel]");
+      if (panel?.contains(target)) return;
+      setOpenFilter(null);
     };
     document.addEventListener("mousedown", handler);
     return () => document.removeEventListener("mousedown", handler);
@@ -126,27 +130,38 @@ export function AppSidebar() {
             const isActive = openFilter === c.filter;
 
             return (
-              <button
-                key={c.filter}
-                onClick={() => setOpenFilter(isActive ? null : c.filter)}
-                className={`relative flex flex-col items-center justify-center rounded-xl py-3 px-2 transition-all cursor-pointer ${c.bg} ${
-                  isActive ? "ring-2 ring-offset-1 ring-offset-background ring-current" : "hover:scale-[1.03]"
-                } ${c.color}`}
-              >
-                <span className="text-2xl font-bold">{count}</span>
-                {!collapsed && (
-                  <span className="text-[9px] font-medium uppercase tracking-wider mt-0.5 text-muted-foreground">{c.label}</span>
-                )}
-              </button>
+              <div key={c.filter}>
+                <button
+                  ref={(el) => { buttonRefs.current[c.filter] = el; }}
+                  onClick={() => setOpenFilter(isActive ? null : c.filter)}
+                  className={`w-full flex flex-col items-center justify-center rounded-xl py-3 px-2 transition-all cursor-pointer ${c.bg} ${
+                    isActive ? "ring-2 ring-offset-1 ring-offset-background ring-current" : "hover:scale-[1.03]"
+                  } ${c.color}`}
+                >
+                  <span className="text-2xl font-bold">{count}</span>
+                  {!collapsed && (
+                    <span className="text-[9px] font-medium uppercase tracking-wider mt-0.5 text-muted-foreground">{c.label}</span>
+                  )}
+                </button>
+              </div>
             );
           })}
 
-          {/* Dropdown panel — opens to the right */}
-          {openFilter && activeCard && (
-            <div
-              className="fixed left-[calc(var(--sidebar-width)+0.5rem)] top-[120px] w-[550px] max-h-[400px] bg-card rounded-xl border shadow-xl flex flex-col overflow-hidden z-50"
-              style={{ animation: "dropDown 150ms ease-out" }}
-            >
+          {/* Dropdown panel — fixed position, escapes sidebar overflow */}
+          {openFilter && activeCard && (() => {
+            const btn = buttonRefs.current[openFilter];
+            const rect = btn?.getBoundingClientRect();
+            const top = rect ? rect.top : 120;
+            return (
+              <div
+                data-status-panel
+                className="fixed w-[550px] max-h-[400px] bg-card rounded-xl border shadow-2xl flex flex-col overflow-hidden z-[100]"
+                style={{
+                  top: `${top}px`,
+                  left: `calc(var(--sidebar-width) + 0.75rem)`,
+                  animation: "dropDown 150ms ease-out",
+                }}
+              >
               <div className="flex items-center justify-between px-4 py-3 border-b border-border bg-muted/30">
                 <div className="flex items-center gap-2">
                   <span className={`h-2 w-2 rounded-full ${activeCard.dot}`} />
@@ -176,7 +191,8 @@ export function AppSidebar() {
                 ))}
               </div>
             </div>
-          )}
+            );
+          })()}
         </div>
       </SidebarContent>
     </Sidebar>
