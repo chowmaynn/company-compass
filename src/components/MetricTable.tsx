@@ -12,9 +12,11 @@ interface MetricTableProps {
   readOnlyMetrics?: Set<string>;
   /** When set, multiplies all numeric values by this rate (NZD→USD conversion) */
   currencyRate?: number;
+  /** Per-metric edit check. If provided, overrides onMetricChange for metrics where this returns false. */
+  canEditMetric?: (metric: Metric) => boolean;
 }
 
-export function MetricTable({ metrics, onMetricChange, readOnlyMetrics, currencyRate }: MetricTableProps) {
+export function MetricTable({ metrics, onMetricChange, readOnlyMetrics, currencyRate, canEditMetric }: MetricTableProps) {
   const convert = (val: number | string | ""): number | string | "" => {
     if (!currencyRate || val === "" || val === "—") return val;
     if (typeof val === "number") return Math.round(val * currencyRate);
@@ -81,7 +83,7 @@ export function MetricTable({ metrics, onMetricChange, readOnlyMetrics, currency
                 </div>
               </td>
               {metric.weeks.map((w, wi) => {
-                const isReadOnly = readOnlyMetrics?.has(metric.name);
+                const isReadOnly = readOnlyMetrics?.has(metric.name) || (canEditMetric && !canEditMetric(metric));
                 return (
                   <React.Fragment key={wi}>
                     <td className="px-1 py-2 text-right min-w-[70px]">
@@ -102,7 +104,7 @@ export function MetricTable({ metrics, onMetricChange, readOnlyMetrics, currency
                       <EditableCell
                         value={convert(w.projection)}
                         isProjection
-                        onChange={currencyRate ? undefined : (val) => onMetricChange?.(metric.name, `weeks.${wi}.projection`, val)}
+                        onChange={isReadOnly || currencyRate ? undefined : (val) => onMetricChange?.(metric.name, `weeks.${wi}.projection`, val)}
                       />
                     </td>
                   </React.Fragment>
@@ -124,7 +126,7 @@ export function MetricTable({ metrics, onMetricChange, readOnlyMetrics, currency
                 <EditableCell
                   value={convert(metric.monthlyTarget)}
                   isProjection
-                  onChange={currencyRate ? undefined : (val) => onMetricChange?.(metric.name, "monthlyTarget", val)}
+                  onChange={isReadOnly || currencyRate ? undefined : (val) => onMetricChange?.(metric.name, "monthlyTarget", val)}
                 />
               </td>
               <td className="px-3 py-3 text-center">

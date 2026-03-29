@@ -1,4 +1,5 @@
 import { AppSidebar } from "@/components/AppSidebar";
+import { useAuth } from "@/hooks/use-auth";
 import { Outlet, useLocation, Link } from "react-router-dom";
 import { isAuthorized, getAuthUrl, clearTokens } from "@/lib/youtube-auth";
 import {
@@ -135,11 +136,24 @@ function GoogleAuthButton() {
   );
 }
 
+function SignOutButton() {
+  const { signOut } = useAuth();
+  return (
+    <button
+      onClick={signOut}
+      className="flex items-center justify-center rounded-lg p-1.5 text-muted-foreground hover:bg-accent hover:text-accent-foreground transition-all"
+      title="Sign out"
+    >
+      <LogOut className="h-4 w-4" />
+    </button>
+  );
+}
+
 function NavLinks() {
   const location = useLocation();
 
   return (
-    <nav className="flex items-center gap-1 bg-black/40 backdrop-blur-sm rounded-full px-1.5 py-1 ring-1 ring-white/10">
+    <nav className="flex items-center gap-1 bg-black/5 dark:bg-black/40 backdrop-blur-sm rounded-full px-1.5 py-1 ring-1 ring-black/10 dark:ring-white/10">
       {navItems.map((item) => {
         const isActive = item.end
           ? location.pathname === item.url
@@ -150,7 +164,7 @@ function NavLinks() {
             to={item.url}
             className={`px-4 py-1.5 rounded-full text-[12px] font-medium whitespace-nowrap transition-all ${
               isActive
-                ? "bg-white/20 text-foreground shadow-sm"
+                ? "bg-black/10 dark:bg-white/20 text-foreground shadow-sm"
                 : "text-muted-foreground hover:text-foreground"
             }`}
           >
@@ -199,7 +213,7 @@ export function AppLayout() {
             <div className="flex items-center gap-2 shrink-0">
               <CurrencyToggle currency={currency} setCurrency={setCurrency} />
               <ThemeToggle />
-              <GoogleAuthButton />
+              <SignOutButton />
             </div>
           </header>
           <main className="flex-1 overflow-auto">

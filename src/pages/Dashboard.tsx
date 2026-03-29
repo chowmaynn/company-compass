@@ -4,7 +4,8 @@ import { weekConfigs } from "@/data/scorecardData";
 import { useScorecard } from "@/hooks/use-scorecard";
 import { useCurrency, useSelectedMonth } from "@/components/AppLayout";
 import { fetchRevenueHistory, type ScorecardRow } from "@/lib/supabase-scorecard";
-import { DollarSign, TrendingUp, BarChart3 } from "lucide-react";
+import { DollarSign, BarChart3 } from "lucide-react";
+import { useAuth } from "@/hooks/use-auth";
 import { FunnelSankey } from "@/components/FunnelSankey";
 import {
   AreaChart,
@@ -72,9 +73,8 @@ const revPct = pctOfTarget(revenue?.monthlyActual ?? 0, revenue?.monthlyTarget ?
 
   return (
     <div className="p-6 space-y-6 max-w-[1440px] mx-auto">
-      {/* ── Status Overview Row ─────────────────────────────── */}
-
-      {/* Status cards moved to navbar */}
+      {/* ── Welcome ───────────────────────────────────────── */}
+      <WelcomeHeader />
 
       {/* ── Financial Overview + Revenue Chart (single card) ── */}
       <Card className="overflow-hidden" data-glass-padding="4px">
@@ -143,6 +143,17 @@ const revPct = pctOfTarget(revenue?.monthlyActual ?? 0, revenue?.monthlyTarget ?
 
 
 // ── Revenue Trend Chart ──────────────────────────────────────
+
+function WelcomeHeader() {
+  const { user } = useAuth();
+  const name = user?.user_metadata?.display_name || user?.user_metadata?.full_name || user?.email?.split("@")[0];
+
+  return (
+    <h1 className="text-2xl font-bold text-foreground">
+      Welcome{name ? `, ${name}` : ""}
+    </h1>
+  );
+}
 
 type RevenueRange = "week" | "month" | "last-month" | "3m" | "6m" | "ytd" | "yoy";
 
@@ -315,15 +326,15 @@ function RevenueTrendChart({
   const content = (
     <div className="p-5">
       <div className="flex items-center justify-end mb-4">
-          <div className="flex items-center gap-0.5 bg-black/30 backdrop-blur-sm rounded-full p-1 ring-1 ring-white/10">
+          <div className="flex items-center gap-0.5 bg-black/5 dark:bg-black/30 backdrop-blur-sm rounded-full p-1 ring-1 ring-black/10 dark:ring-white/10">
             {RANGE_LABELS.map((r) => (
               <button
                 key={r.id}
                 onClick={() => setRange(r.id)}
                 className={`px-3 py-1.5 rounded-full text-[11px] font-medium transition-all ${
                   range === r.id
-                    ? "bg-white/15 text-foreground shadow-sm ring-1 ring-white/20"
-                    : "text-muted-foreground hover:text-foreground hover:bg-white/5"
+                    ? "bg-black/10 dark:bg-white/15 text-foreground shadow-sm ring-1 ring-black/10 dark:ring-white/20"
+                    : "text-muted-foreground hover:text-foreground hover:bg-black/5 dark:hover:bg-white/5"
                 }`}
               >
                 {r.label}

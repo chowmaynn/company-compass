@@ -1,4 +1,4 @@
-import { SUPABASE_URL, supabaseHeaders as headers } from "@/lib/supabase";
+import { SUPABASE_URL, getSupabaseHeaders } from "@/lib/supabase";
 
 export interface ScorecardRow {
   id: string;
@@ -25,10 +25,8 @@ export interface ScorecardRow {
   updated_at: string;
 }
 
-/**
- * Fetch distinct months available in the scorecard table, sorted descending.
- */
 export async function fetchAvailableMonths(): Promise<string[]> {
+  const headers = await getSupabaseHeaders();
   const res = await fetch(
     `${SUPABASE_URL}/rest/v1/scorecard?select=month&order=month.desc`,
     { headers }
@@ -38,10 +36,8 @@ export async function fetchAvailableMonths(): Promise<string[]> {
   return [...new Set(rows.map((r) => r.month))];
 }
 
-/**
- * Fetch all scorecard rows for a given month.
- */
 export async function fetchScorecard(month: string): Promise<ScorecardRow[]> {
+  const headers = await getSupabaseHeaders();
   const res = await fetch(
     `${SUPABASE_URL}/rest/v1/scorecard?month=eq.${month}&order=department,metric`,
     { headers }
@@ -53,11 +49,9 @@ export async function fetchScorecard(month: string): Promise<ScorecardRow[]> {
   return res.json();
 }
 
-/**
- * Fetch Revenue rows across multiple months for the trend chart.
- */
 export async function fetchRevenueHistory(months: string[]): Promise<ScorecardRow[]> {
   if (months.length === 0) return [];
+  const headers = await getSupabaseHeaders();
   const filter = months.map((m) => `month.eq.${m}`).join(",");
   const res = await fetch(
     `${SUPABASE_URL}/rest/v1/scorecard?metric=eq.Revenue&or=(${filter})&order=month.asc`,
@@ -70,16 +64,13 @@ export async function fetchRevenueHistory(months: string[]): Promise<ScorecardRo
   return res.json();
 }
 
-/**
- * Update a single cell in a scorecard row.
- * Uses metric + month as the unique key.
- */
 export async function updateScorecardCell(
   metric: string,
   month: string,
   field: string,
   value: string
 ): Promise<boolean> {
+  const headers = await getSupabaseHeaders();
   const res = await fetch(
     `${SUPABASE_URL}/rest/v1/scorecard?metric=eq.${encodeURIComponent(metric)}&month=eq.${month}`,
     {

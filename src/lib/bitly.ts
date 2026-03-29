@@ -1,4 +1,4 @@
-import { SUPABASE_URL, supabaseHeaders as supabaseH } from "@/lib/supabase";
+import { SUPABASE_URL, getSupabaseHeaders } from "@/lib/supabase";
 import { bucketByWeek } from "@/lib/dates";
 
 const BITLY_TOKEN = "2a5c70f0612f7fbe8baa0790acb7ce5d588bba35";
@@ -19,9 +19,10 @@ export interface DailyClickRow {
 // ── Supabase: fetch link IDs by category ──────────────────────
 
 async function fetchLinkIdsByCategory(category: string): Promise<string[]> {
+  const headers = await getSupabaseHeaders();
   const res = await fetch(
     `${SUPABASE_URL}/rest/v1/bitly_links?select=bitly_shortlink&category=eq.${category}`,
-    { headers: supabaseH }
+    { headers }
   );
   if (!res.ok) return [];
   const rows: { bitly_shortlink: string }[] = await res.json();

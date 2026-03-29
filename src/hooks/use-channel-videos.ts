@@ -1,7 +1,7 @@
 import { useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 
-import { SUPABASE_URL, supabaseHeaders as headers } from "@/lib/supabase";
+import { SUPABASE_URL, getSupabaseHeaders } from "@/lib/supabase";
 
 export interface ChannelSummary {
   id: number;
@@ -55,6 +55,7 @@ function generateRecentMonths(count = 6): string[] {
 }
 
 async function fetchVideosForMonth(month: string): Promise<LiamVideo[]> {
+  const headers = await getSupabaseHeaders();
   const { start, end } = getMonthBounds(month);
   const url = `${SUPABASE_URL}/rest/v1/liam_videos?published_at=gte.${start}&published_at=lt.${end}&order=published_at.desc&limit=100`;
   const res = await fetch(url, { headers });
@@ -63,6 +64,7 @@ async function fetchVideosForMonth(month: string): Promise<LiamVideo[]> {
 }
 
 async function fetchChannelSummary(month: string): Promise<ChannelSummary | null> {
+  const headers = await getSupabaseHeaders();
   const url = `${SUPABASE_URL}/rest/v1/channel_summaries?month=eq.${month}&limit=1`;
   const res = await fetch(url, { headers });
   if (!res.ok) return null;

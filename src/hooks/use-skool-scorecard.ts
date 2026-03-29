@@ -1,7 +1,8 @@
 import { useQuery } from "@tanstack/react-query";
-import { SUPABASE_URL, supabaseHeaders as headers } from "@/lib/supabase";
+import { SUPABASE_URL, getSupabaseHeaders } from "@/lib/supabase";
 
 async function fetchLatest(metric: string): Promise<{ value: string; month: string } | null> {
+  const headers = await getSupabaseHeaders();
   const res = await fetch(
     `${SUPABASE_URL}/rest/v1/scorecard?metric=eq.${encodeURIComponent(metric)}&order=month.desc&limit=12&select=month,monthly_actual`,
     { headers }

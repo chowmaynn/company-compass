@@ -1,4 +1,4 @@
-import { SUPABASE_URL, supabaseHeaders as headers } from "@/lib/supabase";
+import { SUPABASE_URL, getSupabaseHeaders } from "@/lib/supabase";
 
 // --- Types ---
 
@@ -65,6 +65,7 @@ export interface CompetitorSummary {
 // --- Fetch functions ---
 
 export async function fetchCompetitorChannels(): Promise<CompetitorChannel[]> {
+  const headers = await getSupabaseHeaders();
   const res = await fetch(
     `${SUPABASE_URL}/rest/v1/competitor_channels?select=*&order=channel_name`,
     { headers }
@@ -80,6 +81,7 @@ export async function fetchCompetitorVideos(
   channelId?: number,
   limit = 200
 ): Promise<CompetitorVideo[]> {
+  const headers = await getSupabaseHeaders();
   let url = `${SUPABASE_URL}/rest/v1/competitor_videos?select=*,competitor_channels!competitorchannel_id(channel_name,subscribers)&order=published_at.desc&limit=${limit}`;
   if (channelId) {
     url += `&competitorchannel_id=eq.${channelId}`;
@@ -93,6 +95,7 @@ export async function fetchCompetitorVideos(
 }
 
 export async function fetchLatestSummary(): Promise<CompetitorSummary | null> {
+  const headers = await getSupabaseHeaders();
   const res = await fetch(
     `${SUPABASE_URL}/rest/v1/competitor_summaries?select=*&order=created_at.desc&limit=1`,
     { headers }

@@ -4,6 +4,7 @@ import { DailyTrackingTable } from "./DailyTrackingTable";
 import { DepartmentCharts } from "./DepartmentCharts";
 import { getAuthUrl } from "@/lib/youtube-auth";
 import { useCurrency } from "@/components/AppLayout";
+import { useAuth } from "@/hooks/use-auth";
 import { BarChart3, Video, Megaphone, Phone, Users, LogIn } from "lucide-react";
 
 const departmentIcons: Record<Department, React.ElementType> = {
@@ -35,6 +36,7 @@ export function DepartmentSection({ department, metrics, onMetricChange, showCha
   const Icon = departmentIcons[department];
   const colorClass = departmentColors[department];
   const { currency, rate } = useCurrency();
+  const { canEdit } = useAuth();
   const isFinance = department === "Finance";
 
   const statusSummary = metrics.reduce(
@@ -87,7 +89,13 @@ export function DepartmentSection({ department, metrics, onMetricChange, showCha
       {department === "Marketing" && showCharts && (
         <p className="text-sm font-medium text-muted-foreground">Weekly Tracking</p>
       )}
-      <MetricTable metrics={metrics} onMetricChange={onMetricChange} readOnlyMetrics={readOnlyMetrics} currencyRate={isFinance && currency === "USD" && rate ? rate : undefined} />
+      <MetricTable
+        metrics={metrics}
+        onMetricChange={onMetricChange}
+        readOnlyMetrics={readOnlyMetrics}
+        currencyRate={isFinance && currency === "USD" && rate ? rate : undefined}
+        canEditMetric={(m) => canEdit(m.department)}
+      />
     </div>
   );
 }
