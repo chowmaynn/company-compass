@@ -1,0 +1,19 @@
+{
+  "buildCommand": "npm run build",
+  "outputDirectory": "dist",
+  "framework": "vite",
+  "rewrites": [
+    { "source": "/api/notion/:path*", "destination": "/api/notion" },
+    { "source": "/api/kit/:path*", "destination": "/api/kit" },
+    { "source": "/api/calendly/:path*", "destination": "/api/calendly" },
+    { "source": "/api/close/:path*", "destination": "/api/close" },
+    { "source": "/api/circle/:path*", "destination": "/api/circle" },
+    { "source": "/api/airtable/:path*", "destination": "/api/airtable" },
+    { "source": "/api/tally/:path*", "destination": "/api/tally" },
+    { "source": "/api/intercom/:path*", "destination": "/api/intercom" },
+    { "source": "/api/stripe/:path*", "destination": "/api/stripe" },
+    { "source": "/api/supabase/:path*", "destination": "/api/supabase" },
+    { "source": "/api/ga4/:path*", "destination": "/api/ga4" },
+    { "source": "/((?!api/).*)", "destination": "/index.html" }
+  ]
+}

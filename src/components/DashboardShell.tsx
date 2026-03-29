@@ -1,4 +1,4 @@
-import { Loader2, AlertCircle } from "lucide-react";
+import { AlertCircle } from "lucide-react";
 
 export interface DashboardShellProps {
   loading: boolean;
@@ -9,8 +9,7 @@ export interface DashboardShellProps {
 
 /**
  * Shared wrapper for dashboard pages. Always renders children (skeleton-first).
- * Shows a subtle loading indicator inline, not blocking the UI.
- * Only blocks on error.
+ * Applies a subtle shimmer overlay when loading. Only blocks on error.
  */
 export function DashboardShell({
   loading,
@@ -27,13 +26,7 @@ export function DashboardShell({
   }
 
   return (
-    <div className="relative">
-      {loading && (
-        <div className="absolute top-0 right-0 z-10 flex items-center gap-1.5 text-muted-foreground bg-card/80 backdrop-blur-sm rounded-md px-2 py-1">
-          <Loader2 className="h-3.5 w-3.5 animate-spin" />
-          <span className="text-xs">Loading...</span>
-        </div>
-      )}
+    <div className={`relative ${loading ? "dashboard-loading" : ""}`}>
       {children}
     </div>
   );

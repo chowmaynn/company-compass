@@ -63,7 +63,9 @@ export function MetricTable({ metrics, onMetricChange, readOnlyMetrics, currency
           </tr>
         </thead>
         <tbody>
-          {metrics.map((metric, i) => (
+          {metrics.map((metric, i) => {
+            const isReadOnly = readOnlyMetrics?.has(metric.name) || (canEditMetric && !canEditMetric(metric));
+            return (
             <tr key={metric.name} className={`border-b border-border/50 transition-colors hover:bg-muted/30 ${i % 2 === 0 ? "" : "bg-muted/10"}`}>
               <td className="sticky left-0 z-10 bg-card/95 backdrop-blur-sm px-4 py-3 font-medium text-foreground border-r border-border/50">
                 <div className="flex items-center gap-2">
@@ -83,7 +85,6 @@ export function MetricTable({ metrics, onMetricChange, readOnlyMetrics, currency
                 </div>
               </td>
               {metric.weeks.map((w, wi) => {
-                const isReadOnly = readOnlyMetrics?.has(metric.name) || (canEditMetric && !canEditMetric(metric));
                 return (
                   <React.Fragment key={wi}>
                     <td className="px-1 py-2 text-right min-w-[70px]">
@@ -136,7 +137,8 @@ export function MetricTable({ metrics, onMetricChange, readOnlyMetrics, currency
                 {metric.owner}
               </td>
             </tr>
-          ))}
+          );
+          })}
         </tbody>
       </table>
     </div>
