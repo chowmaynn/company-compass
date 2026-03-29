@@ -8,11 +8,6 @@ import {
   AlertTriangle,
   XCircle,
 } from "lucide-react";
-import {
-  Sidebar,
-  SidebarContent,
-  useSidebar,
-} from "@/components/ui/sidebar";
 import { useSelectedMonth } from "@/components/AppLayout";
 import { useScorecard } from "@/hooks/use-scorecard";
 import type { StatusFilter } from "@/components/SummaryCards";
@@ -29,32 +24,30 @@ const slugToDept: Record<string, string> = {
 };
 
 const statusCards = [
-  { filter: "ahead" as StatusFilter, icon: TrendingUp, color: "text-status-light-green", bg: "bg-status-light-green/10", dot: "bg-status-light-green", label: "Ahead", statusKey: "light-green" },
-  { filter: "onTrack" as StatusFilter, icon: CheckCircle2, color: "text-status-green", bg: "bg-status-green/10", dot: "bg-status-green", label: "On Track", statusKey: "green" },
-  { filter: "behind" as StatusFilter, icon: AlertTriangle, color: "text-status-yellow", bg: "bg-status-yellow/10", dot: "bg-status-yellow", label: "Behind", statusKey: "yellow" },
-  { filter: "offTrack" as StatusFilter, icon: XCircle, color: "text-status-red", bg: "bg-status-red/10", dot: "bg-status-red", label: "Off Track", statusKey: "red" },
+  { filter: "ahead" as StatusFilter, icon: TrendingUp, color: "text-status-light-green", bg: "bg-status-light-green/15", dot: "bg-status-light-green", label: "Ahead", statusKey: "light-green" },
+  { filter: "onTrack" as StatusFilter, icon: CheckCircle2, color: "text-status-green", bg: "bg-status-green/15", dot: "bg-status-green", label: "On Track", statusKey: "green" },
+  { filter: "behind" as StatusFilter, icon: AlertTriangle, color: "text-status-yellow", bg: "bg-status-yellow/15", dot: "bg-status-yellow", label: "Behind", statusKey: "yellow" },
+  { filter: "offTrack" as StatusFilter, icon: XCircle, color: "text-status-red", bg: "bg-status-red/15", dot: "bg-status-red", label: "Off Track", statusKey: "red" },
 ];
 
 export function AppSidebar() {
-  const { state } = useSidebar();
-  const collapsed = state === "collapsed";
   const { selectedMonth } = useSelectedMonth();
   const { metrics } = useScorecard(selectedMonth);
   const location = useLocation();
   const [openFilter, setOpenFilter] = useState<StatusFilter | null>(null);
-  const containerRef = useRef<HTMLDivElement>(null);
+  const railRef = useRef<HTMLDivElement>(null);
   const buttonRefs = useRef<Record<string, HTMLButtonElement | null>>({});
+  const [panelTop, setPanelTop] = useState(200);
 
   // Close on route change
   useEffect(() => { setOpenFilter(null); }, [location.pathname]);
 
-  // Close on outside click (check both sidebar and the fixed dropdown panel)
+  // Close on outside click
   useEffect(() => {
     if (!openFilter) return;
     const handler = (e: MouseEvent) => {
       const target = e.target as Node;
-      if (containerRef.current?.contains(target)) return;
-      // Check if click is inside the fixed dropdown panel
+      if (railRef.current?.contains(target)) return;
       const panel = document.querySelector("[data-status-panel]");
       if (panel?.contains(target)) return;
       setOpenFilter(null);
@@ -89,112 +82,109 @@ export function AppSidebar() {
     return [];
   }, [openFilter, filtered]);
 
+  const isDashboard = location.pathname === "/";
+  const isScorecard = location.pathname === "/scorecard";
+
   return (
-    <Sidebar collapsible="icon" className="border-r border-border bg-card">
-      <SidebarContent>
-        {/* Logo */}
-        <Link to="/" className="block px-4 h-[56px] flex items-center border-b border-border hover:bg-muted/50 transition-colors">
-          {!collapsed ? (
-            <div className="flex items-center gap-2.5">
-              <div className="rounded-lg bg-primary p-1.5">
-                <Compass className="h-5 w-5 text-white" />
-              </div>
-              <h1 className="text-sm font-bold tracking-tight text-foreground">Dashboard</h1>
-            </div>
-          ) : (
-            <div className="flex justify-center w-full">
-              <div className="rounded-md bg-primary p-1">
-                <Compass className="h-4 w-4 text-white" />
-              </div>
-            </div>
-          )}
+    <>
+      {/* Floating glass rail */}
+      <div
+        ref={railRef}
+        className="fixed left-4 top-1/2 -translate-y-1/2 z-30 flex flex-col items-center gap-1 rounded-2xl p-2 bg-white/[0.06] backdrop-blur-xl ring-1 ring-white/[0.12] shadow-[0_8px_32px_-4px_rgba(0,0,0,0.4)]"
+      >
+        {/* Dashboard */}
+        <Link
+          to="/"
+          className={`flex items-center justify-center h-10 w-10 rounded-xl transition-all ${
+            isDashboard ? "bg-primary text-white shadow-md" : "text-muted-foreground hover:text-foreground hover:bg-white/10"
+          }`}
+          title="Dashboard"
+        >
+          <Compass className="h-5 w-5" />
         </Link>
 
-        {/* Scorecard link */}
+        {/* Scorecard */}
         <Link
           to="/scorecard"
-          className={`mx-2 mt-2 flex items-center gap-2.5 px-3 py-2 rounded-lg text-sm transition-colors ${
-            location.pathname === "/scorecard"
-              ? "bg-primary/10 text-primary font-medium"
-              : "text-muted-foreground hover:bg-muted hover:text-foreground"
+          className={`flex items-center justify-center h-10 w-10 rounded-xl transition-all ${
+            isScorecard ? "bg-primary text-white shadow-md" : "text-muted-foreground hover:text-foreground hover:bg-white/10"
           }`}
+          title="Scorecard"
         >
-          <ClipboardList className="h-4 w-4 shrink-0" />
-          {!collapsed && <span>Scorecard</span>}
+          <ClipboardList className="h-5 w-5" />
         </Link>
 
-        {/* Status metrics */}
-        <div className="flex-1 flex flex-col gap-1 p-2 pt-4" ref={containerRef}>
-          {statusCards.map((c) => {
-            const count = counts[c.filter === "onTrack" ? "onTrack" : c.filter === "offTrack" ? "offTrack" : c.filter];
-            const isActive = openFilter === c.filter;
+        {/* Divider */}
+        <div className="w-6 h-px bg-white/10 my-1" />
 
-            return (
-              <div key={c.filter}>
-                <button
-                  ref={(el) => { buttonRefs.current[c.filter] = el; }}
-                  onClick={() => setOpenFilter(isActive ? null : c.filter)}
-                  className={`w-full flex flex-col items-center justify-center rounded-xl py-3 px-2 transition-all cursor-pointer ${c.bg} ${
-                    isActive ? "ring-2 ring-offset-1 ring-offset-background ring-current" : "hover:scale-[1.03]"
-                  } ${c.color}`}
-                >
-                  <span className="text-2xl font-bold">{count}</span>
-                  {!collapsed && (
-                    <span className="text-[9px] font-medium uppercase tracking-wider mt-0.5 text-muted-foreground">{c.label}</span>
-                  )}
-                </button>
-              </div>
-            );
-          })}
+        {/* Status metric buttons */}
+        {statusCards.map((c) => {
+          const count = counts[c.filter === "onTrack" ? "onTrack" : c.filter === "offTrack" ? "offTrack" : c.filter];
+          const isActive = openFilter === c.filter;
 
-          {/* Dropdown panel — fixed position, escapes sidebar overflow */}
-          {openFilter && activeCard && (() => {
-            const btn = buttonRefs.current[openFilter];
-            const rect = btn?.getBoundingClientRect();
-            const top = rect ? rect.top : 120;
-            return (
-              <div
-                data-status-panel
-                className="fixed w-[550px] max-h-[400px] bg-card rounded-xl border shadow-2xl flex flex-col overflow-hidden z-[100]"
-                style={{
-                  top: `${top}px`,
-                  left: `calc(var(--sidebar-width) + 0.75rem)`,
-                  animation: "dropDown 150ms ease-out",
-                }}
-              >
-              <div className="flex items-center justify-between px-4 py-3 border-b border-border bg-muted/30">
-                <div className="flex items-center gap-2">
-                  <span className={`h-2 w-2 rounded-full ${activeCard.dot}`} />
-                  <span className={`text-sm font-semibold ${activeCard.color}`}>{activeCard.label}</span>
-                  <span className="text-xs text-muted-foreground bg-muted px-2 py-0.5 rounded-full">
-                    {dropdownMetrics.length} KPI{dropdownMetrics.length !== 1 ? "s" : ""}
-                  </span>
-                </div>
-              </div>
-              <div className="grid grid-cols-[1fr_90px_80px_70px] gap-2 px-4 py-2 bg-muted/20 border-b border-border text-[10px] font-semibold text-muted-foreground uppercase tracking-wider">
-                <span>KPI</span>
-                <span className="text-right">Actual</span>
-                <span className="text-right">Target</span>
-                <span className="text-center">Owner</span>
-              </div>
-              <div className="overflow-y-auto flex-1">
-                {dropdownMetrics.map((m) => (
-                  <div key={m.name} className="grid grid-cols-[1fr_90px_80px_70px] gap-2 px-4 py-2.5 items-center border-b border-border/30 hover:bg-muted/10 transition-colors last:border-0">
-                    <div className="min-w-0">
-                      <p className="text-sm font-medium text-foreground truncate">{m.name}</p>
-                      {dept ? null : <p className="text-[10px] text-muted-foreground">{m.department}</p>}
-                    </div>
-                    <span className="text-sm font-semibold text-foreground text-right font-mono">{String(m.monthlyActual)}</span>
-                    <span className="text-xs text-muted-foreground text-right font-mono">{String(m.monthlyTarget)}</span>
-                    <span className="text-[10px] text-muted-foreground text-center truncate">{m.owner?.split(" ")[0] || "—"}</span>
-                  </div>
-                ))}
+          return (
+            <button
+              key={c.filter}
+              ref={(el) => { buttonRefs.current[c.filter] = el; }}
+              onClick={() => {
+                if (!isActive) {
+                  const rect = buttonRefs.current[c.filter]?.getBoundingClientRect();
+                  if (rect) setPanelTop(rect.top);
+                }
+                setOpenFilter(isActive ? null : c.filter);
+              }}
+              className={`flex items-center justify-center h-10 w-10 rounded-xl text-sm font-bold transition-all cursor-pointer ${c.color} ${
+                isActive ? `${c.bg} ring-2 ring-current` : "hover:bg-white/10"
+              }`}
+              title={`${c.label}: ${count}`}
+            >
+              {count}
+            </button>
+          );
+        })}
+      </div>
+
+      {/* Dropdown panel — fixed, escapes any clipping */}
+      {openFilter && activeCard && (
+          <div
+            data-status-panel
+            className="fixed w-[550px] max-h-[400px] bg-card rounded-xl border shadow-2xl flex flex-col overflow-hidden z-[100]"
+            style={{
+              top: `${panelTop}px`,
+              left: "5.5rem",
+              animation: "dropDown 150ms ease-out",
+            }}
+          >
+            <div className="flex items-center justify-between px-4 py-3 border-b border-border bg-muted/30">
+              <div className="flex items-center gap-2">
+                <span className={`h-2 w-2 rounded-full ${activeCard.dot}`} />
+                <span className={`text-sm font-semibold ${activeCard.color}`}>{activeCard.label}</span>
+                <span className="text-xs text-muted-foreground bg-muted px-2 py-0.5 rounded-full">
+                  {dropdownMetrics.length} KPI{dropdownMetrics.length !== 1 ? "s" : ""}
+                </span>
               </div>
             </div>
-            );
-          })()}
-        </div>
-      </SidebarContent>
-    </Sidebar>
+            <div className="grid grid-cols-[1fr_90px_80px_70px] gap-2 px-4 py-2 bg-muted/20 border-b border-border text-[10px] font-semibold text-muted-foreground uppercase tracking-wider">
+              <span>KPI</span>
+              <span className="text-right">Actual</span>
+              <span className="text-right">Target</span>
+              <span className="text-center">Owner</span>
+            </div>
+            <div className="overflow-y-auto flex-1">
+              {dropdownMetrics.map((m) => (
+                <div key={m.name} className="grid grid-cols-[1fr_90px_80px_70px] gap-2 px-4 py-2.5 items-center border-b border-border/30 hover:bg-muted/10 transition-colors last:border-0">
+                  <div className="min-w-0">
+                    <p className="text-sm font-medium text-foreground truncate">{m.name}</p>
+                    {dept ? null : <p className="text-[10px] text-muted-foreground">{m.department}</p>}
+                  </div>
+                  <span className="text-sm font-semibold text-foreground text-right font-mono">{String(m.monthlyActual)}</span>
+                  <span className="text-xs text-muted-foreground text-right font-mono">{String(m.monthlyTarget)}</span>
+                  <span className="text-[10px] text-muted-foreground text-center truncate">{m.owner?.split(" ")[0] || "—"}</span>
+                </div>
+              ))}
+            </div>
+          </div>
+      )}
+    </>
   );
 }

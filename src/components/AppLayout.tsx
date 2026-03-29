@@ -1,4 +1,3 @@
-import { SidebarProvider, SidebarTrigger } from "@/components/ui/sidebar";
 import { AppSidebar } from "@/components/AppSidebar";
 import { Outlet, useLocation, Link } from "react-router-dom";
 import { isAuthorized, getAuthUrl, clearTokens } from "@/lib/youtube-auth";
@@ -190,14 +189,10 @@ export function AppLayout() {
     <MonthContext.Provider value={{ selectedMonth, setSelectedMonth }}>
     <CurrencyContext.Provider value={currencyCtx}>
     <StatusModalContext.Provider value={{ activeFilter: statusFilter, setActiveFilter: setStatusFilter }}>
-    <SidebarProvider>
-      <div className="min-h-screen flex w-full bg-background">
+      <div className="min-h-screen bg-background">
         <AppSidebar />
-        <div className="flex-1 flex flex-col min-w-0">
-          <header className="sticky top-0 z-20 h-[56px] flex items-center justify-between border-b border-border bg-background/80 backdrop-blur-xl px-4">
-            <div className="flex items-center gap-3 shrink-0">
-              <SidebarTrigger />
-            </div>
+        <div className="pl-16 flex flex-col min-h-screen">
+          <header className="sticky top-0 z-20 h-[56px] flex items-center justify-between bg-background/80 backdrop-blur-xl px-6">
             <div className="flex-1 flex justify-center">
               <NavLinks />
             </div>
@@ -212,7 +207,6 @@ export function AppLayout() {
           </main>
         </div>
       </div>
-    </SidebarProvider>
     </StatusModalContext.Provider>
     </CurrencyContext.Provider>
     </MonthContext.Provider>
