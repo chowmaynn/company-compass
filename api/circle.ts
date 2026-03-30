@@ -2,12 +2,18 @@ import type { VercelRequest, VercelResponse } from "@vercel/node";
 
 export default async function handler(req: VercelRequest, res: VercelResponse) {
   const proxyPath = ((req.query.__proxy_path as string) || "").replace(/^\//, "");
-  const target = new URL(`https://app.circle.so/api/${proxyPath}`);
-  for (const [k, v] of Object.entries(req.query)) {
-    if (k === "__proxy_path" || k === "path") continue;
-    target.searchParams.set(k, String(v));
+
+  const rawUrl = req.url || "";
+  const qsStart = rawUrl.indexOf("?");
+  let qs = "";
+  if (qsStart >= 0) {
+    const parts = rawUrl.slice(qsStart + 1).split("&").filter(p =>
+      !p.startsWith("__proxy_path=") && !p.startsWith("path=")
+    );
+    qs = parts.join("&");
   }
-  const url = target.toString();
+
+  const url = `https://app.circle.so/api/${proxyPath}${qs ? `?${qs}` : ""}`;
 
   const response = await fetch(url, {
     method: req.method || "GET",
