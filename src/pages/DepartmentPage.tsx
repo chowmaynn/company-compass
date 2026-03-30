@@ -108,16 +108,6 @@ export default function DepartmentPage() {
   return (
     <div className="p-6 max-w-7xl mx-auto space-y-6">
 
-      {/* ── Header ────────────────────────────────────────── */}
-      {!isContent && !isFinance && !isMarketing && (
-        <div>
-          <h1 className="text-2xl font-bold tracking-tight text-foreground">
-            {isFinance ? "Subscriptions" : department}
-          </h1>
-          <p className="text-sm text-muted-foreground mt-0.5">Department metrics & performance</p>
-        </div>
-      )}
-
       {/* ── Tab Toggle ────────────────────────────────────── */}
       {!isMarketing && !isFinance && <div className="flex items-center gap-1 bg-muted rounded-lg p-1 w-fit">
         {(isSales ? salesTabs : isProduct ? productTabs : isContent ? contentTabs : tabs).map((tab) => {
