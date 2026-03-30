@@ -133,13 +133,13 @@ export function AppSidebar() {
                 }
                 setOpenFilter(isActive ? null : c.filter);
               }}
-              className={`flex flex-col items-center justify-center h-14 w-14 rounded-xl text-sm font-bold transition-all cursor-pointer ${c.color} ${
+              className={`flex flex-col items-center justify-center h-10 w-10 rounded-xl text-sm font-bold transition-all cursor-pointer ${c.color} ${
                 isActive ? `${c.bg} ring-2 ring-current` : "hover:bg-white/10"
               }`}
               title={`${c.label}: ${count}`}
             >
               {count}
-              <span className="text-[7px] font-medium opacity-70 leading-none mt-0.5">{c.label}</span>
+              <span className="text-[6px] font-medium opacity-60 leading-none -mt-0.5">{c.label}</span>
             </button>
           );
         })}
