@@ -132,12 +132,9 @@ const API_METRIC_MAP: Record<string, ApiSource> = {
   // Bitly clicks are written to scorecard by the bitly-daily edge function — no live overlay needed
   "Total Bookings":                       { hook: "computed",  field: "totalBookings" },
   "Email Bookings":                       { hook: "computed",  field: "emailBookings" },
-  "Closing Calls Booked":                 { hook: "computed",  field: "totalBookings" },
+  // Closing Calls metrics: manual entry (Close CRM API data available on Sales page)
   "Website Booking Rate":                 { hook: "computed",  field: "websiteBookingRate" },
   "Skool Booking Rate":                   { hook: "computed",  field: "skoolBookingRate" },
-  "Closing Call Show Rate":               { hook: "close",     field: "showRate" },
-  "Closing Calls Taken":                  { hook: "close",     field: "callsAnswered" },
-  "Closing Call Close Rate":              { hook: "close",     field: "winRate" },
   // Customer support complaints: manual entry (Intercom has no clean "complaint" classification)
   "NPS Score - 2 months":                 { hook: "tally",     field: "2 months" },
   "NPS Score - 6 Months":                 { hook: "tally",     field: "6 Months" },
