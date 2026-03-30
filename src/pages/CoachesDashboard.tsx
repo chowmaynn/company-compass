@@ -33,7 +33,7 @@ const COACH_PALETTE = [
   { bg: "bg-rose-100", text: "text-rose-700", dot: "bg-rose-500", hex: "#f43f5e" },
   { bg: "bg-teal-100", text: "text-teal-700", dot: "bg-teal-500", hex: "#14b8a6" },
   { bg: "bg-indigo-100", text: "text-indigo-700", dot: "bg-indigo-500", hex: "#6366f1" },
-  { bg: "bg-amber-100", text: "text-amber-700", dot: "bg-amber-500", hex: "#f59e0b" },
+  { bg: "bg-amber-100 dark:bg-amber-900/40", text: "text-amber-700 dark:text-amber-300", dot: "bg-amber-500", hex: "#f59e0b" },
 ];
 
 function coachColour(name: string) {
@@ -94,7 +94,7 @@ function SectionHeader({ icon: Icon, title, sub }: { icon: React.ElementType; ti
 // ── SLA helpers ───────────────────────────────────────────────
 
 function slaColour(mins?: number, status?: string) {
-  if (status !== "Complete") return { border: "border-amber-300", badge: "bg-amber-100 text-amber-700" };
+  if (status !== "Complete") return { border: "border-amber-300 dark:border-amber-700", badge: "bg-amber-100 text-amber-700 dark:bg-amber-900/50 dark:text-amber-300" };
   if (!mins) return { border: "border-border", badge: "bg-gray-100 text-gray-600" };
   if (mins < 240) return { border: "border-emerald-300", badge: "bg-emerald-100 text-emerald-700" };
   if (mins < 720) return { border: "border-emerald-300", badge: "bg-emerald-100 text-emerald-700" };
@@ -308,7 +308,7 @@ export default function CoachesDashboard() {
                   const isDevHelp = (f["Help Subject"] ?? "").toLowerCase().includes("dev");
 
                   return (
-                    <div key={p.id} className={`rounded-lg border p-3 ${colours.border} ${isPending ? "bg-amber-50/40" : "bg-card"}`}>
+                    <div key={p.id} className={`rounded-lg border p-3 ${colours.border} ${isPending ? "bg-amber-50/40 dark:bg-amber-950/30" : "bg-card"}`}>
                       <div className="flex items-start justify-between gap-2">
                         <div className="flex items-start gap-2 min-w-0">
                           <span className={`inline-flex items-center px-1.5 py-0.5 rounded text-[9px] font-semibold uppercase tracking-wide shrink-0 ${isDevHelp ? "bg-purple-100 text-purple-700" : "bg-blue-100 text-blue-700"}`}>
@@ -321,7 +321,7 @@ export default function CoachesDashboard() {
                         </div>
                         <div className="flex items-center gap-1.5 shrink-0">
                           {isPending ? (
-                            <span className="inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-medium bg-amber-100 text-amber-700">Pending</span>
+                            <span className="inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-medium bg-amber-100 text-amber-700 dark:bg-amber-900/50 dark:text-amber-300">Pending</span>
                           ) : (
                             <span className="inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-medium bg-emerald-100 text-emerald-700">Complete</span>
                           )}
@@ -338,7 +338,7 @@ export default function CoachesDashboard() {
                           {coach ? (
                             <span className={`font-medium ${coachColour(coach).text}`}>{coach}</span>
                           ) : (
-                            <span className="text-amber-600 font-medium">Pending</span>
+                            <span className="text-amber-600 dark:text-amber-400 font-medium">Pending</span>
                           )}
                         </span>
                         <span className={`font-medium ${colours.badge.replace("bg-", "text-").replace("-100", "-700")}`}>
