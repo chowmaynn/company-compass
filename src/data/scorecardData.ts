@@ -32,7 +32,7 @@ export const weekConfigs: WeekConfig[] = [
   { label: "W1", dateLabel: "02/03", start: "2026-03-01T11:00:00Z", end: "2026-03-08T11:00:00Z" },
   { label: "W2", dateLabel: "09/03", start: "2026-03-08T11:00:00Z", end: "2026-03-15T11:00:00Z" },
   { label: "W3", dateLabel: "16/03", start: "2026-03-15T11:00:00Z", end: "2026-03-22T11:00:00Z" },
-  { label: "W4", dateLabel: "23/03", start: "2026-03-22T11:00:00Z", end: "2026-03-29T11:00:00Z" },
+  { label: "W4", dateLabel: "23/03", start: "2026-03-22T11:00:00Z", end: "2026-04-01T11:00:00Z" },
 ];
 
 export const scorecardMonth = "March 2026";
