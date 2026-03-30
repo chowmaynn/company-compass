@@ -134,6 +134,7 @@ const API_METRIC_MAP: Record<string, ApiSource> = {
   "Email Bookings":                       { hook: "computed",  field: "emailBookings" },
   "Closing Calls Booked":                 { hook: "computed",  field: "totalBookings" },
   "Website Booking Rate":                 { hook: "computed",  field: "websiteBookingRate" },
+  "Skool Booking Rate":                   { hook: "computed",  field: "skoolBookingRate" },
   "Closing Call Show Rate":               { hook: "close",     field: "showRate" },
   "Closing Calls Taken":                  { hook: "close",     field: "callsAnswered" },
   "Closing Call Close Rate":              { hook: "close",     field: "winRate" },
@@ -156,6 +157,7 @@ function resolveApiValue(
     salesMetrics: ReturnType<typeof useSupabaseMetrics>;
     intercom: ReturnType<typeof useIntercom>;
     tallyNps: ReturnType<typeof useTallyNps>;
+    currentMetrics: Metric[];
   }
 ): number | string | "—" {
   switch (source.hook) {
@@ -235,6 +237,21 @@ function resolveApiValue(
         const bookings = sumWeekBookings(["AAA Accelerator Business Call (Website)"]);
         if (bookings > 0) {
           return `${((bookings / views) * 100).toFixed(2)}%`;
+        }
+      }
+
+      if (source.field === "skoolBookingRate") {
+        const sjMetric = apis.currentMetrics.find((m) => m.name === "Skool Joins");
+        const raw = sjMetric?.weeks[weekIndex]?.actual;
+        const skoolJoins = typeof raw === "number" ? raw : Number(String(raw).replace(/,/g, ""));
+        if (!skoolJoins || isNaN(skoolJoins) || skoolJoins <= 0) return "—";
+        const skoolBookings = sumWeekBookings([
+          "AAA Accelerator Business Call (Skool A)",
+          "AAA Accelerator Business Call (Skool C)",
+          "AAA Accelerator Business Call (Skool P)",
+        ]);
+        if (skoolBookings > 0) {
+          return `${((skoolBookings / skoolJoins) * 100).toFixed(2)}%`;
         }
       }
 
@@ -325,7 +342,7 @@ export function useScorecard(month: string = DEFAULT_MONTH) {
       let updated = m;
 
       if (source) {
-        const apiVal = resolveApiValue(source, cwi, { kit, notion, ga, close, intercom, tallyNps, salesMetrics });
+        const apiVal = resolveApiValue(source, cwi, { kit, notion, ga, close, intercom, tallyNps, salesMetrics, currentMetrics: supabaseMetrics });
         if (apiVal !== "—") {
           updated = { ...m, weeks: [...m.weeks] };
           updated.weeks[cwi] = { ...updated.weeks[cwi], actual: apiVal };
