@@ -135,9 +135,7 @@ const API_METRIC_MAP: Record<string, ApiSource> = {
   // Closing Calls metrics: manual entry (Close CRM API data available on Sales page)
   "Website Booking Rate":                 { hook: "computed",  field: "websiteBookingRate" },
   "Skool Booking Rate":                   { hook: "computed",  field: "skoolBookingRate" },
-  // Customer support complaints: manual entry (Intercom has no clean "complaint" classification)
-  "NPS Score - 2 months":                 { hook: "tally",     field: "2 months" },
-  "NPS Score - 6 Months":                 { hook: "tally",     field: "6 Months" },
+  // Customer support complaints, NPS: manual entry
 };
 
 /** Set of metric names that are API-sourced (read-only for current week) */
