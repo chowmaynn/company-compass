@@ -146,6 +146,7 @@ export default function SuccessTrackingDashboard() {
           icon={DollarSign}
           accent="text-emerald-600"
           gradient="bg-emerald-50/80"
+          loading={loading}
         />
         <StatCard
           label="Total Approved Wins"
@@ -153,6 +154,7 @@ export default function SuccessTrackingDashboard() {
           sub="CSM verified"
           icon={Trophy}
           accent="text-indigo-600"
+          loading={loading}
         />
         <StatCard
           label="Avg Revenue per Win"
@@ -160,6 +162,7 @@ export default function SuccessTrackingDashboard() {
           sub="Monetary wins only"
           icon={TrendingUp}
           accent="text-foreground"
+          loading={loading}
         />
         <StatCard
           label="Members Generating Revenue"
@@ -167,6 +170,7 @@ export default function SuccessTrackingDashboard() {
           sub={`Median: ${fmtRevenue(medianRevenue)}/win`}
           icon={Users}
           accent="text-foreground"
+          loading={loading}
         />
       </div>
 

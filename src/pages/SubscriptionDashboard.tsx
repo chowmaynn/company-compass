@@ -242,6 +242,7 @@ export default function SubscriptionDashboard() {
           sub="Currently in dunning"
           icon={AlertTriangle}
           accent="text-amber-500"
+          loading={loading}
         />
         <StatCard
           label="Cancellation Requests"
@@ -249,6 +250,7 @@ export default function SubscriptionDashboard() {
           sub={`${pendingCancellations} pending review`}
           icon={XCircle}
           accent="text-red-500"
+          loading={loading}
         />
         <StatCard
           label="New Customers"
@@ -256,6 +258,7 @@ export default function SubscriptionDashboard() {
           sub="Selected period"
           icon={CreditCard}
           accent="text-blue-500"
+          loading={stripeLoading}
         />
       </div>
 

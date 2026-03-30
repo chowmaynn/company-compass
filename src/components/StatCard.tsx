@@ -14,6 +14,8 @@ export interface StatCardProps {
   gradient?: string;
   /** Optional trend badge */
   trend?: { value: string; up: boolean };
+  /** Show pulsing placeholder instead of value */
+  loading?: boolean;
 }
 
 export function StatCard({
@@ -25,6 +27,7 @@ export function StatCard({
   bg,
   gradient,
   trend,
+  loading,
 }: StatCardProps) {
   const textColor = accent ?? "text-foreground";
 
@@ -41,7 +44,7 @@ export function StatCard({
               {label}
             </p>
             <p className={`text-3xl font-bold tracking-tight ${textColor}`}>
-              {value}
+              {loading ? <span className="text-muted-foreground animate-pulse">...</span> : value}
             </p>
             {sub && (
               <p

@@ -232,9 +232,9 @@ export default function CoachesDashboard() {
     <div className="p-6 space-y-6 max-w-[1440px] mx-auto">
       {/* ── Stats bar ────────────────────────────────────── */}
       <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-        <StatCard label="Total Calls Today" value={totalToday} icon={CalendarDays} />
-        <StatCard label="Completed Today" value={completedToday} accent="text-emerald-600" icon={CheckCircle2} />
-        <StatCard label="Upcoming Today" value={upcomingToday} accent="text-blue-600" icon={Clock} />
+        <StatCard label="Total Calls Today" value={totalToday} icon={CalendarDays} loading={loading} />
+        <StatCard label="Completed Today" value={completedToday} accent="text-emerald-600" icon={CheckCircle2} loading={loading} />
+        <StatCard label="Upcoming Today" value={upcomingToday} accent="text-blue-600" icon={Clock} loading={loading} />
         <StatCard
           label="Avg Circle Response"
           value={avgResponseTime !== null ? `${avgResponseTime}m` : "—"}
@@ -246,6 +246,7 @@ export default function CoachesDashboard() {
               : "text-red-600"
           }
           icon={Users}
+          loading={loading}
         />
       </div>
 
