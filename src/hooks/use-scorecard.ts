@@ -322,7 +322,7 @@ export function useScorecard(month: string = DEFAULT_MONTH) {
     };
 
     // Metrics that should show average instead of sum
-    const averagedMetrics = new Set(["Videos in the backlog", "Skool Booking Rate", "Closing Call Show Rate", "Closing Call Close Rate"]);
+    const averagedMetrics = new Set(["Videos in the backlog", "Skool Booking Rate", "Closing Call Show Rate", "Closing Call Close Rate", "NPS Score - 2 months", "NPS Score - 6 Months"]);
     // Metrics where monthly is computed from totals (not averaged weekly percentages)
     const ratioMetrics = new Set(["Website Booking Rate"]);
     // Metrics where monthly is manually entered (don't auto-calculate)
