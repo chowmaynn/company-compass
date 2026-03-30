@@ -32,6 +32,10 @@ export function parseNumeric(val: number | string): number | null {
   const num = parseFloat(cleaned);
   if (!isNaN(num) && /^[\d]+(\.\d+)?$/.test(cleaned)) return num;
 
+  // Handle "X per week", "X / wk", "X/wk" patterns
+  const perMatch = s.match(/^([\d.]+)\s*(?:\/\s*wk|per\s*week|\/\s*week)/i);
+  if (perMatch) return parseFloat(perMatch[1]);
+
   return null;
 }
 
