@@ -90,7 +90,7 @@ export function AppSidebar() {
       {/* Floating glass rail */}
       <div
         ref={railRef}
-        className="fixed left-4 top-1/2 -translate-y-1/2 z-30 flex flex-col items-center gap-1 rounded-2xl p-2 bg-white/[0.06] backdrop-blur-xl ring-1 ring-white/[0.12] shadow-[0_8px_32px_-4px_rgba(0,0,0,0.4)]"
+        className="fixed left-4 top-1/2 -translate-y-1/2 z-30 flex flex-col items-center gap-1 rounded-2xl p-2 bg-white/[0.04] backdrop-blur-2xl ring-1 ring-white/[0.15] shadow-[0_8px_40px_-4px_rgba(0,0,0,0.5),inset_0_1px_0_0_rgba(255,255,255,0.08)]"
       >
         {/* Dashboard */}
         <Link
