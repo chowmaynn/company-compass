@@ -3,11 +3,12 @@ import type { VercelRequest, VercelResponse } from "@vercel/node";
 export default async function handler(req: VercelRequest, res: VercelResponse) {
   const proxyPath = ((req.query.__proxy_path as string) || "").replace(/^\//, "");
   // Filter out rewrite-injected params
-  const qs = Object.entries(req.query)
-    .filter(([k]) => k !== "__proxy_path" && k !== "path")
-    .map(([k, v]) => `${k}=${String(v)}`)
-    .join("&");
-  const url = `https://unelmbldddpwzguttluq.supabase.co/${proxyPath}${qs ? `?${qs}` : ""}`;
+  const target = new URL(`https://unelmbldddpwzguttluq.supabase.co/${proxyPath}`);
+  for (const [k, v] of Object.entries(req.query)) {
+    if (k === "__proxy_path" || k === "path") continue;
+    target.searchParams.set(k, String(v));
+  }
+  const url = target.toString();
 
   const response = await fetch(url, {
     method: req.method || "GET",
