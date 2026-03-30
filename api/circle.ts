@@ -3,7 +3,7 @@ import type { VercelRequest, VercelResponse } from "@vercel/node";
 export default async function handler(req: VercelRequest, res: VercelResponse) {
   const proxyPath = ((req.query.__proxy_path as string) || "").replace(/^\//, "");
   const qs = Object.entries(req.query)
-    .filter(([k]) => k !== "__proxy_path")
+    .filter(([k]) => k !== "__proxy_path" && k !== "path")
     .map(([k, v]) => `${k}=${encodeURIComponent(String(v))}`)
     .join("&");
   const url = `https://app.circle.so/api/${proxyPath}${qs ? `?${qs}` : ""}`;
