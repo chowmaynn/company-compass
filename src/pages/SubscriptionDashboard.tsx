@@ -116,7 +116,7 @@ export default function SubscriptionDashboard() {
           <div className="flex-1 p-5 lg:border-r border-white/[0.06]">
             <p className="text-xs text-muted-foreground font-medium mb-1">Gross Volume</p>
             <p className="text-2xl font-bold text-foreground">
-              {s ? `${cfmt(s.grossVolume)}` : "—"}
+              {s ? `${cfmt(s.grossVolume)}` : stripeLoading ? <span className="text-muted-foreground animate-pulse">Loading...</span> : "—"}
             </p>
             <p className="text-xs text-muted-foreground mt-1">via Stripe / Payfunnels</p>
             {s && s.dailyVolume.length > 1 && (
@@ -141,7 +141,7 @@ export default function SubscriptionDashboard() {
           <div className="flex-1 p-5 border-t lg:border-t-0 lg:border-r border-white/[0.06]">
             <p className="text-xs text-muted-foreground font-medium mb-1">Net Volume</p>
             <p className="text-2xl font-bold text-foreground">
-              {s ? `${cfmt(s.netVolume)}` : "—"}
+              {s ? `${cfmt(s.netVolume)}` : stripeLoading ? <span className="text-muted-foreground animate-pulse">Loading...</span> : "—"}
             </p>
             <p className="text-xs text-muted-foreground mt-1">after Stripe fees</p>
             {s && s.dailyVolume.length > 1 && (
