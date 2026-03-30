@@ -1,8 +1,12 @@
 import type { VercelRequest, VercelResponse } from "@vercel/node";
 
 export default async function handler(req: VercelRequest, res: VercelResponse) {
-  const path = (req.query.path as string[])?.join("/") || "";
-  const url = `https://api.intercom.io/${path}${req.url?.includes("?") ? req.url.slice(req.url.indexOf("?")) : ""}`;
+  const proxyPath = ((req.query.__proxy_path as string) || "").replace(/^\//, "");
+  const qs = Object.entries(req.query)
+    .filter(([k]) => k !== "__proxy_path")
+    .map(([k, v]) => `${k}=${encodeURIComponent(String(v))}`)
+    .join("&");
+  const url = `https://api.intercom.io/${proxyPath}${qs ? `?${qs}` : ""}`;
 
   const response = await fetch(url, {
     method: req.method || "GET",

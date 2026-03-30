@@ -40,7 +40,7 @@ async function getAccessToken(): Promise<string> {
 export default async function handler(req: VercelRequest, res: VercelResponse) {
   try {
     const token = await getAccessToken();
-    const path = (req.query.path as string[])?.join("/") || "";
+    const path = ((req.query.__proxy_path as string) || "").replace(/^\//, "");
     const url = `https://analyticsdata.googleapis.com/v1beta/${path}`;
 
     const response = await fetch(url, {

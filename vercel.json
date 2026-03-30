@@ -2,23 +2,22 @@
   "buildCommand": "npm run build",
   "outputDirectory": "dist",
   "functions": {
-    "api/**/*.ts": {
+    "api/*.ts": {
       "runtime": "@vercel/node@5.6.22"
     }
   },
-  "routes": [
-    { "src": "/api/kit/(.*)", "dest": "/api/kit/[...path]" },
-    { "src": "/api/notion/(.*)", "dest": "/api/notion/[...path]" },
-    { "src": "/api/calendly/(.*)", "dest": "/api/calendly/[...path]" },
-    { "src": "/api/close/(.*)", "dest": "/api/close/[...path]" },
-    { "src": "/api/circle/(.*)", "dest": "/api/circle/[...path]" },
-    { "src": "/api/airtable/(.*)", "dest": "/api/airtable/[...path]" },
-    { "src": "/api/tally/(.*)", "dest": "/api/tally/[...path]" },
-    { "src": "/api/intercom/(.*)", "dest": "/api/intercom/[...path]" },
-    { "src": "/api/stripe/(.*)", "dest": "/api/stripe/[...path]" },
-    { "src": "/api/supabase/(.*)", "dest": "/api/supabase/[...path]" },
-    { "src": "/api/ga4/(.*)", "dest": "/api/ga4/[...path]" },
-    { "handle": "filesystem" },
-    { "src": "/(.*)", "dest": "/index.html" }
+  "rewrites": [
+    { "source": "/api/kit/:path(.*)", "destination": "/api/kit?__proxy_path=/:path" },
+    { "source": "/api/notion/:path(.*)", "destination": "/api/notion?__proxy_path=/:path" },
+    { "source": "/api/calendly/:path(.*)", "destination": "/api/calendly?__proxy_path=/:path" },
+    { "source": "/api/close/:path(.*)", "destination": "/api/close?__proxy_path=/:path" },
+    { "source": "/api/circle/:path(.*)", "destination": "/api/circle?__proxy_path=/:path" },
+    { "source": "/api/airtable/:path(.*)", "destination": "/api/airtable?__proxy_path=/:path" },
+    { "source": "/api/tally/:path(.*)", "destination": "/api/tally?__proxy_path=/:path" },
+    { "source": "/api/intercom/:path(.*)", "destination": "/api/intercom?__proxy_path=/:path" },
+    { "source": "/api/stripe/:path(.*)", "destination": "/api/stripe?__proxy_path=/:path" },
+    { "source": "/api/supabase/:path(.*)", "destination": "/api/supabase?__proxy_path=/:path" },
+    { "source": "/api/ga4/:path(.*)", "destination": "/api/ga4?__proxy_path=/:path" },
+    { "source": "/((?!api/).*)", "destination": "/index.html" }
   ]
 }
