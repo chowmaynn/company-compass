@@ -130,8 +130,7 @@ const API_METRIC_MAP: Record<string, ApiSource> = {
   "Videos in the backlog":                { hook: "notion",    field: "backlogCount" },
   "Website Views":                        { hook: "ga",        field: "weeklyViews" },
   // Bitly clicks are written to scorecard by the bitly-daily edge function — no live overlay needed
-  "Total Bookings":                       { hook: "computed",  field: "totalBookings" },
-  "Email Bookings":                       { hook: "computed",  field: "emailBookings" },
+  // Total Bookings, Email Bookings: manual entry
   // Closing Calls metrics: manual entry (Close CRM API data available on Sales page)
   "Website Booking Rate":                 { hook: "computed",  field: "websiteBookingRate" },
   "Skool Booking Rate":                   { hook: "computed",  field: "skoolBookingRate" },
