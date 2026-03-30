@@ -162,10 +162,10 @@ function NavLinks() {
           <Link
             key={item.url}
             to={item.url}
-            className={`px-4 py-1.5 rounded-full text-[12px] font-medium whitespace-nowrap transition-all ${
+            className={`rounded-full font-medium whitespace-nowrap transition-all duration-200 ${
               isActive
-                ? "bg-black/10 dark:bg-white/20 text-foreground shadow-sm"
-                : "text-muted-foreground hover:text-foreground"
+                ? "px-5 py-2 text-[18px] bg-black/10 dark:bg-white/20 text-foreground shadow-sm scale-100"
+                : "px-4 py-1.5 text-[12px] text-muted-foreground hover:text-foreground"
             }`}
           >
             {item.title}
