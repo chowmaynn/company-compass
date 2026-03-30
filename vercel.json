@@ -6,7 +6,19 @@
       "runtime": "@vercel/node@5.6.22"
     }
   },
-  "rewrites": [
-    { "source": "/((?!api/).*)", "destination": "/index.html" }
+  "routes": [
+    { "src": "/api/kit/(.*)", "dest": "/api/kit/[...path]" },
+    { "src": "/api/notion/(.*)", "dest": "/api/notion/[...path]" },
+    { "src": "/api/calendly/(.*)", "dest": "/api/calendly/[...path]" },
+    { "src": "/api/close/(.*)", "dest": "/api/close/[...path]" },
+    { "src": "/api/circle/(.*)", "dest": "/api/circle/[...path]" },
+    { "src": "/api/airtable/(.*)", "dest": "/api/airtable/[...path]" },
+    { "src": "/api/tally/(.*)", "dest": "/api/tally/[...path]" },
+    { "src": "/api/intercom/(.*)", "dest": "/api/intercom/[...path]" },
+    { "src": "/api/stripe/(.*)", "dest": "/api/stripe/[...path]" },
+    { "src": "/api/supabase/(.*)", "dest": "/api/supabase/[...path]" },
+    { "src": "/api/ga4/(.*)", "dest": "/api/ga4/[...path]" },
+    { "handle": "filesystem" },
+    { "src": "/(.*)", "dest": "/index.html" }
   ]
 }
