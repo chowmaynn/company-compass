@@ -119,7 +119,7 @@ export default function SubscriptionDashboard() {
               {s ? `${cfmt(s.grossVolume)}` : "—"}
             </p>
             <p className="text-xs text-muted-foreground mt-1">via Stripe / Payfunnels</p>
-            {s && s.dailyVolume.length > 0 && (
+            {s && s.dailyVolume.length > 1 && (
               <div className="mt-4">
                 <ResponsiveContainer width="100%" height={80}>
                   <AreaChart data={s.dailyVolume} margin={{ top: 2, right: 2, left: 0, bottom: 0 }}>
@@ -144,7 +144,7 @@ export default function SubscriptionDashboard() {
               {s ? `${cfmt(s.netVolume)}` : "—"}
             </p>
             <p className="text-xs text-muted-foreground mt-1">after Stripe fees</p>
-            {s && s.dailyVolume.length > 0 && (
+            {s && s.dailyVolume.length > 1 && (
               <div className="mt-4">
                 <ResponsiveContainer width="100%" height={80}>
                   <AreaChart data={s.dailyVolume} margin={{ top: 2, right: 2, left: 0, bottom: 0 }}>

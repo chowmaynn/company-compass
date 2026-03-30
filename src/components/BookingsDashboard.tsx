@@ -67,11 +67,13 @@ export function BookingsDashboard({ from, to, showRate }: {
         <Card className="card-shadow">
           <CardContent className="p-6">
             <p className="text-xs font-semibold text-muted-foreground uppercase tracking-widest mb-5">Daily Trend</p>
-            {isLoading ? (
-              <div className="flex justify-center py-8"><Loader2 className="h-5 w-5 animate-spin text-muted-foreground" /></div>
-            ) : (
+            {(() => {
+              const activeDays = dailyBookings.filter(d => d.bookings > 0 || d.held > 0 || d.qualified > 0);
+              if (isLoading) return <div className="flex justify-center py-8"><Loader2 className="h-5 w-5 animate-spin text-muted-foreground" /></div>;
+              if (activeDays.length < 2) return <p className="text-xs text-muted-foreground py-8 text-center">Not enough data for trend chart</p>;
+              return (
               <ResponsiveContainer width="100%" height={200}>
-                <AreaChart data={dailyBookings}>
+                <AreaChart data={activeDays}>
                   <defs>
                     {(["#3b82f6", "#6366f1", "#10b981"] as const).map((c, i) => (
                       <linearGradient key={i} id={`bg${i}`} x1="0" y1="0" x2="0" y2="1">
@@ -90,7 +92,8 @@ export function BookingsDashboard({ from, to, showRate }: {
                   <Area type="monotone" dataKey="held"      name="Held"      stroke="#10b981" strokeWidth={2} fill="url(#bg2)" dot={false} activeDot={{ r: 4 }} />
                 </AreaChart>
               </ResponsiveContainer>
-            )}
+              );
+            })()}
           </CardContent>
         </Card>
 

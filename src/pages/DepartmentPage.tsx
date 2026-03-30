@@ -15,7 +15,8 @@ import SubscriptionDashboard from "@/pages/SubscriptionDashboard";
 import MarketingDashboard from "@/pages/MarketingDashboard";
 import { CompetitorsDashboard } from "@/components/CompetitorsDashboard";
 import { ContentOverview } from "@/components/ContentOverview";
-import { LayoutDashboard, BarChart3, Users, Shield, Trophy, HeadphonesIcon, DollarSign, Swords, Megaphone } from "lucide-react";
+import { SalesTrackingTable } from "@/components/SalesTrackingTable";
+import { LayoutDashboard, BarChart3, Users, Shield, Trophy, HeadphonesIcon, DollarSign, Swords, Megaphone, ClipboardList, Plug } from "lucide-react";
 
 const slugToDepartment: Record<string, Department> = {
   "subscriptions": "Finance",
@@ -27,7 +28,7 @@ const slugToDepartment: Record<string, Department> = {
   "community-management": "Product",
 };
 
-type Tab = "dashboard" | "charts" | "rep-metrics" | "coaches" | "success" | "support" | "finance" | "competitors" | "marketing";
+type Tab = "dashboard" | "charts" | "rep-metrics" | "coaches" | "success" | "support" | "finance" | "competitors" | "marketing" | "tracking" | "close-api";
 
 const tabs: { id: Tab; label: string; icon: React.ElementType }[] = [
   { id: "dashboard", label: "Overview", icon: LayoutDashboard },
@@ -42,7 +43,8 @@ const productTabs: { id: Tab; label: string; icon: React.ElementType }[] = [
 ];
 
 const salesTabs: { id: Tab; label: string; icon: React.ElementType }[] = [
-  { id: "dashboard",   label: "Dashboard",   icon: LayoutDashboard },
+  { id: "tracking",    label: "Tracking",    icon: ClipboardList },
+  { id: "close-api",   label: "Close API",   icon: Plug },
   { id: "rep-metrics", label: "Rep Metrics", icon: Users },
 ];
 
@@ -64,13 +66,13 @@ export default function DepartmentPage() {
   const department = slug ? slugToDepartment[slug] : undefined;
 
   const [activeTab, setActiveTab] = useState<Tab>(
-    slug === "subscriptions" || slug === "finance" ? "finance" : slug === "marketing" ? "marketing" : "dashboard"
+    slug === "subscriptions" || slug === "finance" ? "finance" : slug === "marketing" ? "marketing" : slug === "sales" ? "tracking" : "dashboard"
   );
   const [metrics, setMetrics] = useState<Metric[]>(initialData);
 
   // Reset tab when navigating between departments
   useEffect(() => {
-    setActiveTab(slug === "subscriptions" || slug === "finance" ? "finance" : slug === "marketing" ? "marketing" : "dashboard");
+    setActiveTab(slug === "subscriptions" || slug === "finance" ? "finance" : slug === "marketing" ? "marketing" : slug === "sales" ? "tracking" : "dashboard");
   }, [slug]);
 
   if (!department) return <Navigate to="/" replace />;
@@ -143,8 +145,6 @@ export default function DepartmentPage() {
       {activeTab === "dashboard" && (
         isProduct ? (
           <ProductDashboard />
-        ) : isSales ? (
-          <SalesDashboard />
         ) : isContent ? (
           <ContentOverview />
         ) : (
@@ -175,6 +175,10 @@ export default function DepartmentPage() {
       {activeTab === "competitors" && <CompetitorsDashboard />}
 
       {activeTab === "marketing" && <MarketingDashboard />}
+
+      {activeTab === "tracking" && <SalesTrackingTable />}
+
+      {activeTab === "close-api" && <SalesDashboard />}
 
     </div>
   );
