@@ -5,7 +5,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
   // Filter out rewrite-injected params
   const qs = Object.entries(req.query)
     .filter(([k]) => k !== "__proxy_path" && k !== "path")
-    .map(([k, v]) => `${k}=${encodeURIComponent(String(v))}`)
+    .map(([k, v]) => `${k}=${String(v)}`)
     .join("&");
   const url = `https://unelmbldddpwzguttluq.supabase.co/${proxyPath}${qs ? `?${qs}` : ""}`;
 
