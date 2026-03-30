@@ -207,6 +207,9 @@ export function AppLayout() {
         <AppSidebar />
         <div className="pl-16 flex flex-col min-h-screen">
           <header className="sticky top-0 z-20 h-[56px] flex items-center justify-between bg-background/80 backdrop-blur-xl px-6">
+            <Link to="/" className="flex items-center gap-2 shrink-0 mr-4 text-foreground hover:text-primary transition-colors" title="Dashboard">
+              <Compass className="h-5 w-5" />
+            </Link>
             <div className="flex-1 flex justify-center">
               <NavLinks />
             </div>

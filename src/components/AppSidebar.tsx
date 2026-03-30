@@ -1,7 +1,6 @@
 import { useState, useEffect, useRef, useMemo } from "react";
 import { useLocation, Link } from "react-router-dom";
 import {
-  Compass,
   ClipboardList,
   TrendingUp,
   CheckCircle2,
@@ -82,7 +81,6 @@ export function AppSidebar() {
     return [];
   }, [openFilter, filtered]);
 
-  const isDashboard = location.pathname === "/";
   const isScorecard = location.pathname === "/scorecard";
 
   return (
@@ -92,17 +90,6 @@ export function AppSidebar() {
         ref={railRef}
         className="fixed left-4 top-1/2 -translate-y-1/2 z-30 flex flex-col items-center gap-1 rounded-2xl p-2 bg-white/[0.04] backdrop-blur-2xl ring-1 ring-white/[0.15] shadow-[0_8px_40px_-4px_rgba(0,0,0,0.5),inset_0_1px_0_0_rgba(255,255,255,0.08)]"
       >
-        {/* Dashboard */}
-        <Link
-          to="/"
-          className={`flex items-center justify-center h-10 w-10 rounded-xl transition-all ${
-            isDashboard ? "bg-primary text-white shadow-md" : "text-muted-foreground hover:text-foreground hover:bg-white/10"
-          }`}
-          title="Dashboard"
-        >
-          <Compass className="h-5 w-5" />
-        </Link>
-
         {/* Scorecard */}
         <Link
           to="/scorecard"
