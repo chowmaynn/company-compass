@@ -15,7 +15,7 @@ import SubscriptionDashboard from "@/pages/SubscriptionDashboard";
 import MarketingDashboard from "@/pages/MarketingDashboard";
 import { CompetitorsDashboard } from "@/components/CompetitorsDashboard";
 import { ContentOverview } from "@/components/ContentOverview";
-import { SalesTrackingTable } from "@/components/SalesTrackingTable";
+import { SalesTrackingPage } from "@/components/SalesTrackingPage";
 import { LayoutDashboard, BarChart3, Users, Shield, Trophy, HeadphonesIcon, DollarSign, Swords, Megaphone, ClipboardList, Plug } from "lucide-react";
 
 const slugToDepartment: Record<string, Department> = {
@@ -166,7 +166,7 @@ export default function DepartmentPage() {
 
       {activeTab === "marketing" && <MarketingDashboard />}
 
-      {activeTab === "tracking" && <SalesTrackingTable />}
+      {activeTab === "tracking" && <SalesTrackingPage />}
 
       {activeTab === "close-api" && <SalesDashboard />}
 

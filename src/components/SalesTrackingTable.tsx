@@ -3,7 +3,7 @@ import { ChevronDown, ChevronRight, Loader2 } from "lucide-react";
 import { Card, CardContent } from "@/components/ui/card";
 import { EditableCell } from "@/components/EditableCell";
 import { useAuth } from "@/hooks/use-auth";
-import { useSalesTracking, type WeeklyRepData, type WeekMetrics } from "@/hooks/use-sales-tracking";
+import type { WeeklyRepData, WeekMetrics } from "@/hooks/use-sales-tracking";
 import type { SalesMetricField, SalesTrackingRow } from "@/lib/supabase-sales";
 import { formatValue, fmtCurrency } from "@/lib/formatNumber";
 
@@ -36,16 +36,28 @@ function formatMonth(m: string): string {
   return `${names[parseInt(mo) - 1]} ${y}`;
 }
 
-export function SalesTrackingTable() {
+interface SalesTrackingTableProps {
+  month: string;
+  setMonth: (m: string) => void;
+  reps: WeeklyRepData[];
+  teamTotals: WeeklyRepData;
+  isLoading: boolean;
+  availableMonths: string[];
+  updateCell: (repName: string, date: string, field: SalesMetricField, value: number) => Promise<boolean>;
+  upsertTodayCell: (repName: string, field: SalesMetricField, value: number) => Promise<boolean>;
+  isTodayInMonth: boolean;
+  getTodayRow: (repName: string) => any;
+  todayDate: string;
+}
+
+export function SalesTrackingTable({
+  month, setMonth, reps, teamTotals, isLoading, availableMonths,
+  updateCell, upsertTodayCell, isTodayInMonth, getTodayRow, todayDate,
+}: SalesTrackingTableProps) {
   const { canEdit } = useAuth();
   const editable = canEdit("Sales");
 
-  // Default to current month
-  const defaultMonth = `${new Date().getFullYear()}-${String(new Date().getMonth() + 1).padStart(2, "0")}`;
-  const [month, setMonth] = useState(defaultMonth);
   const [expandedReps, setExpandedReps] = useState<Set<string>>(new Set());
-
-  const { reps, teamTotals, isLoading, availableMonths, updateCell, upsertTodayCell, isTodayInMonth, getTodayRow, todayDate } = useSalesTracking(month);
 
   const toggleRep = (name: string) => {
     setExpandedReps((prev) => {
@@ -68,8 +80,8 @@ export function SalesTrackingTable() {
 
   const months = useMemo(() => {
     if (availableMonths.length > 0) return availableMonths;
-    return [defaultMonth];
-  }, [availableMonths, defaultMonth]);
+    return [month];
+  }, [availableMonths, month]);
 
   return (
     <Card>
