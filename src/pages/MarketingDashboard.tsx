@@ -43,6 +43,8 @@ const SOURCE_COLORS: Record<string, string> = {
   Email:            "#6366f1",
   "Welcome Email":  "#8b5cf6",
   Website:          "#06b6d4",
+  "Website B":      "#0891b2",
+  "Website C":      "#0e7490",
   "Skool A":        "#10b981",
   "Skool C":        "#34d399",
   "Skool P":        "#6ee7b7",
@@ -221,7 +223,7 @@ export default function MarketingDashboard() {
                       <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--border))" horizontal={false} />
                       <XAxis type="number" tick={{ fontSize: 11, fill: "hsl(var(--muted-foreground))" }} axisLine={false} tickLine={false} />
                       <YAxis dataKey="name" type="category" tick={{ fontSize: 11, fill: "hsl(var(--muted-foreground))" }} axisLine={false} tickLine={false} width={90} />
-                      <Tooltip content={<ChartTooltip formatter={(v) => `${v} qualified bookings`} />} />
+                      <Tooltip cursor={false} content={<ChartTooltip formatter={(v) => `${v} qualified bookings`} />} />
                       <Bar dataKey="qualified" radius={[0, 4, 4, 0]}>
                         {supabase.salesEventBreakdown.map((entry) => (
                           <Cell key={entry.name} fill={SOURCE_COLORS[entry.name] ?? DEFAULT_COLOR} />
@@ -267,7 +269,7 @@ export default function MarketingDashboard() {
                         tickLine={false}
                         width={24}
                       />
-                      <Tooltip content={<ChartTooltip formatter={(v) => `${v} bookings`} />} />
+                      <Tooltip cursor={false} content={<ChartTooltip formatter={(v) => `${v} bookings`} />} />
                       <Area
                         type="monotone"
                         dataKey="bookings"
@@ -421,6 +423,7 @@ export default function MarketingDashboard() {
                           <Cell fill="#8b5cf6" />
                         </Pie>
                         <Tooltip
+                          cursor={false}
                           content={({ active, payload }) => {
                             if (!active || !payload?.length) return null;
                             return (

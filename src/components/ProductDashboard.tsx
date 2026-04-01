@@ -194,7 +194,7 @@ export function ProductDashboard() {
                     <CartesianGrid strokeDasharray="3 3" stroke={GRID} vertical={false} />
                     <XAxis dataKey="date" tickFormatter={formatDay} tick={{ fontSize: 11, fill: TICK }} axisLine={{ stroke: GRID }} tickLine={false} interval={4} />
                     <YAxis tick={{ fontSize: 11, fill: TICK }} axisLine={false} tickLine={false} allowDecimals={false} />
-                    <Tooltip contentStyle={TOOLTIP_STYLE} labelFormatter={(v) => `Date: ${v}`} formatter={(v: number) => [v, "New members"]} />
+                    <Tooltip cursor={false} contentStyle={TOOLTIP_STYLE} labelFormatter={(v) => `Date: ${v}`} formatter={(v: number) => [v, "New members"]} />
                     <Area type="monotone" dataKey="count" stroke="#3b82f6" strokeWidth={2} fill="url(#memberGrad)" dot={false} activeDot={{ r: 4 }} />
                   </AreaChart>
                 </ResponsiveContainer>
@@ -213,7 +213,7 @@ export function ProductDashboard() {
                     <CartesianGrid strokeDasharray="3 3" stroke={GRID} vertical={false} />
                     <XAxis dataKey="date" tickFormatter={formatDay} tick={{ fontSize: 11, fill: TICK }} axisLine={{ stroke: GRID }} tickLine={false} interval={4} />
                     <YAxis tick={{ fontSize: 11, fill: TICK }} axisLine={false} tickLine={false} allowDecimals={false} />
-                    <Tooltip contentStyle={TOOLTIP_STYLE} labelFormatter={(v) => `Date: ${v}`} formatter={(v: number) => [v, "Posts"]} />
+                    <Tooltip cursor={false} contentStyle={TOOLTIP_STYLE} labelFormatter={(v) => `Date: ${v}`} formatter={(v: number) => [v, "Posts"]} />
                     <Bar dataKey="count" fill="#6366f1" radius={[3, 3, 0, 0]} />
                   </BarChart>
                 </ResponsiveContainer>

@@ -5,7 +5,7 @@ import { calculateStatus, invertedMetrics } from "@/lib/calculateStatus";
 import { useKit } from "@/hooks/use-kit";
 import { useNotion } from "@/hooks/use-notion";
 import { useGoogleAnalytics } from "@/hooks/use-google-analytics";
-import { useClose } from "@/hooks/use-close";
+import { useSalesTracking } from "@/hooks/use-sales-tracking";
 import { useIntercom } from "@/hooks/use-intercom";
 import { useTallyNps } from "@/hooks/use-tally-nps";
 import { useSupabaseMetrics } from "@/hooks/use-supabase-metrics";
@@ -119,7 +119,7 @@ const DEFAULT_MONTH = `${new Date().getFullYear()}-${String(new Date().getMonth(
 
 // Metrics sourced from live APIs — only the current week gets overlaid
 type ApiSource = {
-  hook: "kit" | "notion" | "ga" | "close" | "intercom" | "tally" | "computed";
+  hook: "kit" | "notion" | "ga" | "salesTracking" | "intercom" | "tally" | "computed";
   field: string;
 };
 
@@ -147,7 +147,7 @@ function resolveApiValue(
     kit: ReturnType<typeof useKit>;
     notion: ReturnType<typeof useNotion>;
     ga: { weeklyViews: (number | "—")[] };
-    close: ReturnType<typeof useClose>;
+    salesTracking: { wonCount: number; callsAnswered: number; showRate: number | null; winRate: number | null };
     salesMetrics: ReturnType<typeof useSupabaseMetrics>;
     intercom: ReturnType<typeof useIntercom>;
     tallyNps: ReturnType<typeof useTallyNps>;
@@ -166,8 +166,8 @@ function resolveApiValue(
     }
     case "ga":
       return apis.ga.weeklyViews[weekIndex] ?? "—";
-    case "close": {
-      const val = apis.close[source.field as keyof ReturnType<typeof useClose>];
+    case "salesTracking": {
+      const val = apis.salesTracking[source.field as keyof typeof apis.salesTracking];
       if (typeof val === "number") return val;
       return "—";
     }
@@ -265,7 +265,14 @@ export function useScorecard(month: string = DEFAULT_MONTH) {
   const kit = useKit();
   const notion = useNotion();
   const ga = useGoogleAnalytics();
-  const close = useClose();
+  const salesTrackingData = useSalesTracking(month);
+  const stTeam = salesTrackingData.teamTotals?.monthly;
+  const salesTracking = useMemo(() => ({
+    wonCount: stTeam?.closes ?? 0,
+    callsAnswered: stTeam?.calls_taken ?? 0,
+    showRate: stTeam?.show_rate ?? null,
+    winRate: stTeam?.close_rate ?? null,
+  }), [stTeam]);
   const intercom = useIntercom();
   const tallyNps = useTallyNps();
 
@@ -336,7 +343,7 @@ export function useScorecard(month: string = DEFAULT_MONTH) {
       let updated = m;
 
       if (source) {
-        const apiVal = resolveApiValue(source, cwi, { kit, notion, ga, close, intercom, tallyNps, salesMetrics, currentMetrics: supabaseMetrics });
+        const apiVal = resolveApiValue(source, cwi, { kit, notion, ga, salesTracking, intercom, tallyNps, salesMetrics, currentMetrics: supabaseMetrics });
         if (apiVal !== "—") {
           updated = { ...m, weeks: [...m.weeks] };
           updated.weeks[cwi] = { ...updated.weeks[cwi], actual: apiVal };
@@ -385,7 +392,7 @@ export function useScorecard(month: string = DEFAULT_MONTH) {
 
       return updated;
     });
-  }, [supabaseMetrics, kit, notion, ga.weeklyViews, ga.monthlyViews, close.wonCount, close.showRate, close.callsAnswered, close.winRate, intercom.inboxTotal, tallyNps.results, salesMetrics.salesEventBreakdown, salesMetrics.cube, salesMetrics.dates]);
+  }, [supabaseMetrics, kit, notion, ga.weeklyViews, ga.monthlyViews, salesTracking, intercom.inboxTotal, tallyNps.results, salesMetrics.salesEventBreakdown, salesMetrics.cube, salesMetrics.dates]);
 
   // Auto-calculate statuses from most recent week's actual vs target
   const metricsWithStatus = useMemo(() => {

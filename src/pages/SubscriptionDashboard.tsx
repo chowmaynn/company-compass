@@ -100,7 +100,7 @@ export default function SubscriptionDashboard() {
   return (
     <>
     {/* ── Date range filter (outside DashboardShell so it persists during loading) */}
-    <div className="flex items-center gap-2 mb-6">
+    <div className="flex items-center justify-end gap-2 mb-6">
       <DateRangePicker onChange={setDateRange} />
       {stripeLoading && <RefreshCw className="h-3.5 w-3.5 text-muted-foreground animate-spin" />}
     </div>
@@ -129,7 +129,7 @@ export default function SubscriptionDashboard() {
                         <stop offset="95%" stopColor="#8b5cf6" stopOpacity={0} />
                       </linearGradient>
                     </defs>
-                    <Tooltip content={<ChartTooltip formatter={(v, name) => `${name}: ${fmtCurrency(v)}`} />} />
+                    <Tooltip cursor={false} content={<ChartTooltip formatter={(v, name) => `${name}: ${fmtCurrency(v)}`} />} />
                     <Area type="monotone" dataKey="gross" name="Gross" stroke="#8b5cf6" strokeWidth={1.5} fill="url(#grossGrad)" dot={false} />
                   </AreaChart>
                 </ResponsiveContainer>
@@ -154,7 +154,7 @@ export default function SubscriptionDashboard() {
                         <stop offset="95%" stopColor="#10b981" stopOpacity={0} />
                       </linearGradient>
                     </defs>
-                    <Tooltip content={<ChartTooltip formatter={(v, name) => `${name}: ${fmtCurrency(v)}`} />} />
+                    <Tooltip cursor={false} content={<ChartTooltip formatter={(v, name) => `${name}: ${fmtCurrency(v)}`} />} />
                     <Area type="monotone" dataKey="net" name="Net" stroke="#10b981" strokeWidth={1.5} fill="url(#netGrad)" dot={false} />
                   </AreaChart>
                 </ResponsiveContainer>
@@ -197,9 +197,7 @@ export default function SubscriptionDashboard() {
               </div>
             </>
           ) : (
-            <div className="flex items-center gap-2 text-muted-foreground text-xs">
-              <Loader2 className="h-3.5 w-3.5 animate-spin" /> Loading…
-            </div>
+            <p className="text-2xl font-bold text-muted-foreground animate-pulse">Loading...</p>
           )}
         </div>
 
@@ -226,7 +224,7 @@ export default function SubscriptionDashboard() {
               <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--border))" vertical={false} />
               <XAxis dataKey="date" tick={{ fontSize: 11, fill: "hsl(var(--muted-foreground))" }} axisLine={false} tickLine={false} interval="preserveStartEnd" />
               <YAxis tick={{ fontSize: 11, fill: "hsl(var(--muted-foreground))" }} axisLine={false} tickLine={false} tickFormatter={(v) => cfmt(v)} width={60} />
-              <Tooltip content={<ChartTooltip formatter={(v, name) => `${name}: ${fmtCurrency(v)}`} />} />
+              <Tooltip cursor={false} content={<ChartTooltip formatter={(v, name) => `${name}: ${fmtCurrency(v)}`} />} />
               <Area type="monotone" dataKey="gross" name="Gross" stroke="#8b5cf6" strokeWidth={2} fill="url(#g2)" dot={false} />
               <Area type="monotone" dataKey="net" name="Net" stroke="#10b981" strokeWidth={2} fill="url(#n2)" dot={false} />
             </AreaChart>

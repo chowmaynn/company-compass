@@ -270,6 +270,7 @@ export default function CoachesDashboard() {
                     <XAxis dataKey="label" tick={{ fontSize: 10, fill: "#94a3b8" }} axisLine={false} tickLine={false} />
                     <YAxis tick={{ fontSize: 10, fill: "#94a3b8" }} axisLine={false} tickLine={false} allowDecimals={false} />
                     <Tooltip
+                      cursor={false}
                       contentStyle={{ fontSize: 12, borderRadius: 8, border: "1px solid #e2e8f0" }}
                       formatter={(val) => [`${val} posts`, "Count"]}
                     />

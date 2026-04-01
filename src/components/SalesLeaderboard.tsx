@@ -1,6 +1,6 @@
 import { useState, useMemo } from "react";
 import { Card } from "@/components/ui/card";
-import { Trophy, Phone, Target, DollarSign } from "lucide-react";
+import { Trophy, Phone, Target, DollarSign, ChevronDown } from "lucide-react";
 import { fmtCurrency } from "@/lib/formatNumber";
 import type { WeeklyRepData } from "@/hooks/use-sales-tracking";
 
@@ -9,17 +9,30 @@ type SortMetric = "close_rate" | "show_rate";
 interface Props {
   reps: WeeklyRepData[];
   loading?: boolean;
+  convert?: (nzd: number) => number;
+  symbol?: string;
 }
 
-const MEDAL_COLORS = ["#FFD700", "#C0C0C0", "#CD7F32"]; // gold, silver, bronze
+const MEDAL_COLORS = ["#F5C542", "#B0B3B8", "#C4956A"]; // gold, silver, bronze
 
-export function SalesLeaderboard({ reps, loading }: Props) {
+function formatDate(date: string) {
+  const d = new Date(date + "T00:00:00");
+  return d.toLocaleDateString("en-NZ", { day: "numeric", month: "short" });
+}
+
+export function SalesLeaderboard({ reps, loading, convert = (n) => n, symbol = "$" }: Props) {
   const [sortBy, setSortBy] = useState<SortMetric>("close_rate");
+  const [expanded, setExpanded] = useState<Set<string>>(new Set());
+
+  const toggle = (name: string) =>
+    setExpanded((prev) => {
+      const next = new Set(prev);
+      next.has(name) ? next.delete(name) : next.add(name);
+      return next;
+    });
 
   const ranked = useMemo(() => {
-    // Filter out reps with 0 calls taken (can't compute rates)
     const eligible = reps.filter((r) => r.monthly.calls_taken > 0);
-
     return [...eligible].sort((a, b) => {
       const aVal = sortBy === "close_rate" ? (a.monthly.close_rate ?? 0) : (a.monthly.show_rate ?? 0);
       const bVal = sortBy === "close_rate" ? (b.monthly.close_rate ?? 0) : (b.monthly.show_rate ?? 0);
@@ -99,13 +112,16 @@ export function SalesLeaderboard({ reps, loading }: Props) {
           const rate = sortBy === "close_rate" ? (rep.monthly.close_rate ?? 0) : (rep.monthly.show_rate ?? 0);
           const barWidth = maxRate > 0 ? (rate / maxRate) * 100 : 0;
           const medalColor = i < 3 ? MEDAL_COLORS[i] : undefined;
+          const isOpen = expanded.has(rep.rep_name);
+          const rows = rep.dailyRows ?? [];
 
           return (
-            <div
-              key={rep.rep_name}
-              className="rounded-lg bg-muted/20 hover:bg-muted/30 transition-colors p-3"
-            >
-              <div className="flex items-center gap-3">
+            <div key={rep.rep_name} className="rounded-lg bg-muted/20 transition-colors">
+              {/* Main row */}
+              <button
+                onClick={() => toggle(rep.rep_name)}
+                className="w-full p-3 flex items-center gap-3 hover:bg-muted/30 rounded-lg transition-colors text-left"
+              >
                 {/* Rank badge */}
                 <div
                   className="flex items-center justify-center h-7 w-7 rounded-full text-xs font-bold shrink-0"
@@ -133,7 +149,7 @@ export function SalesLeaderboard({ reps, loading }: Props) {
                       className="h-full rounded-full transition-all duration-500"
                       style={{
                         width: `${barWidth}%`,
-                        backgroundColor: medalColor ?? "hsl(var(--primary))",
+                        backgroundColor: medalColor ?? "#6b7280",
                       }}
                     />
                   </div>
@@ -151,10 +167,60 @@ export function SalesLeaderboard({ reps, loading }: Props) {
                   </span>
                   <span className="inline-flex items-center gap-1" title="Contract Value">
                     <DollarSign className="h-3 w-3" />
-                    {fmtCurrency(rep.monthly.cc)}
+                    {fmtCurrency(convert(rep.monthly.cc), symbol)}
                   </span>
                 </div>
-              </div>
+
+                {/* Chevron */}
+                <ChevronDown
+                  className={`h-4 w-4 text-muted-foreground shrink-0 transition-transform duration-200 ${isOpen ? "rotate-180" : ""}`}
+                />
+              </button>
+
+              {/* Expanded daily data */}
+              {isOpen && rows.length > 0 && (
+                <div className="px-3 pb-3">
+                  <div className="rounded-md border border-border overflow-hidden">
+                    <table className="w-full text-[11px]">
+                      <thead>
+                        <tr className="bg-muted/40 text-muted-foreground">
+                          <th className="text-left px-3 py-1.5 font-medium">Date</th>
+                          <th className="text-right px-3 py-1.5 font-medium">Booked</th>
+                          <th className="text-right px-3 py-1.5 font-medium">Taken</th>
+                          <th className="text-right px-3 py-1.5 font-medium">Show %</th>
+                          <th className="text-right px-3 py-1.5 font-medium">Closes</th>
+                          <th className="text-right px-3 py-1.5 font-medium">CC</th>
+                          <th className="text-right px-3 py-1.5 font-medium">No Shows</th>
+                          <th className="text-right px-3 py-1.5 font-medium">Cancels</th>
+                          <th className="text-right px-3 py-1.5 font-medium">Reschedules</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {rows.map((r) => {
+                          const showPct = r.calls_booked > 0 ? Math.round((r.calls_taken / r.calls_booked) * 100) : 0;
+                          return (
+                          <tr key={r.date} className="border-t border-border/50 hover:bg-muted/20">
+                            <td className="px-3 py-1.5 text-foreground font-medium">{formatDate(r.date)}</td>
+                            <td className="text-right px-3 py-1.5 text-muted-foreground">{r.calls_booked}</td>
+                            <td className="text-right px-3 py-1.5 text-muted-foreground">{r.calls_taken}</td>
+                            <td className="text-right px-3 py-1.5 text-muted-foreground">{showPct}%</td>
+                            <td className="text-right px-3 py-1.5 text-foreground font-medium">{r.closes}</td>
+                            <td className="text-right px-3 py-1.5 text-muted-foreground">{fmtCurrency(convert(r.cc), symbol)}</td>
+                            <td className="text-right px-3 py-1.5 text-muted-foreground">{r.no_shows}</td>
+                            <td className="text-right px-3 py-1.5 text-muted-foreground">{r.cancellations}</td>
+                            <td className="text-right px-3 py-1.5 text-muted-foreground">{r.reschedules}</td>
+                          </tr>
+                          );
+                        })}
+                      </tbody>
+                    </table>
+                  </div>
+                </div>
+              )}
+
+              {isOpen && rows.length === 0 && (
+                <p className="px-3 pb-3 text-xs text-muted-foreground">No daily data for this period.</p>
+              )}
             </div>
           );
         })}

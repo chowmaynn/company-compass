@@ -196,7 +196,7 @@ export default function SuccessTrackingDashboard() {
               </defs>
               <XAxis dataKey="label" tick={{ fontSize: 10, fill: "#94a3b8" }} axisLine={false} tickLine={false} interval="preserveStartEnd" />
               <YAxis tick={{ fontSize: 10, fill: "#94a3b8" }} axisLine={false} tickLine={false} tickFormatter={fmtRevenueShort} width={55} />
-              <Tooltip content={<ChartTooltip formatter={(v) => fmtRevenue(v)} />} />
+              <Tooltip cursor={false} content={<ChartTooltip formatter={(v) => fmtRevenue(v)} />} />
               <Area type="monotone" dataKey="revenue" stroke="#10b981" strokeWidth={2} fill="url(#revenueGrad)" dot={false} activeDot={{ r: 4, fill: "#10b981" }} />
             </AreaChart>
           </ResponsiveContainer>
@@ -214,7 +214,7 @@ export default function SuccessTrackingDashboard() {
               <BarChart data={monthlyRevenue} barSize={16} margin={{ top: 5, right: 5, left: -10, bottom: 0 }}>
                 <XAxis dataKey="label" tick={{ fontSize: 10, fill: "#94a3b8" }} axisLine={false} tickLine={false} interval="preserveStartEnd" />
                 <YAxis tick={{ fontSize: 10, fill: "#94a3b8" }} axisLine={false} tickLine={false} allowDecimals={false} />
-                <Tooltip content={<ChartTooltip formatter={(v) => `${v} wins`} />} />
+                <Tooltip cursor={false} content={<ChartTooltip formatter={(v) => `${v} wins`} />} />
                 <Bar dataKey="wins" fill="#6366f1" radius={[3, 3, 0, 0]} />
               </BarChart>
             </ResponsiveContainer>
@@ -242,6 +242,7 @@ export default function SuccessTrackingDashboard() {
                   ))}
                 </Pie>
                 <Tooltip
+                  cursor={false}
                   contentStyle={{ fontSize: 11, borderRadius: 8, border: "1px solid hsl(var(--border))", backgroundColor: "hsl(var(--card))", color: "hsl(var(--foreground))" }}
                   formatter={(val, name) => [`${val} wins`, name]}
                 />
@@ -310,6 +311,7 @@ export default function SuccessTrackingDashboard() {
                   ))}
                 </Pie>
                 <Tooltip
+                  cursor={false}
                   contentStyle={{ fontSize: 11, borderRadius: 8, border: "1px solid #e2e8f0" }}
                   formatter={(val, name) => [`${val} wins`, name]}
                 />

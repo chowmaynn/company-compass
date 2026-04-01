@@ -165,11 +165,18 @@ Deno.serve(async (_req) => {
       videoDetails.push(...batch);
     }
 
-    // 6. Filter out competitor channels and own channel
-    const filtered = videoDetails.filter(
-      (v) => !excludeChannelIds.has(v.snippet.channelId)
-    );
-    logs.push(`${filtered.length} after excluding known channels`);
+    // 6. Filter out competitor channels, own channel, and non-English
+    const filtered = videoDetails.filter((v) => {
+      if (excludeChannelIds.has(v.snippet.channelId)) return false;
+      // Check language fields from YouTube API
+      const lang = v.snippet.defaultLanguage || v.snippet.defaultAudioLanguage || "";
+      if (lang && !lang.startsWith("en")) return false;
+      // Also check title + description for non-Latin scripts
+      const text = (v.snippet.title || "") + (v.snippet.description || "").slice(0, 200);
+      if (FOREIGN_REGEX.test(text)) return false;
+      return true;
+    });
+    logs.push(`${filtered.length} after excluding known channels + non-English`);
 
     // 7. Get channel subscriber counts
     const channelIds = [...new Set(filtered.map((v) => v.snippet.channelId))];

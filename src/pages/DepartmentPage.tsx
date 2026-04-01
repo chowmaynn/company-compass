@@ -4,8 +4,6 @@ import { scorecardData as initialData, type Department, type Metric } from "@/da
 
 import { DepartmentSection } from "@/components/DepartmentSection";
 import { ProductDashboard } from "@/components/ProductDashboard";
-import { SalesDashboard } from "@/components/SalesDashboard";
-import { RepMetrics } from "@/components/RepMetrics";
 import { CircleCharts } from "@/components/CircleCharts";
 import { DepartmentCharts } from "@/components/DepartmentCharts";
 import CoachesDashboard from "@/pages/CoachesDashboard";
@@ -16,7 +14,7 @@ import MarketingDashboard from "@/pages/MarketingDashboard";
 import { CompetitorsDashboard } from "@/components/CompetitorsDashboard";
 import { ContentOverview } from "@/components/ContentOverview";
 import { SalesTrackingPage } from "@/components/SalesTrackingPage";
-import { LayoutDashboard, BarChart3, Users, Shield, Trophy, HeadphonesIcon, DollarSign, Swords, Megaphone, ClipboardList, Plug } from "lucide-react";
+import { LayoutDashboard, BarChart3, Shield, Trophy, HeadphonesIcon, DollarSign, Swords, Megaphone } from "lucide-react";
 
 const slugToDepartment: Record<string, Department> = {
   "subscriptions": "Finance",
@@ -28,7 +26,7 @@ const slugToDepartment: Record<string, Department> = {
   "community-management": "Product",
 };
 
-type Tab = "dashboard" | "charts" | "rep-metrics" | "coaches" | "success" | "support" | "finance" | "competitors" | "marketing" | "tracking" | "close-api";
+type Tab = "dashboard" | "charts" | "coaches" | "success" | "support" | "finance" | "competitors" | "marketing" | "tracking";
 
 const tabs: { id: Tab; label: string; icon: React.ElementType }[] = [
   { id: "dashboard", label: "Overview", icon: LayoutDashboard },
@@ -40,12 +38,6 @@ const productTabs: { id: Tab; label: string; icon: React.ElementType }[] = [
   { id: "coaches",   label: "Coaches",         icon: Shield },
   { id: "success",   label: "Success Tracker", icon: Trophy },
   { id: "support",   label: "Support",         icon: HeadphonesIcon },
-];
-
-const salesTabs: { id: Tab; label: string; icon: React.ElementType }[] = [
-  { id: "tracking",    label: "Tracking",    icon: ClipboardList },
-  { id: "close-api",   label: "Close API",   icon: Plug },
-  { id: "rep-metrics", label: "Rep Metrics", icon: Users },
 ];
 
 const financeTabs: { id: Tab; label: string; icon: React.ElementType }[] = [
@@ -109,8 +101,8 @@ export default function DepartmentPage() {
     <div className="p-6 max-w-7xl mx-auto space-y-6">
 
       {/* ── Tab Toggle ────────────────────────────────────── */}
-      {!isMarketing && !isFinance && <div className="flex items-center gap-1 bg-muted rounded-lg p-1 w-fit">
-        {(isSales ? salesTabs : isProduct ? productTabs : isContent ? contentTabs : tabs).map((tab) => {
+      {!isMarketing && !isFinance && !isSales && <div className="flex items-center gap-1 bg-muted rounded-lg p-1 w-fit">
+        {(isProduct ? productTabs : isContent ? contentTabs : tabs).map((tab) => {
           const Icon = tab.icon;
           return (
             <button
@@ -154,8 +146,6 @@ export default function DepartmentPage() {
         )
       )}
 
-      {activeTab === "rep-metrics" && <RepMetrics />}
-
       {activeTab === "coaches" && <CoachesDashboard />}
 
       {activeTab === "success" && <SuccessTrackingDashboard />}
@@ -167,8 +157,6 @@ export default function DepartmentPage() {
       {activeTab === "marketing" && <MarketingDashboard />}
 
       {activeTab === "tracking" && <SalesTrackingPage />}
-
-      {activeTab === "close-api" && <SalesDashboard />}
 
     </div>
   );

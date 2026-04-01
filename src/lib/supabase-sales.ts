@@ -16,6 +16,19 @@ export interface SalesTrackingRow {
 export type SalesMetricField = "calls_booked" | "calls_taken" | "closes" | "cc" | "no_shows" | "cancellations" | "reschedules";
 
 /**
+ * Fetch all sales tracking rows for a date range.
+ */
+export async function fetchSalesTrackingRange(from: string, to: string): Promise<SalesTrackingRow[]> {
+  const headers = await getSupabaseHeaders();
+  const res = await fetch(
+    `${SUPABASE_URL}/rest/v1/sales_tracking?date=gte.${from}&date=lte.${to}&order=rep_name,date`,
+    { headers }
+  );
+  if (!res.ok) return [];
+  return res.json();
+}
+
+/**
  * Fetch all sales tracking rows for a given month (YYYY-MM format).
  */
 export async function fetchSalesTracking(month: string): Promise<SalesTrackingRow[]> {
@@ -47,6 +60,33 @@ export async function fetchSalesMonths(): Promise<string[]> {
   const rows: { date: string }[] = await res.json();
   const months = new Set(rows.map((r) => r.date.slice(0, 7)));
   return [...months].sort().reverse();
+}
+
+export interface DailyCloses {
+  date: string;
+  closes: number;
+}
+
+/**
+ * Fetch daily team closes aggregated across all reps for a date range.
+ */
+export async function fetchDailyCloses(from: string, to: string): Promise<DailyCloses[]> {
+  const headers = await getSupabaseHeaders();
+  const res = await fetch(
+    `${SUPABASE_URL}/rest/v1/sales_tracking?select=date,closes&date=gte.${from}&date=lte.${to}&order=date`,
+    { headers }
+  );
+  if (!res.ok) return [];
+  const rows: { date: string; closes: number }[] = await res.json();
+
+  // Aggregate closes per day across reps
+  const byDate = new Map<string, number>();
+  for (const r of rows) {
+    byDate.set(r.date, (byDate.get(r.date) ?? 0) + r.closes);
+  }
+  return [...byDate.entries()]
+    .sort(([a], [b]) => a.localeCompare(b))
+    .map(([date, closes]) => ({ date, closes }));
 }
 
 /**

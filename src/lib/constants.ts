@@ -37,6 +37,8 @@ export const FOLLOWUP_EVENT_NAMES = [
  */
 export const PUBLIC_SALES_EVENTS = [
   "AAA Accelerator Business Call (Website)",
+  "AAA Accelerator Business Call (Website B)",
+  "AAA Accelerator Business Call (Website C)",
   "AAA Accelerator Business Call (Skool A)",
   "AAA Accelerator Business Call (Skool C)",
   "AAA Accelerator Business Call (Skool P)",

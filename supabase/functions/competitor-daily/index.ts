@@ -3,7 +3,7 @@
 // tracks view decay, triggers outlier detection, and keyword search on Sundays.
 
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
-import { parseISO8601Duration, fetchYouTubeComments, analyzeComments } from "../_shared/youtube.ts";
+import { parseISO8601Duration } from "../_shared/youtube.ts";
 
 const SUPABASE_URL = Deno.env.get("SUPABASE_URL")!;
 const SUPABASE_SERVICE_ROLE_KEY = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
@@ -155,22 +155,33 @@ async function invokeEdgeFunction(name: string, body: Record<string, any>): Prom
   }
 }
 
-Deno.serve(async (_req) => {
+const BATCH_SIZE = 7;
+
+Deno.serve(async (req) => {
   const logs: string[] = [];
 
   try {
-    // 1. Load all competitor channels
-    const { data: channels, error: chErr } = await supabase
-      .from("competitor_channels")
-      .select("*");
+    // Parse batch offset from request body
+    let offset = 0;
+    try {
+      const body = await req.json();
+      offset = body.offset ?? 0;
+    } catch { /* no body = start from 0 */ }
 
-    if (chErr || !channels) {
+    // 1. Load all competitor channels
+    const { data: allChannels, error: chErr } = await supabase
+      .from("competitor_channels")
+      .select("*")
+      .order("id");
+
+    if (chErr || !allChannels) {
       return new Response(JSON.stringify({ error: "Failed to load channels" }), { status: 500 });
     }
 
-    logs.push(`Processing ${channels.length} channels`);
+    const channels = allChannels.slice(offset, offset + BATCH_SIZE);
+    logs.push(`Batch offset=${offset}, processing ${channels.length} of ${allChannels.length} channels`);
 
-    // 2. Process each channel
+    // 2. Process each channel in this batch
     for (const channel of channels) {
       try {
         // 2a. Resolve or update channel info
@@ -249,13 +260,6 @@ Deno.serve(async (_req) => {
               updateData[`views_day_${trackedDay}`] = views;
             }
 
-            // Fetch comment analysis if missing
-            if (!existing.comments_summary && commentCount > 0) {
-              const ytComments = await fetchYouTubeComments(video.id, YOUTUBE_API_KEY);
-              const analysis = await analyzeComments(ytComments, OPENAI_API_KEY);
-              if (analysis) updateData.comments_summary = analysis;
-            }
-
             await supabase
               .from("competitor_videos")
               .update(updateData)
@@ -302,13 +306,6 @@ Deno.serve(async (_req) => {
               }
             }
 
-            // Fetch comment analysis for all new videos
-            if (commentCount > 0) {
-              const ytComments = await fetchYouTubeComments(video.id, YOUTUBE_API_KEY);
-              const analysis = await analyzeComments(ytComments, OPENAI_API_KEY);
-              if (analysis) insertData.comments_summary = analysis;
-            }
-
             const { data: inserted, error: insertErr } = await supabase
               .from("competitor_videos")
               .insert(insertData)
@@ -338,89 +335,28 @@ Deno.serve(async (_req) => {
       }
     }
 
-    // 3. Generate competitor insights summary
-    try {
-      const fourteenDaysAgo = new Date(Date.now() - 14 * 24 * 60 * 60 * 1000).toISOString();
-      const { data: recentVideos } = await supabase
-        .from("competitor_videos")
-        .select("video_title, views, likes, comments, is_outlier, channel_name, comments_summary, published_at")
-        .gte("published_at", fourteenDaysAgo)
-        .not("comments_summary", "is", null)
-        .order("views", { ascending: false })
-        .limit(50);
+    // 3. Chain next batch or finalize
+    const nextOffset = offset + BATCH_SIZE;
+    if (nextOffset < allChannels.length) {
+      // More channels to process — invoke self with next offset
+      await invokeEdgeFunction("competitor-daily", { offset: nextOffset });
+      logs.push(`Chained next batch at offset=${nextOffset}`);
+    } else {
+      // Last batch — trigger follow-up tasks
+      logs.push("All channels processed — triggering follow-up tasks");
 
-      if (recentVideos && recentVideos.length >= 3) {
-        const videoBriefs = recentVideos.map((v: any) => {
-          const cs = typeof v.comments_summary === "string"
-            ? JSON.parse(v.comments_summary)
-            : v.comments_summary;
-          return `- "${v.video_title}" by ${v.channel_name} (${v.views} views${v.is_outlier ? ", OUTLIER" : ""})
-  Sentiment: ${cs?.sentiment || "N/A"}
-  Pain points: ${cs?.pain_points || "N/A"}
-  Resonated: ${cs?.what_resonated || "N/A"}`;
-        }).join("\n\n");
+      // Comment analysis
+      await invokeEdgeFunction("competitor-comments", {});
+      logs.push("Triggered competitor-comments");
 
-        const summaryRes = await fetch("https://api.openai.com/v1/chat/completions", {
-          method: "POST",
-          headers: {
-            Authorization: `Bearer ${OPENAI_API_KEY}`,
-            "Content-Type": "application/json",
-          },
-          body: JSON.stringify({
-            model: "gpt-4.1-mini",
-            temperature: 0.5,
-            messages: [
-              {
-                role: "system",
-                content: `You analyze YouTube competitor research data for an AI automation agency.
-Given recent competitor videos with their performance metrics and comment analysis, produce a strategic summary.
-
-Return ONLY a JSON object with these keys:
-- "takeaways": array of 3-5 key strategic takeaways (each 1-2 sentences)
-- "trending_topics": array of 5-8 trending topic keywords/phrases
-- "top_pain_points": array of 5-8 audience pain points identified across videos
-- "what_resonated": array of 5-8 things that resonated with audiences
-- "title_analysis": array of 4-6 observations about what makes the top-performing video titles effective (hooks, formats, power words, patterns, length, emotional triggers). Compare high-view titles vs lower-view titles and identify what probably worked.
-
-Return ONLY valid JSON, no markdown.`,
-              },
-              { role: "user", content: `Here are ${recentVideos.length} competitor videos from the last 14 days:\n\n${videoBriefs}` },
-            ],
-          }),
+      // On Sundays, trigger keyword search
+      const today = new Date();
+      if (today.getUTCDay() === 0) {
+        logs.push("Sunday — triggering keyword search");
+        await invokeEdgeFunction("competitor-keywords", {
+          timestamp: today.toISOString(),
         });
-
-        if (summaryRes.ok) {
-          const summaryData = await summaryRes.json();
-          const summaryContent = summaryData.choices?.[0]?.message?.content;
-          if (summaryContent) {
-            const parsed = JSON.parse(summaryContent);
-            const periodEnd = new Date();
-            const periodStart = new Date(fourteenDaysAgo);
-
-            await supabase.from("competitor_summaries").insert({
-              period_start: periodStart.toISOString(),
-              period_end: periodEnd.toISOString(),
-              total_videos: recentVideos.length,
-              outlier_count: recentVideos.filter((v: any) => v.is_outlier).length,
-              summary: parsed,
-            });
-            logs.push("Generated competitor insights summary");
-          }
-        }
-      } else {
-        logs.push("Skipped summary — not enough videos with comment analysis");
       }
-    } catch (sumErr) {
-      logs.push(`Summary generation error: ${String(sumErr)}`);
-    }
-
-    // 4. On Sundays, trigger keyword search
-    const today = new Date();
-    if (today.getUTCDay() === 0) {
-      logs.push("Sunday — triggering keyword search");
-      await invokeEdgeFunction("competitor-keywords", {
-        timestamp: today.toISOString(),
-      });
     }
 
     return new Response(JSON.stringify({ success: true, logs }), {

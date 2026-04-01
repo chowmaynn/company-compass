@@ -85,7 +85,7 @@ export function BookingsDashboard({ from, to, showRate }: {
                   <CartesianGrid strokeDasharray="3 3" stroke={GRID} vertical={false} />
                   <XAxis dataKey="date" tickFormatter={formatDay} tick={{ fontSize: 11, fill: TICK }} axisLine={{ stroke: GRID }} tickLine={false} />
                   <YAxis tick={{ fontSize: 11, fill: TICK }} axisLine={false} tickLine={false} allowDecimals={false} />
-                  <Tooltip contentStyle={TOOLTIP_STYLE} labelFormatter={(v) => `Date: ${v}`} />
+                  <Tooltip cursor={false} contentStyle={TOOLTIP_STYLE} labelFormatter={(v) => `Date: ${v}`} />
                   <Legend iconType="circle" iconSize={8} wrapperStyle={{ fontSize: 11 }} />
                   <Area type="monotone" dataKey="bookings"  name="Bookings"  stroke="#3b82f6" strokeWidth={2} fill="url(#bg0)" dot={false} activeDot={{ r: 4 }} />
                   <Area type="monotone" dataKey="qualified" name="Qualified" stroke="#6366f1" strokeWidth={2} fill="url(#bg1)" dot={false} activeDot={{ r: 4 }} />
@@ -112,7 +112,7 @@ export function BookingsDashboard({ from, to, showRate }: {
                   <XAxis dataKey="name" tick={{ fontSize: 10, fill: TICK }} axisLine={{ stroke: GRID }}
                     tickLine={false} interval={0} angle={-30} textAnchor="end" height={48} />
                   <YAxis tick={{ fontSize: 11, fill: TICK }} axisLine={false} tickLine={false} allowDecimals={false} />
-                  <Tooltip contentStyle={TOOLTIP_STYLE} formatter={(v: number) => [v, "Qualified"]} />
+                  <Tooltip cursor={false} contentStyle={TOOLTIP_STYLE} formatter={(v: number) => [v, "Qualified"]} />
                   <Bar dataKey="qualified" radius={[4, 4, 0, 0]}>
                     {salesEventBreakdown.map((_, i) => (
                       <Cell key={i} fill={SOURCE_COLORS[i % SOURCE_COLORS.length]} />

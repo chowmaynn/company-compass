@@ -90,6 +90,7 @@ export function CircleCharts() {
                   allowDecimals={false}
                 />
                 <Tooltip
+                  cursor={false}
                   contentStyle={TOOLTIP_STYLE}
                   labelFormatter={(v) => `Date: ${v}`}
                   formatter={(v: number) => [v, "New members"]}
@@ -128,6 +129,7 @@ export function CircleCharts() {
                   allowDecimals={false}
                 />
                 <Tooltip
+                  cursor={false}
                   contentStyle={TOOLTIP_STYLE}
                   labelFormatter={(v) => `Date: ${v}`}
                   formatter={(v: number) => [v, "Posts"]}
@@ -163,6 +165,7 @@ export function CircleCharts() {
                   width={120}
                 />
                 <Tooltip
+                  cursor={false}
                   contentStyle={TOOLTIP_STYLE}
                   formatter={(v: number) => [v, "Posts"]}
                 />
@@ -194,6 +197,7 @@ export function CircleCharts() {
                   allowDecimals={false}
                 />
                 <Tooltip
+                  cursor={false}
                   contentStyle={TOOLTIP_STYLE}
                   formatter={(v: number) => [v, "Members"]}
                 />
@@ -236,6 +240,7 @@ export function CircleCharts() {
                 width={180}
               />
               <Tooltip
+                cursor={false}
                 contentStyle={TOOLTIP_STYLE}
               />
               <Bar dataKey="likes" name="Likes" fill="#3b82f6" radius={[0, 2, 2, 0]} stackId="a" />

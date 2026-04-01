@@ -369,6 +369,7 @@ function RevenueTrendChart({
                 tickFormatter={(v) => `${symbol}${compactNumber(v)}`}
               />
               <Tooltip
+                cursor={false}
                 contentStyle={{
                   backgroundColor: "#ffffff",
                   border: "1px solid hsl(220, 13%, 91%)",

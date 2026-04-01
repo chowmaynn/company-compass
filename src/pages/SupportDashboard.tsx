@@ -229,7 +229,7 @@ export default function SupportDashboard() {
               <CartesianGrid strokeDasharray="3 3" stroke={GRID} vertical={false} />
               <XAxis dataKey="label" tick={{ fontSize: 10, fill: TICK }} axisLine={{ stroke: GRID }} tickLine={false} interval={Math.max(1, Math.floor(days / 10))} />
               <YAxis tick={{ fontSize: 10, fill: TICK }} axisLine={false} tickLine={false} allowDecimals={false} />
-              <Tooltip contentStyle={TOOLTIP_STYLE} formatter={(v: number) => [v, "Conversations"]} />
+              <Tooltip cursor={false} contentStyle={TOOLTIP_STYLE} formatter={(v: number) => [v, "Conversations"]} />
               <Area type="monotone" dataKey="count" stroke="#6366f1" strokeWidth={2} fill="url(#volGrad)" dot={false} activeDot={{ r: 4, fill: "#6366f1" }} />
             </AreaChart>
           </ResponsiveContainer>
@@ -249,7 +249,7 @@ export default function SupportDashboard() {
                 <CartesianGrid strokeDasharray="3 3" stroke={GRID} vertical={false} />
                 <XAxis dataKey="label" tick={{ fontSize: 11, fill: TICK }} axisLine={false} tickLine={false} />
                 <YAxis tick={{ fontSize: 11, fill: TICK }} axisLine={false} tickLine={false} allowDecimals={false} />
-                <Tooltip contentStyle={TOOLTIP_STYLE} formatter={(v: number) => [v, "Conversations"]} />
+                <Tooltip cursor={false} contentStyle={TOOLTIP_STYLE} formatter={(v: number) => [v, "Conversations"]} />
                 <Bar dataKey="count" radius={[4, 4, 0, 0]}>
                   {responseDistribution.map((entry, i) => (
                     <Cell key={i} fill={entry.colour} />
