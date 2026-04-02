@@ -27,15 +27,17 @@ export interface Metric {
   description: string;
 }
 
-// March 2026 weeks (Monday–Sunday), NZ timezone (Pacific/Auckland, NZDT UTC+13)
+// April 2026 weeks (Monday–Sunday), NZ timezone (Pacific/Auckland)
+// DST change: NZDT (UTC+13) → NZST (UTC+12) on Apr 5 at 3am local
+// So: Apr 1-4 midnight NZT = T11:00Z (NZDT), Apr 6+ midnight NZT = T12:00Z (NZST)
 export const weekConfigs: WeekConfig[] = [
-  { label: "W1", dateLabel: "02/03", start: "2026-03-01T11:00:00Z", end: "2026-03-08T11:00:00Z" },
-  { label: "W2", dateLabel: "09/03", start: "2026-03-08T11:00:00Z", end: "2026-03-15T11:00:00Z" },
-  { label: "W3", dateLabel: "16/03", start: "2026-03-15T11:00:00Z", end: "2026-03-22T11:00:00Z" },
-  { label: "W4", dateLabel: "23/03", start: "2026-03-22T11:00:00Z", end: "2026-04-01T11:00:00Z" },
+  { label: "W1", dateLabel: "06/04", start: "2026-04-05T12:00:00Z", end: "2026-04-12T12:00:00Z" },
+  { label: "W2", dateLabel: "13/04", start: "2026-04-12T12:00:00Z", end: "2026-04-19T12:00:00Z" },
+  { label: "W3", dateLabel: "20/04", start: "2026-04-19T12:00:00Z", end: "2026-04-26T12:00:00Z" },
+  { label: "W4", dateLabel: "27/04", start: "2026-04-26T12:00:00Z", end: "2026-04-30T12:00:00Z" },
 ];
 
-export const scorecardMonth = "March 2026";
+export const scorecardMonth = "April 2026";
 
 /** Returns 0-3 for the current active week, 4 if past all weeks, -1 if before month */
 export function getCurrentWeekIndex(): number {
