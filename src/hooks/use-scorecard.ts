@@ -313,8 +313,10 @@ export function useScorecard(month: string = DEFAULT_MONTH) {
     if (supabaseMetrics.length === 0) return supabaseMetrics;
 
     const cwi = getCurrentWeekIndex();
-    // Only overlay live API data when we're within an active week (0-3)
-    const shouldOverlayApi = cwi >= 0 && cwi < 4;
+    // Overlay live API data when within an active week (0-3)
+    const shouldOverlayWeek = cwi >= 0 && cwi < 4;
+    // During catch-up period (cwi === -1), we're in the month but before W1
+    const isCatchUp = cwi === -1;
 
     const parseWeekVal = (raw: number | string): number | null => {
       if (typeof raw === "number") return raw;
@@ -338,16 +340,27 @@ export function useScorecard(month: string = DEFAULT_MONTH) {
     const dedicatedMonthlyMetrics = new Set(["Website Views"]);
 
     return supabaseMetrics.map((m) => {
-      // Step 1: Apply API overlay for current week (only when within an active week)
+      // Step 1: Apply API overlay
       let updated = m;
 
-      if (shouldOverlayApi) {
+      if (shouldOverlayWeek) {
+        // During an active week: overlay API data into that week's actual
         const source = API_METRIC_MAP[m.name];
         if (source) {
           const apiVal = resolveApiValue(source, cwi, { kit, notion, ga, salesTracking, intercom, tallyNps, salesMetrics, currentMetrics: supabaseMetrics });
           if (apiVal !== "—") {
             updated = { ...m, weeks: [...m.weeks] };
             updated.weeks[cwi] = { ...updated.weeks[cwi], actual: apiVal };
+          }
+        }
+      } else if (isCatchUp) {
+        // During catch-up period: overlay snapshot metrics into catch-up actual
+        const source = API_METRIC_MAP[m.name];
+        if (source) {
+          // Use week index 0 for resolving — snapshot metrics (backlogCount) ignore the index
+          const apiVal = resolveApiValue(source, 0, { kit, notion, ga, salesTracking, intercom, tallyNps, salesMetrics, currentMetrics: supabaseMetrics });
+          if (apiVal !== "—") {
+            updated = { ...m, catchUp: { ...m.catchUp, actual: apiVal } };
           }
         }
       }
