@@ -35,6 +35,11 @@ export function MetricTable({ metrics, onMetricChange, readOnlyMetrics, currency
             <th rowSpan={2} className="sticky left-0 z-10 bg-muted/90 backdrop-blur-sm px-4 py-2 text-left font-semibold text-foreground min-w-[200px] border-r border-border/50">
               Metric
             </th>
+            <th colSpan={2} className="px-1 py-2 text-center font-semibold text-foreground border-r border-border/30">
+              <div className="flex flex-col items-center">
+                <span className="text-xs text-muted-foreground">Catch-Up</span>
+              </div>
+            </th>
             {weekConfigs.map((wc) => (
               <th key={wc.label} colSpan={2} className="px-1 py-2 text-center font-semibold text-foreground border-r border-border/30">
                 <div className="flex flex-col items-center">
@@ -50,6 +55,12 @@ export function MetricTable({ metrics, onMetricChange, readOnlyMetrics, currency
           </tr>
           {/* Sub-headers: Actual / Target */}
           <tr className="border-b border-border bg-muted/30">
+            <th className="px-2 py-1.5 text-right text-xs font-bold text-foreground whitespace-nowrap">
+              Actual
+            </th>
+            <th className="px-2 py-1.5 text-right text-xs font-medium text-muted-foreground/40 whitespace-nowrap bg-muted border-r border-border/50">
+              Target
+            </th>
             {weekConfigs.map((wc) => (
               <React.Fragment key={`${wc.label}-sub`}>
                 <th className="px-2 py-1.5 text-right text-xs font-bold text-foreground whitespace-nowrap">
@@ -83,6 +94,28 @@ export function MetricTable({ metrics, onMetricChange, readOnlyMetrics, currency
                     </Tooltip>
                   )}
                 </div>
+              </td>
+              {/* Catch-Up columns */}
+              <td className="px-1 py-2 text-right min-w-[70px]">
+                {isReadOnly ? (
+                  <span className={`block rounded px-1.5 py-0.5 font-mono text-sm ${
+                    String(convert(metric.catchUp.actual)) === "—" ? "bg-yellow-500/10 text-yellow-600 dark:text-yellow-400/70" : "text-foreground"
+                  }`}>
+                    {formatValue(convert(metric.catchUp.actual))}
+                  </span>
+                ) : (
+                  <EditableCell
+                    value={convert(metric.catchUp.actual)}
+                    onChange={currencyRate ? undefined : (val) => onMetricChange?.(metric.name, "catchUp.actual", val)}
+                  />
+                )}
+              </td>
+              <td className="px-1 py-2 text-right bg-muted border-r border-border/50 min-w-[70px]">
+                <EditableCell
+                  value={convert(metric.catchUp.projection)}
+                  isProjection
+                  onChange={isReadOnly || currencyRate ? undefined : (val) => onMetricChange?.(metric.name, "catchUp.projection", val)}
+                />
               </td>
               {metric.weeks.map((w, wi) => {
                 return (

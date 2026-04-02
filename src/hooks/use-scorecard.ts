@@ -285,18 +285,18 @@ export function useScorecard(month: string = DEFAULT_MONTH) {
   // Load from Supabase
   useEffect(() => {
     let cancelled = false;
+    setLoading(true);
+    setError(null);
 
     async function load() {
       try {
         const rows = await fetchScorecard(month);
         if (cancelled) return;
 
-        if (rows.length > 0) {
-          setSupabaseMetrics(sortMetrics(rows.map(rowToMetric)));
-        }
+        setSupabaseMetrics(rows.length > 0 ? sortMetrics(rows.map(rowToMetric)) : []);
       } catch (err) {
+        console.error("Scorecard load error:", err);
         if (!cancelled) {
-          console.error("Scorecard load error:", err);
           setError(String(err));
         }
       } finally {
@@ -313,8 +313,8 @@ export function useScorecard(month: string = DEFAULT_MONTH) {
     if (supabaseMetrics.length === 0) return supabaseMetrics;
 
     const cwi = getCurrentWeekIndex();
-    // No overlay needed if before month or past all weeks
-    if (cwi < 0 || cwi >= 4) return supabaseMetrics;
+    // Only overlay live API data when we're within an active week (0-3)
+    const shouldOverlayApi = cwi >= 0 && cwi < 4;
 
     const parseWeekVal = (raw: number | string): number | null => {
       if (typeof raw === "number") return raw;
@@ -333,20 +333,22 @@ export function useScorecard(month: string = DEFAULT_MONTH) {
     // Metrics where monthly is computed from totals (not averaged weekly percentages)
     const ratioMetrics = new Set(["Website Booking Rate"]);
     // Metrics where monthly is manually entered (don't auto-calculate)
-    const manualMonthlyMetrics = new Set(["Revenue", "Cash Collected"]);
+    const manualMonthlyMetrics = new Set<string>([]);
     // Metrics where monthly comes from a dedicated full-range query (not sum of weeks)
     const dedicatedMonthlyMetrics = new Set(["Website Views"]);
 
     return supabaseMetrics.map((m) => {
-      // Step 1: Apply API overlay for current week
-      const source = API_METRIC_MAP[m.name];
+      // Step 1: Apply API overlay for current week (only when within an active week)
       let updated = m;
 
-      if (source) {
-        const apiVal = resolveApiValue(source, cwi, { kit, notion, ga, salesTracking, intercom, tallyNps, salesMetrics, currentMetrics: supabaseMetrics });
-        if (apiVal !== "—") {
-          updated = { ...m, weeks: [...m.weeks] };
-          updated.weeks[cwi] = { ...updated.weeks[cwi], actual: apiVal };
+      if (shouldOverlayApi) {
+        const source = API_METRIC_MAP[m.name];
+        if (source) {
+          const apiVal = resolveApiValue(source, cwi, { kit, notion, ga, salesTracking, intercom, tallyNps, salesMetrics, currentMetrics: supabaseMetrics });
+          if (apiVal !== "—") {
+            updated = { ...m, weeks: [...m.weeks] };
+            updated.weeks[cwi] = { ...updated.weeks[cwi], actual: apiVal };
+          }
         }
       }
 
@@ -374,11 +376,20 @@ export function useScorecard(month: string = DEFAULT_MONTH) {
             .map((w) => parseWeekVal(w.actual))
             .filter((v): v is number => v !== null);
 
-          if (weekVals.length > 0) {
+          // Include catch-up value for summed (non-averaged) metrics
+          const catchUpVal = parseWeekVal(updated.catchUp.actual);
+
+          if (weekVals.length > 0 || catchUpVal !== null) {
             const isAvg = averagedMetrics.has(m.name);
-            const raw = isAvg
-              ? weekVals.reduce((a, b) => a + b, 0) / weekVals.length
-              : weekVals.reduce((a, b) => a + b, 0);
+            const weekSum = weekVals.reduce((a, b) => a + b, 0);
+            let raw: number;
+            if (isAvg) {
+              // For averaged metrics, only average the week values (catch-up not included)
+              raw = weekVals.length > 0 ? weekSum / weekVals.length : 0;
+            } else {
+              // For summed metrics, add catch-up to the week total
+              raw = weekSum + (catchUpVal ?? 0);
+            }
 
             // Check if the metric uses percentage format
             const isPercent = updated.weeks.some((w) => String(w.actual).includes("%"));
@@ -418,6 +429,10 @@ export function useScorecard(month: string = DEFAULT_MONTH) {
             updated.monthlyTarget = value;
           } else if (field === "status") {
             updated.status = value as StatusColor;
+          } else if (field === "catchUp.actual") {
+            updated.catchUp = { ...updated.catchUp, actual: value };
+          } else if (field === "catchUp.projection") {
+            updated.catchUp = { ...updated.catchUp, projection: value };
           } else if (field.startsWith("weeks.")) {
             const parts = field.split(".");
             const weekIndex = parseInt(parts[1]);

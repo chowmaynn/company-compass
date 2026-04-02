@@ -183,8 +183,9 @@ export function AppLayout() {
   const { rate } = useExchangeRate();
   const [statusFilter, setStatusFilter] = useState<StatusFilter | null>(null);
   const [selectedMonth, setSelectedMonth] = useState(() => {
-    const now = new Date();
-    return `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, "0")}`;
+    // Default to current month in NZ timezone
+    const nz = new Date().toLocaleDateString("en-CA", { timeZone: "Pacific/Auckland" });
+    return nz.slice(0, 7); // "YYYY-MM"
   });
 
   useEffect(() => {
