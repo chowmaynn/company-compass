@@ -1,6 +1,7 @@
 import { useState, useMemo } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { Loader2, Globe, AlertTriangle } from "lucide-react";
+import { LoadingDots } from "@/components/LoadingDots";
 import { useWebsiteABTest } from "@/hooks/use-website-ab-test";
 import { fetchPageSessions } from "@/lib/google-analytics";
 import { DateRangePicker as SharedDateRangePicker, type DateRangeValue } from "@/components/DateRangePicker";
@@ -69,43 +70,35 @@ export function WebsiteChannelCard({ gaAuthed }: { gaAuthed: boolean }) {
         <p className="text-sm text-muted-foreground py-4 text-center">
           Connect Google in the top-right to see website analytics.
         </p>
-      ) : gaLoading || abTest.loading ? (
-        <div className="flex items-center gap-2 text-muted-foreground text-sm">
-          <Loader2 className="h-4 w-4 animate-spin" /> Loading…
-        </div>
       ) : (
         <div className="space-y-4">
           {/* Aggregate metrics */}
           <div className="grid grid-cols-3 gap-3">
             <div className="bg-muted/30 rounded-lg p-3">
               <p className="text-xs text-muted-foreground uppercase tracking-wider font-medium mb-1">Website Views</p>
-              <p className="text-xl font-bold text-foreground">{fmt(totalWebViews)}</p>
+              <p className="text-xl font-bold text-foreground">{gaLoading ? <LoadingDots /> : fmt(totalWebViews)}</p>
             </div>
             <div className="bg-muted/30 rounded-lg p-3">
               <p className="text-xs text-muted-foreground uppercase tracking-wider font-medium mb-1">Website Bookings</p>
-              <p className="text-xl font-bold text-foreground">{fmt(websiteBookings)}</p>
+              <p className="text-xl font-bold text-foreground">{abTest.loading ? <LoadingDots /> : fmt(websiteBookings)}</p>
             </div>
             <div className="bg-muted/30 rounded-lg p-3">
               <p className="text-xs text-muted-foreground uppercase tracking-wider font-medium mb-1">Booking Rate</p>
-              <p className="text-xl font-bold text-foreground">{bookingRate}</p>
+              <p className="text-xl font-bold text-foreground">{gaLoading || abTest.loading ? <LoadingDots /> : bookingRate}</p>
             </div>
           </div>
 
           {/* A/B/C Test sub-section */}
           <div className="border border-border/50 rounded-lg p-4 space-y-4 bg-muted/10">
             <p className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">A/B/C Test</p>
-            {abTest.variants.B.bookings === 0 && abTest.variants.C.bookings === 0 && !abTest.loading && (
+            {!abTest.loading && abTest.variants.B.bookings === 0 && abTest.variants.C.bookings === 0 && (
               <p className="text-xs text-red-500 dark:text-red-400 flex items-center gap-1.5">
                 <AlertTriangle className="h-3.5 w-3.5 shrink-0" />
                 Website B and C not yet set up in Supabase
               </p>
             )}
 
-            {abTest.loading ? (
-              <div className="flex items-center gap-2 text-muted-foreground text-sm py-4">
-                <Loader2 className="h-4 w-4 animate-spin" /> Loading variant data…
-              </div>
-            ) : abTest.error ? (
+            {abTest.error ? (
               <p className="text-sm text-red-500 py-4">{abTest.error}</p>
             ) : (
               <div className="space-y-4">
@@ -134,17 +127,17 @@ export function WebsiteChannelCard({ gaAuthed }: { gaAuthed: boolean }) {
                         </div>
                         <div>
                           <p className="text-2xl font-bold text-foreground">
-                            {v.conversionRate.toFixed(2)}%
+                            {abTest.loading ? <LoadingDots /> : `${v.conversionRate.toFixed(2)}%`}
                           </p>
                           <p className="text-[10px] text-muted-foreground">conversion rate</p>
                         </div>
                         <div className="grid grid-cols-2 gap-2 pt-1 border-t border-border/50">
                           <div>
-                            <p className="text-sm font-semibold text-foreground">{fmt(v.visitors)}</p>
+                            <p className="text-sm font-semibold text-foreground">{abTest.loading ? <LoadingDots /> : fmt(v.visitors)}</p>
                             <p className="text-[10px] text-muted-foreground">visitors</p>
                           </div>
                           <div>
-                            <p className="text-sm font-semibold text-foreground">{fmt(v.bookings)}</p>
+                            <p className="text-sm font-semibold text-foreground">{abTest.loading ? <LoadingDots /> : fmt(v.bookings)}</p>
                             <p className="text-[10px] text-muted-foreground">bookings</p>
                           </div>
                         </div>
@@ -183,3 +176,4 @@ export function WebsiteChannelCard({ gaAuthed }: { gaAuthed: boolean }) {
     </div>
   );
 }
+

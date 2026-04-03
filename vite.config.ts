@@ -167,6 +167,15 @@ export default defineConfig(({ mode }) => {
             "Authorization": `Bearer ${env.CALENDLY_SUPABASE_ANON_KEY}`,
           },
         },
+        "/api/skool-supabase": {
+          target: "https://zfypovnnagzycetggazy.supabase.co",
+          changeOrigin: true,
+          rewrite: (path) => path.replace(/^\/api\/skool-supabase/, ""),
+          headers: {
+            "apikey": env.SKOOL_SUPABASE_ANON_KEY,
+            "Authorization": `Bearer ${env.SKOOL_SUPABASE_ANON_KEY}`,
+          },
+        },
       },
     },
     plugins: [

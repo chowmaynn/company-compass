@@ -28,6 +28,7 @@ function getYearMonth(dateStr: string): string {
 import { StatCard } from "@/components/StatCard";
 
 import { ChartTooltip } from "@/components/ChartTooltip";
+import { LoadingDots } from "@/components/LoadingDots";
 
 // ── Main Dashboard ────────────────────────────────────────────────────────────
 
@@ -116,7 +117,7 @@ export default function SubscriptionDashboard() {
           <div className="flex-1 p-5 lg:border-r border-white/[0.06]">
             <p className="text-xs text-muted-foreground font-medium mb-1">Gross Volume</p>
             <p className="text-2xl font-bold text-foreground">
-              {s ? `${cfmt(s.grossVolume)}` : stripeLoading ? <span className="text-muted-foreground animate-pulse">Loading...</span> : "—"}
+              {s ? `${cfmt(s.grossVolume)}` : stripeLoading ? <LoadingDots /> : "—"}
             </p>
             <p className="text-xs text-muted-foreground mt-1">via Stripe / Payfunnels</p>
             {s && s.dailyVolume.length > 1 && (
@@ -141,7 +142,7 @@ export default function SubscriptionDashboard() {
           <div className="flex-1 p-5 border-t lg:border-t-0 lg:border-r border-white/[0.06]">
             <p className="text-xs text-muted-foreground font-medium mb-1">Net Volume</p>
             <p className="text-2xl font-bold text-foreground">
-              {s ? `${cfmt(s.netVolume)}` : stripeLoading ? <span className="text-muted-foreground animate-pulse">Loading...</span> : "—"}
+              {s ? `${cfmt(s.netVolume)}` : stripeLoading ? <LoadingDots /> : "—"}
             </p>
             <p className="text-xs text-muted-foreground mt-1">after Stripe fees</p>
             {s && s.dailyVolume.length > 1 && (
@@ -197,7 +198,7 @@ export default function SubscriptionDashboard() {
               </div>
             </>
           ) : (
-            <p className="text-2xl font-bold text-muted-foreground animate-pulse">Loading...</p>
+            <p className="text-2xl font-bold"><LoadingDots /></p>
           )}
         </div>
 
@@ -205,32 +206,38 @@ export default function SubscriptionDashboard() {
       </Card>
 
       {/* ── Full daily volume chart ───────────────────────────────────── */}
-      {s && s.dailyVolume.length > 0 && (
         <div className="bg-card border border-border rounded-xl p-5">
           <h3 className="text-sm font-semibold text-foreground mb-1">Daily Volume</h3>
           <p className="text-xs text-muted-foreground mb-4">Gross vs Net ({currencyLabel})</p>
-          <ResponsiveContainer width="100%" height={220}>
-            <AreaChart data={s.dailyVolume} margin={{ top: 4, right: 4, left: 0, bottom: 0 }}>
-              <defs>
-                <linearGradient id="g2" x1="0" y1="0" x2="0" y2="1">
-                  <stop offset="5%" stopColor="#8b5cf6" stopOpacity={0.2} />
-                  <stop offset="95%" stopColor="#8b5cf6" stopOpacity={0} />
-                </linearGradient>
-                <linearGradient id="n2" x1="0" y1="0" x2="0" y2="1">
-                  <stop offset="5%" stopColor="#10b981" stopOpacity={0.2} />
-                  <stop offset="95%" stopColor="#10b981" stopOpacity={0} />
-                </linearGradient>
-              </defs>
-              <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--border))" vertical={false} />
-              <XAxis dataKey="date" tick={{ fontSize: 11, fill: "hsl(var(--muted-foreground))" }} axisLine={false} tickLine={false} interval="preserveStartEnd" />
-              <YAxis tick={{ fontSize: 11, fill: "hsl(var(--muted-foreground))" }} axisLine={false} tickLine={false} tickFormatter={(v) => cfmt(v)} width={60} />
-              <Tooltip cursor={false} content={<ChartTooltip formatter={(v, name) => `${name}: ${fmtCurrency(v)}`} />} />
-              <Area type="monotone" dataKey="gross" name="Gross" stroke="#8b5cf6" strokeWidth={2} fill="url(#g2)" dot={false} />
-              <Area type="monotone" dataKey="net" name="Net" stroke="#10b981" strokeWidth={2} fill="url(#n2)" dot={false} />
-            </AreaChart>
-          </ResponsiveContainer>
+          <div style={{ height: 220 }}>
+            {!s || stripeLoading ? (
+              <div className="flex items-center justify-center h-full"><LoadingDots /></div>
+            ) : s.dailyVolume.length === 0 ? (
+              <p className="text-sm text-muted-foreground text-center py-8">No data for this period</p>
+            ) : (
+              <ResponsiveContainer width="100%" height={220}>
+                <AreaChart data={s.dailyVolume} margin={{ top: 4, right: 4, left: 0, bottom: 0 }}>
+                  <defs>
+                    <linearGradient id="g2" x1="0" y1="0" x2="0" y2="1">
+                      <stop offset="5%" stopColor="#8b5cf6" stopOpacity={0.2} />
+                      <stop offset="95%" stopColor="#8b5cf6" stopOpacity={0} />
+                    </linearGradient>
+                    <linearGradient id="n2" x1="0" y1="0" x2="0" y2="1">
+                      <stop offset="5%" stopColor="#10b981" stopOpacity={0.2} />
+                      <stop offset="95%" stopColor="#10b981" stopOpacity={0} />
+                    </linearGradient>
+                  </defs>
+                  <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--border))" vertical={false} />
+                  <XAxis dataKey="date" tick={{ fontSize: 11, fill: "hsl(var(--muted-foreground))" }} axisLine={false} tickLine={false} interval="preserveStartEnd" />
+                  <YAxis tick={{ fontSize: 11, fill: "hsl(var(--muted-foreground))" }} axisLine={false} tickLine={false} tickFormatter={(v) => cfmt(v)} width={60} />
+                  <Tooltip cursor={false} content={<ChartTooltip formatter={(v, name) => `${name}: ${fmtCurrency(v)}`} />} />
+                  <Area type="monotone" dataKey="gross" name="Gross" stroke="#8b5cf6" strokeWidth={2} fill="url(#g2)" dot={false} />
+                  <Area type="monotone" dataKey="net" name="Net" stroke="#10b981" strokeWidth={2} fill="url(#n2)" dot={false} />
+                </AreaChart>
+              </ResponsiveContainer>
+            )}
+          </div>
         </div>
-      )}
 
       {/* ── Stat Cards row ───────────────────────────────────────────── */}
       <div className="grid grid-cols-2 lg:grid-cols-3 gap-4">

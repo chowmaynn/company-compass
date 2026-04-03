@@ -24,6 +24,7 @@ import {
 } from "recharts";
 
 import { GRID, TICK, TOOLTIP_STYLE } from "@/lib/chart-theme";
+import { LoadingDots } from "@/components/LoadingDots";
 
 function formatTime(iso: string) {
   return new Date(iso).toLocaleTimeString("en-NZ", { hour: "2-digit", minute: "2-digit" });
@@ -84,7 +85,7 @@ export function ProductDashboard() {
               </span>
             )}
             {npsLoading && npsResults.length === 0 && (
-              <Loader2 className="h-4 w-4 animate-spin text-muted-foreground ml-auto" />
+              <LoadingDots className="ml-auto" />
             )}
           </div>
 
@@ -97,7 +98,7 @@ export function ProductDashboard() {
                       <p className="text-xs font-semibold text-foreground">{r.formName}</p>
                       <p className="text-[11px] text-muted-foreground">{r.totalResponses} responses</p>
                     </div>
-                    {r.loading && <Loader2 className="h-3.5 w-3.5 animate-spin text-muted-foreground" />}
+                    {r.loading && <LoadingDots />}
                   </div>
                   {r.error ? (
                     <p className="text-xs text-status-red">{r.error}</p>
@@ -153,7 +154,7 @@ export function ProductDashboard() {
               </div>
               <p className="text-3xl font-bold text-foreground">
                 {circleLoading && totalMembers === null
-                  ? <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
+                  ? <LoadingDots />
                   : (totalMembers ?? "—").toLocaleString()}
               </p>
               <p className="text-[11px] text-muted-foreground mt-1">All time</p>
@@ -167,7 +168,7 @@ export function ProductDashboard() {
               </div>
               <p className="text-3xl font-bold text-foreground">
                 {circleLoading && newMembersThisMonth === null
-                  ? <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
+                  ? <LoadingDots />
                   : (newMembersThisMonth ?? "—").toLocaleString()}
               </p>
               <p className="text-[11px] text-muted-foreground mt-1">March 2026</p>

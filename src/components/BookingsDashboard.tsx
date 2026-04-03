@@ -1,6 +1,7 @@
 import { useSupabaseMetrics } from "@/hooks/use-supabase-metrics";
 import { Card, CardContent } from "@/components/ui/card";
 import { AlertCircle, Loader2 } from "lucide-react";
+import { LoadingDots } from "@/components/LoadingDots";
 import { formatDay } from "@/lib/dates";
 import {
   AreaChart, Area, BarChart, Bar,
@@ -49,7 +50,7 @@ export function BookingsDashboard({ from, to, showRate }: {
           <div key={s.label} className="px-5 py-5">
             <p className="text-xs font-medium text-muted-foreground mb-2 uppercase tracking-wide">{s.label}</p>
             {isLoading && s.label !== "Show Rate" ? (
-              <Loader2 className="h-5 w-5 animate-spin text-muted-foreground" />
+              <LoadingDots />
             ) : (
               <p className={`text-3xl font-bold ${s.accent ?? "text-foreground"}`}>
                 {s.value ?? "—"}
@@ -69,7 +70,7 @@ export function BookingsDashboard({ from, to, showRate }: {
             <p className="text-xs font-semibold text-muted-foreground uppercase tracking-widest mb-5">Daily Trend</p>
             {(() => {
               const activeDays = dailyBookings.filter(d => d.bookings > 0 || d.held > 0 || d.qualified > 0);
-              if (isLoading) return <div className="flex justify-center py-8"><Loader2 className="h-5 w-5 animate-spin text-muted-foreground" /></div>;
+              if (isLoading) return <div className="flex items-center justify-center" style={{ height: 200 }}><LoadingDots /></div>;
               if (activeDays.length < 2) return <p className="text-xs text-muted-foreground py-8 text-center">Not enough data for trend chart</p>;
               return (
               <ResponsiveContainer width="100%" height={200}>
@@ -102,7 +103,7 @@ export function BookingsDashboard({ from, to, showRate }: {
           <CardContent className="p-6">
             <p className="text-xs font-semibold text-muted-foreground uppercase tracking-widest mb-5">Qualified by Source</p>
             {isLoading ? (
-              <div className="flex justify-center py-8"><Loader2 className="h-5 w-5 animate-spin text-muted-foreground" /></div>
+              <div className="flex items-center justify-center" style={{ height: 200 }}><LoadingDots /></div>
             ) : salesEventBreakdown.length === 0 ? (
               <p className="text-sm text-muted-foreground text-center py-8">No data for this period</p>
             ) : (

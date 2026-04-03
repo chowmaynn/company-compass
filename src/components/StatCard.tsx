@@ -1,5 +1,6 @@
 import { Card, CardContent } from "@/components/ui/card";
 import { ArrowUpRight, ArrowDownRight } from "lucide-react";
+import { LoadingDots } from "@/components/LoadingDots";
 
 export interface StatCardProps {
   label: string;
@@ -44,7 +45,7 @@ export function StatCard({
               {label}
             </p>
             <p className={`text-3xl font-bold tracking-tight ${textColor}`}>
-              {loading ? <span className="text-muted-foreground animate-pulse">...</span> : value}
+              {loading ? <LoadingDots /> : value}
             </p>
             {sub && (
               <p

@@ -17,6 +17,7 @@
     { "source": "/api/intercom/:path(.*)", "destination": "/api/intercom?__proxy_path=/:path" },
     { "source": "/api/stripe/:path(.*)", "destination": "/api/stripe?__proxy_path=/:path" },
     { "source": "/api/supabase/:path(.*)", "destination": "/api/supabase?__proxy_path=/:path" },
+    { "source": "/api/skool-supabase/:path(.*)", "destination": "/api/skool-supabase?__proxy_path=/:path" },
     { "source": "/api/ga4/:path(.*)", "destination": "/api/ga4?__proxy_path=/:path" },
     { "source": "/((?!api/).*)", "destination": "/index.html" }
   ]

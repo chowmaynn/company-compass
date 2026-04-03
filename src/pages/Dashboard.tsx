@@ -3,7 +3,7 @@ import { Card } from "@/components/ui/card";
 import { weekConfigs } from "@/data/scorecardData";
 import { useScorecard } from "@/hooks/use-scorecard";
 import { useCurrency, useSelectedMonth } from "@/components/AppLayout";
-import { fetchRevenueHistory, type ScorecardRow } from "@/lib/supabase-scorecard";
+import { fetchRevenueHistory, fetchFinancialSummary, type ScorecardRow } from "@/lib/supabase-scorecard";
 import { useAuth } from "@/hooks/use-auth";
 import { FunnelSankey } from "@/components/FunnelSankey";
 import { DateRangePicker, type DateRangeValue } from "@/components/DateRangePicker";
@@ -90,14 +90,52 @@ export default function Dashboard() {
 
   const { metrics: scorecardData, loading } = useScorecard(activeMonth);
 
+  // Multi-month financial summary (Revenue + Cash Collected summed across range)
+  const [financialSummary, setFinancialSummary] = useState<ScorecardRow[]>([]);
+  useEffect(() => {
+    if (rangeMonths.length <= 1) { setFinancialSummary([]); return; }
+    let cancelled = false;
+    fetchFinancialSummary(rangeMonths).then((rows) => {
+      if (!cancelled) setFinancialSummary(rows);
+    });
+    return () => { cancelled = true; };
+  }, [rangeMonths]);
+
   const formatCurrency = (val: number | string | undefined) => {
     if (!val || val === "—") return "—";
     const n = parseNum(String(val));
     return n !== null ? `${symbol}${compactNumber(convert(n))}` : String(val);
   };
 
+  // For multi-month ranges, sum from weekly actuals + catchup (more reliable than monthly_actual which can be stale)
+  const multiMonthFinancials = useMemo(() => {
+    if (rangeMonths.length <= 1 || financialSummary.length === 0) return null;
+    const sumMetric = (metricName: string) => {
+      const rows = financialSummary.filter((r) => r.metric === metricName);
+      let actualSum = 0, targetSum = 0, hasActual = false;
+      for (const row of rows) {
+        // Sum from weekly actuals + catchup to avoid stale monthly_actual
+        const weekVals = [row.catchup_actual, row.w1_actual, row.w2_actual, row.w3_actual, row.w4_actual];
+        for (const v of weekVals) {
+          const n = parseNum(v);
+          if (n !== null) { actualSum += n; hasActual = true; }
+        }
+        const t = parseNum(row.monthly_target);
+        if (t !== null) targetSum += t;
+      }
+      return { actual: hasActual ? actualSum : null, target: targetSum || null };
+    };
+    return { revenue: sumMetric("Revenue"), cash: sumMetric("Cash Collected") };
+  }, [rangeMonths, financialSummary]);
+
   const revenue = scorecardData.find((m) => m.name === "Revenue");
   const cash = scorecardData.find((m) => m.name === "Cash Collected");
+
+  // Use multi-month sums when available, otherwise single-month scorecard
+  const revActual = multiMonthFinancials?.revenue.actual ?? parseNum(revenue?.monthlyActual ?? "—");
+  const revTarget = multiMonthFinancials?.revenue.target ?? parseNum(revenue?.monthlyTarget ?? "—");
+  const cashActual = multiMonthFinancials?.cash.actual ?? parseNum(cash?.monthlyActual ?? "—");
+  const cashTarget = multiMonthFinancials?.cash.target ?? parseNum(cash?.monthlyTarget ?? "—");
 
   const revenueWeekly = useMemo(() =>
     revenue?.weeks.map((w, i) => ({
@@ -107,8 +145,8 @@ export default function Dashboard() {
     })) ?? [],
   [revenue]);
 
-  const revPct = pctOfTarget(revenue?.monthlyActual ?? 0, revenue?.monthlyTarget ?? 0);
-  const cashPct = pctOfTarget(cash?.monthlyActual ?? 0, cash?.monthlyTarget ?? 0);
+  const revPct = revActual !== null && revTarget !== null && revTarget !== 0 ? Math.round((revActual / revTarget) * 100) : null;
+  const cashPct = cashActual !== null && cashTarget !== null && cashTarget !== 0 ? Math.round((cashActual / cashTarget) * 100) : null;
 
   return (
     <div className="p-6 space-y-6 max-w-[1440px] mx-auto">
@@ -128,9 +166,9 @@ export default function Dashboard() {
             <div className="p-5 pb-3">
               <span className="text-sm font-medium text-muted-foreground mb-2 block">Revenue</span>
               <p className="text-3xl font-bold tracking-tight text-foreground">
-                {formatCurrency(revenue?.monthlyActual)}
+                {revActual !== null ? `${symbol}${compactNumber(convert(revActual))}` : "—"}
               </p>
-              <p className="text-xs text-muted-foreground mt-1">Target: {formatCurrency(revenue?.monthlyTarget)}</p>
+              <p className="text-xs text-muted-foreground mt-1">Target: {revTarget !== null ? `${symbol}${compactNumber(convert(revTarget))}` : "—"}</p>
               {revPct !== null && (
                 <div className="mt-3">
                   <div className="flex justify-between text-xs mb-1.5">
@@ -149,9 +187,9 @@ export default function Dashboard() {
             <div className="border-t border-white/[0.06] p-5 pt-3">
               <span className="text-sm font-medium text-muted-foreground mb-2 block">Cash Collected</span>
               <p className="text-3xl font-bold tracking-tight text-foreground">
-                {formatCurrency(cash?.monthlyActual)}
+                {cashActual !== null ? `${symbol}${compactNumber(convert(cashActual))}` : "—"}
               </p>
-              <p className="text-xs text-muted-foreground mt-1">Target: {formatCurrency(cash?.monthlyTarget)}</p>
+              <p className="text-xs text-muted-foreground mt-1">Target: {cashTarget !== null ? `${symbol}${compactNumber(convert(cashTarget))}` : "—"}</p>
               {cashPct !== null && (
                 <div className="mt-3">
                   <div className="flex justify-between text-xs mb-1.5">

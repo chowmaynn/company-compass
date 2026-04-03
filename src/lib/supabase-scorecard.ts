@@ -49,6 +49,20 @@ export async function fetchScorecard(month: string): Promise<ScorecardRow[]> {
   return res.json();
 }
 
+/** Fetch Revenue + Cash Collected rows for one or more months (for dashboard summary). */
+export async function fetchFinancialSummary(months: string[]): Promise<ScorecardRow[]> {
+  if (months.length === 0) return [];
+  const headers = await getSupabaseHeaders();
+  const monthFilter = months.map((m) => `month.eq.${m}`).join(",");
+  const url = `${SUPABASE_URL}/rest/v1/scorecard?or=(metric.eq.Revenue,metric.eq.Cash%20Collected)&or=(${monthFilter})&order=month.asc`;
+  const res = await fetch(url, { headers });
+  if (!res.ok) {
+    console.error("Supabase financial summary fetch error:", res.status);
+    return [];
+  }
+  return res.json();
+}
+
 export async function fetchRevenueHistory(months: string[]): Promise<ScorecardRow[]> {
   if (months.length === 0) return [];
   const headers = await getSupabaseHeaders();

@@ -9,6 +9,7 @@ import { useSalesTracking } from "@/hooks/use-sales-tracking";
 import { useIntercom } from "@/hooks/use-intercom";
 import { useTallyNps } from "@/hooks/use-tally-nps";
 import { useSupabaseMetrics } from "@/hooks/use-supabase-metrics";
+import { useSkoolJoins, type SkoolJoinsData } from "@/hooks/use-skool-joins";
 
 // Define display order for metrics within each department
 const METRIC_ORDER: string[] = [
@@ -119,7 +120,7 @@ const DEFAULT_MONTH = `${new Date().getFullYear()}-${String(new Date().getMonth(
 
 // Metrics sourced from live APIs — only the current week gets overlaid
 type ApiSource = {
-  hook: "kit" | "notion" | "ga" | "salesTracking" | "intercom" | "tally" | "computed";
+  hook: "kit" | "notion" | "ga" | "salesTracking" | "intercom" | "tally" | "computed" | "skoolJoins";
   field: string;
 };
 
@@ -129,6 +130,7 @@ const API_METRIC_MAP: Record<string, ApiSource> = {
   "Videos posted last week":              { hook: "notion",    field: "weeklyPublished" },
   "Videos in the backlog":                { hook: "notion",    field: "backlogCount" },
   "Website Views":                        { hook: "ga",        field: "weeklyViews" },
+  "Skool Joins":                          { hook: "skoolJoins", field: "weeklyJoins" },
   // Bitly clicks are written to scorecard by the bitly-daily edge function — no live overlay needed
   // Total Bookings, Email Bookings: manual entry
   // Closing Calls metrics: manual entry (Close CRM API data available on Sales page)
@@ -151,6 +153,7 @@ function resolveApiValue(
     salesMetrics: ReturnType<typeof useSupabaseMetrics>;
     intercom: ReturnType<typeof useIntercom>;
     tallyNps: ReturnType<typeof useTallyNps>;
+    skoolJoins: SkoolJoinsData;
     currentMetrics: Metric[];
   }
 ): number | string | "—" {
@@ -166,6 +169,8 @@ function resolveApiValue(
     }
     case "ga":
       return apis.ga.weeklyViews[weekIndex] ?? "—";
+    case "skoolJoins":
+      return apis.skoolJoins.weeklyJoins[weekIndex] ?? "—";
     case "salesTracking": {
       const val = apis.salesTracking[source.field as keyof typeof apis.salesTracking];
       if (typeof val === "number") return val;
@@ -235,9 +240,16 @@ function resolveApiValue(
       }
 
       if (source.field === "skoolBookingRate") {
-        const sjMetric = apis.currentMetrics.find((m) => m.name === "Skool Joins");
-        const raw = sjMetric?.weeks[weekIndex]?.actual;
-        const skoolJoins = typeof raw === "number" ? raw : Number(String(raw).replace(/,/g, ""));
+        // Use live Skool Joins data if available, fall back to scorecard
+        const liveJoins = apis.skoolJoins.weeklyJoins[weekIndex];
+        let skoolJoins: number;
+        if (typeof liveJoins === "number" && liveJoins > 0) {
+          skoolJoins = liveJoins;
+        } else {
+          const sjMetric = apis.currentMetrics.find((m) => m.name === "Skool Joins");
+          const raw = sjMetric?.weeks[weekIndex]?.actual;
+          skoolJoins = typeof raw === "number" ? raw : Number(String(raw).replace(/,/g, ""));
+        }
         if (!skoolJoins || isNaN(skoolJoins) || skoolJoins <= 0) return "—";
         const skoolBookings = sumWeekBookings([
           "AAA Accelerator Business Call (Skool A)",
@@ -275,6 +287,7 @@ export function useScorecard(month: string = DEFAULT_MONTH) {
   }), [stTeam]);
   const intercom = useIntercom();
   const tallyNps = useTallyNps();
+  const skoolJoins = useSkoolJoins();
 
   // Casey's Supabase for qualified booking counts
   const [mYear, mMonth] = month.split("-").map(Number);
@@ -347,7 +360,7 @@ export function useScorecard(month: string = DEFAULT_MONTH) {
         // During an active week: overlay API data into that week's actual
         const source = API_METRIC_MAP[m.name];
         if (source) {
-          const apiVal = resolveApiValue(source, cwi, { kit, notion, ga, salesTracking, intercom, tallyNps, salesMetrics, currentMetrics: supabaseMetrics });
+          const apiVal = resolveApiValue(source, cwi, { kit, notion, ga, salesTracking, intercom, tallyNps, skoolJoins, salesMetrics, currentMetrics: supabaseMetrics });
           if (apiVal !== "—") {
             updated = { ...m, weeks: [...m.weeks] };
             updated.weeks[cwi] = { ...updated.weeks[cwi], actual: apiVal };
@@ -357,10 +370,18 @@ export function useScorecard(month: string = DEFAULT_MONTH) {
         // During catch-up period: overlay snapshot metrics into catch-up actual
         const source = API_METRIC_MAP[m.name];
         if (source) {
-          // Use week index 0 for resolving — snapshot metrics (backlogCount) ignore the index
-          const apiVal = resolveApiValue(source, 0, { kit, notion, ga, salesTracking, intercom, tallyNps, salesMetrics, currentMetrics: supabaseMetrics });
-          if (apiVal !== "—") {
-            updated = { ...m, catchUp: { ...m.catchUp, actual: apiVal } };
+          // For Skool Joins, use the dedicated catchUpJoins value
+          if (source.hook === "skoolJoins") {
+            const catchUpVal = skoolJoins.catchUpJoins;
+            if (catchUpVal !== "—") {
+              updated = { ...m, catchUp: { ...m.catchUp, actual: catchUpVal } };
+            }
+          } else {
+            // Use week index 0 for resolving — snapshot metrics (backlogCount) ignore the index
+            const apiVal = resolveApiValue(source, 0, { kit, notion, ga, salesTracking, intercom, tallyNps, skoolJoins, salesMetrics, currentMetrics: supabaseMetrics });
+            if (apiVal !== "—") {
+              updated = { ...m, catchUp: { ...m.catchUp, actual: apiVal } };
+            }
           }
         }
       }
@@ -416,7 +437,7 @@ export function useScorecard(month: string = DEFAULT_MONTH) {
 
       return updated;
     });
-  }, [supabaseMetrics, kit, notion, ga.weeklyViews, ga.monthlyViews, salesTracking, intercom.inboxTotal, tallyNps.results, salesMetrics.salesEventBreakdown, salesMetrics.cube, salesMetrics.dates]);
+  }, [supabaseMetrics, kit, notion, ga.weeklyViews, ga.monthlyViews, salesTracking, intercom.inboxTotal, tallyNps.results, skoolJoins.weeklyJoins, skoolJoins.catchUpJoins, salesMetrics.salesEventBreakdown, salesMetrics.cube, salesMetrics.dates]);
 
   // Auto-calculate statuses from most recent week's actual vs target
   const metricsWithStatus = useMemo(() => {
