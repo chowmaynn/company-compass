@@ -6,7 +6,7 @@ import { toNZDate } from "@/lib/dates";
 
 // ── Types ────────────────────────────────────────────────────
 
-export type Preset = "today" | "MTD" | "TW" | "LM" | "3m" | "custom";
+export type Preset = "today" | "yesterday" | "MTD" | "TW" | "LM" | "3m" | "custom";
 
 export interface DateRangeValue {
   /** ISO string (local midnight → UTC) for Supabase queries */
@@ -55,6 +55,12 @@ export function presetToRange(preset: Exclude<Preset, "custom">): { from: Date; 
     const nzToday = toNZDate(now);
     const todayDate = new Date(nzToday + "T00:00:00");
     return { from: todayDate, to: todayDate };
+  }
+  if (preset === "yesterday") {
+    const nzToday = toNZDate(now);
+    const todayDate = new Date(nzToday + "T00:00:00");
+    const yesterdayDate = new Date(todayDate.getTime() - 86400000);
+    return { from: yesterdayDate, to: yesterdayDate };
   }
   if (preset === "MTD") return { from: new Date(now.getFullYear(), now.getMonth(), 1), to: now };
   if (preset === "TW")  { const w = getCurrentMonthWeek(); return { from: w.from, to: w.to }; }
@@ -127,8 +133,9 @@ export function DateRangePicker({ defaultPreset = "TW", onChange }: Props) {
   }, [customRange]);
 
   const presets: { id: Preset; label: string }[] = [
-    { id: "today", label: "Today" },
-    { id: "TW",  label: "This Week" },
+    { id: "today",     label: "Today" },
+    { id: "yesterday", label: "Yesterday" },
+    { id: "TW",        label: "This Week" },
     { id: "MTD", label: "This Month" },
     { id: "LM",  label: "Last Month" },
     { id: "3m",  label: "3 Months" },
