@@ -7,7 +7,6 @@ import { useYouTube } from "@/hooks/use-youtube";
 import { useBitly } from "@/hooks/use-bitly";
 import { useGoogleAnalytics } from "@/hooks/use-google-analytics";
 import { useNotion } from "@/hooks/use-notion";
-import { useKit } from "@/hooks/use-kit";
 import { isAuthorized } from "@/lib/youtube-auth";
 import { BarChart3 } from "lucide-react";
 
@@ -19,7 +18,6 @@ const Index = () => {
   const bitly = useBitly();
   const ga = useGoogleAnalytics();
   const notion = useNotion();
-  const kit = useKit();
 
   const needsYouTubeAuth = !isAuthorized();
 
@@ -172,41 +170,6 @@ const Index = () => {
     );
   }, [notion.weeklyPublished, notion.backlogCount]);
 
-  // Update Marketing metrics with live Kit (ConvertKit) broadcast data
-  useEffect(() => {
-    const hasSent = kit.weeklyBroadcastCount.some((v) => v !== "—");
-    const hasClicks = kit.weeklyBroadcastClicks.some((v) => v !== "—");
-    if (!hasSent && !hasClicks) return;
-
-    const formatCount = (n: number) =>
-      n >= 1_000_000 ? `${(n / 1_000_000).toFixed(2)}m`
-        : n >= 1_000 ? `${(n / 1_000).toFixed(1)}k`
-          : String(n);
-
-    const kitMetricMap: Record<string, (number | "—")[]> = {
-      "Emails Sent": kit.weeklyBroadcastCount,
-      "Email Clicks": kit.weeklyBroadcastClicks,
-    };
-
-    setMetrics((prev) =>
-      prev.map((m) => {
-        const weeklyData = kitMetricMap[m.name];
-        if (!weeklyData) return m;
-
-        const numericCounts = weeklyData.filter((v): v is number => v !== "—");
-        const totalMonth = numericCounts.reduce((a, b) => a + b, 0);
-
-        return {
-          ...m,
-          weeks: m.weeks.map((w, i) => ({
-            ...w,
-            actual: weeklyData[i],
-          })),
-          monthlyActual: numericCounts.length > 0 ? formatCount(totalMonth) : "—",
-        };
-      })
-    );
-  }, [kit.weeklyBroadcastCount, kit.weeklyBroadcastClicks]);
 
   const filteredMetrics = activeDepartment === "all"
     ? metrics
@@ -222,7 +185,6 @@ const Index = () => {
     "Videos posted last week", "Videos in the backlog", "YouTube views", "New YouTube subscribers",
     "Clicks: YouTube > Skool", "Clicks: YouTube > Accelerator", "Clicks: Skool > Accelerator",
     "Website Views",
-    "Emails Sent", "Email Clicks",
   ]);
 
   const handleMetricChange = (metricName: string, field: string, value: number | string) => {

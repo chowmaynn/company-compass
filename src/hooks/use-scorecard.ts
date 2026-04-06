@@ -26,8 +26,6 @@ const METRIC_ORDER: string[] = [
   "Clicks: Skool > Accelerator",
   "Clicks: Webinar (total)",
   // Marketing
-  "Emails Sent",
-  "Email Clicks",
   "Total Bookings",
   "Email Bookings",
   "Website Views",
@@ -125,8 +123,6 @@ type ApiSource = {
 };
 
 const API_METRIC_MAP: Record<string, ApiSource> = {
-  "Emails Sent":                          { hook: "kit",       field: "weeklyBroadcastCount" },
-  "Email Clicks":                         { hook: "kit",       field: "weeklyBroadcastClicks" },
   "Videos posted last week":              { hook: "notion",    field: "weeklyPublished" },
   "Videos in the backlog":                { hook: "notion",    field: "backlogCount" },
   "Website Views":                        { hook: "ga",        field: "weeklyViews" },

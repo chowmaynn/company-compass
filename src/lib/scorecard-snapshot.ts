@@ -9,7 +9,6 @@
 
 import { weekConfigs, getCompletedWeekIndex } from "@/data/scorecardData";
 import { updateScorecardCell } from "@/lib/supabase-scorecard";
-import { fetchAllBroadcastStats } from "@/lib/kit";
 import { fetchPublishedCount, fetchBacklogCount } from "@/lib/notion";
 import { getCategorizedClicks, bucketClicksByWeek } from "@/lib/bitly";
 // GA4 requires OAuth token — skipped in snapshot (needs manual entry or service account)
@@ -46,18 +45,6 @@ export async function snapshotWeeklyApiMetrics(): Promise<SnapshotResult[]> {
     console.log(`[Snapshot] ${metric} → ${column} = ${strVal} (${ok ? "ok" : "FAILED"})`);
   }
 
-  // --- Kit: Emails Sent + Email Clicks ---
-  try {
-    const weekRanges = weekConfigs.map((wc) => ({ start: wc.start, end: wc.end }));
-    const broadcastStats = await fetchAllBroadcastStats(weekRanges);
-    const week = broadcastStats[completedIdx];
-    if (week) {
-      if (week.count > 0) await write("Emails Sent", week.count);
-      if (week.totalClicks > 0) await write("Email Clicks", week.totalClicks);
-    }
-  } catch (err) {
-    console.error("[Snapshot] Kit fetch failed:", err);
-  }
 
   // --- Notion: Videos posted + Backlog ---
   try {

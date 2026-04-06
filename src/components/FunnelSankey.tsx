@@ -117,7 +117,6 @@ function useFunnelData(metrics: Metric[], formatCurrency?: (val: number | string
     const find = (name: string) => metrics.find((m) => m.name === name);
 
     const ytViews = find("YouTube views");
-    const emailClicks = find("Email Clicks");
     const websiteViews = find("Website Views");
     const skoolJoins = find("Skool Joins");
 
@@ -182,9 +181,8 @@ function useFunnelData(metrics: Metric[], formatCurrency?: (val: number | string
     const nodes: FunnelNode[] = [
       // Sources
       { id: "yt-views", label: "YouTube Views", value: metricValue(ytViews), target: metricTarget(ytViews), formatted: fmt(ytViews), targetFormatted: fmtTarget(ytViews), status: ytViews?.status ?? "green", x: srcX, y: srcStartY, w: srcW, h: srcH },
-      { id: "email", label: "Email Clicks", value: metricValue(emailClicks), target: metricTarget(emailClicks), formatted: fmt(emailClicks), targetFormatted: fmtTarget(emailClicks), status: emailClicks?.status ?? "green", x: srcX, y: srcStartY + srcH + srcGap, w: srcW, h: srcH },
-      { id: "website", label: "Website Views", value: metricValue(websiteViews), target: metricTarget(websiteViews), formatted: fmt(websiteViews), targetFormatted: fmtTarget(websiteViews), status: websiteViews?.status ?? "green", x: srcX, y: srcStartY + 2 * (srcH + srcGap), w: srcW, h: srcH },
-      { id: "skool", label: "Skool Joins", value: metricValue(skoolJoins), target: metricTarget(skoolJoins), formatted: fmt(skoolJoins), targetFormatted: fmtTarget(skoolJoins), status: skoolJoins?.status ?? "green", x: srcX, y: srcStartY + 3 * (srcH + srcGap), w: srcW, h: srcH },
+      { id: "website", label: "Website Views", value: metricValue(websiteViews), target: metricTarget(websiteViews), formatted: fmt(websiteViews), targetFormatted: fmtTarget(websiteViews), status: websiteViews?.status ?? "green", x: srcX, y: srcStartY + srcH + srcGap, w: srcW, h: srcH },
+      { id: "skool", label: "Skool Joins", value: metricValue(skoolJoins), target: metricTarget(skoolJoins), formatted: fmt(skoolJoins), targetFormatted: fmtTarget(skoolJoins), status: skoolJoins?.status ?? "green", x: srcX, y: srcStartY + 2 * (srcH + srcGap), w: srcW, h: srcH },
 
       // Booking types (middle)
       { id: "email-bookings", label: "Email Bookings", value: emailBookingsVal, target: metricTarget(emailBookings), formatted: emailBookingsVal != null ? compact(emailBookingsVal) : "—", targetFormatted: fmtTarget(emailBookings), status: emailBookings?.status ?? "green", x: bkX, y: srcStartY + srcH + srcGap, w: bkW, h: bkH },

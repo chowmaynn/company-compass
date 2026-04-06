@@ -3,8 +3,8 @@
   "configurations": [
     {
       "name": "Vite Dev Server",
-      "runtimeExecutable": "npx",
-      "runtimeArgs": ["vite", "--port", "8080"],
+      "runtimeExecutable": "/opt/homebrew/bin/node",
+      "runtimeArgs": ["node_modules/.bin/vite", "--port", "8080"],
       "port": 8080,
       "autoPort": false
     },

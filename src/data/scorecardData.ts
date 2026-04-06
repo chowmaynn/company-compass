@@ -221,41 +221,6 @@ export const scorecardData: Metric[] = [
     source: "",
     description: "",
   },
-  // MARKETING — Email (Kit)
-  {
-    name: "Emails Sent",
-    department: "Marketing",
-    catchUp: { actual: "—", projection: "—" },
-    weeks: [
-      { actual: "—", projection: "—" },
-      { actual: "—", projection: "—" },
-      { actual: "—", projection: "—" },
-      { actual: "—", projection: "—" },
-    ],
-    monthlyActual: "—",
-    monthlyTarget: "—",
-    status: "green",
-    owner: "Casey",
-    source: "Kit",
-    description: "Total broadcast emails delivered per week",
-  },
-  {
-    name: "Email Clicks",
-    department: "Marketing",
-    catchUp: { actual: "—", projection: "—" },
-    weeks: [
-      { actual: "—", projection: "—" },
-      { actual: "—", projection: "—" },
-      { actual: "—", projection: "—" },
-      { actual: "—", projection: "—" },
-    ],
-    monthlyActual: "—",
-    monthlyTarget: "—",
-    status: "green",
-    owner: "Casey",
-    source: "Kit",
-    description: "Total broadcast email clicks per week",
-  },
   // MARKETING — Bookings
   {
     name: "Total Bookings",

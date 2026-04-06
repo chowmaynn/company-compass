@@ -42,15 +42,15 @@ function fmtDate(iso: string): string {
 // ── Source colours ───────────────────────────────────────────────────────────
 
 const SOURCE_COLORS: Record<string, string> = {
-  Email:            "#6366f1",
-  "Welcome Email":  "#8b5cf6",
-  Website:          "#06b6d4",
-  "Website B":      "#0891b2",
-  "Website C":      "#0e7490",
-  "Skool A":        "#10b981",
-  "Skool C":        "#34d399",
-  "Skool P":        "#6ee7b7",
-  Masterclass:      "#f59e0b",
+  Email:            "#3b82f6",
+  "Welcome Email":  "#93c5fd",
+  Website:          "#ec4899",
+  "Website B":      "#f472b6",
+  "Website C":      "#f9a8d4",
+  "Skool A":        "#eab308",
+  "Skool C":        "#facc15",
+  "Skool P":        "#fde047",
+  Masterclass:      "#f97316",
   Google:           "#ef4444",
 };
 const DEFAULT_COLOR = "#94a3b8";
@@ -148,11 +148,9 @@ export default function MarketingDashboard() {
 
         {/* Card header with date picker */}
         <div className="flex items-center justify-between px-6 py-4 border-b border-border">
-          <div>
+          <div className="flex items-center gap-4">
             <h3 className="text-sm font-semibold text-foreground">Booking Overview</h3>
-            <p className="text-xs text-muted-foreground mt-0.5">
-              All marketing channels · {avgPerDay} per day avg
-            </p>
+            <span className="text-xs font-medium text-muted-foreground bg-muted/50 px-2.5 py-1 rounded-md">Total Average: {avgPerDay}/day</span>
           </div>
           <SharedDateRangePicker onChange={setRange} />
         </div>
@@ -316,9 +314,9 @@ export default function MarketingDashboard() {
 
               {/* A / P / C breakdown */}
               {[
-                { label: "Skool DM", value: skoolBookings.skoolA, color: "#10b981" },
-                { label: "Skool Classroom", value: skoolBookings.skoolC, color: "#34d399" },
-                { label: "Skool Post", value: skoolBookings.skoolP, color: "#6ee7b7" },
+                { label: "Skool DM", value: skoolBookings.skoolA, color: "#eab308" },
+                { label: "Skool Classroom", value: skoolBookings.skoolC, color: "#facc15" },
+                { label: "Skool Post", value: skoolBookings.skoolP, color: "#fde047" },
               ].map(({ label, value, color }) => (
                 <div key={label} className="flex items-center gap-3">
                   <span className="inline-block rounded-sm shrink-0" style={{ width: 10, height: 10, background: color }} />
@@ -407,8 +405,8 @@ export default function MarketingDashboard() {
                           innerRadius={38} outerRadius={60}
                           paddingAngle={3} dataKey="value"
                         >
-                          <Cell fill="#6366f1" />
-                          <Cell fill="#8b5cf6" />
+                          <Cell fill="#3b82f6" />
+                          <Cell fill="#93c5fd" />
                         </Pie>
                         <Tooltip
                           cursor={false}
@@ -426,8 +424,8 @@ export default function MarketingDashboard() {
                     </div>
                     <div className="space-y-3">
                       {[
-                        { label: "Email", value: emailSupabase.salesEventBreakdown.find((e) => e.name === "Email")?.qualified ?? 0, color: "#6366f1" },
-                        { label: "Welcome Series", value: emailSupabase.salesEventBreakdown.find((e) => e.name === "Welcome Email")?.qualified ?? 0, color: "#8b5cf6" },
+                        { label: "Email", value: emailSupabase.salesEventBreakdown.find((e) => e.name === "Email")?.qualified ?? 0, color: "#3b82f6" },
+                        { label: "Welcome Series", value: emailSupabase.salesEventBreakdown.find((e) => e.name === "Welcome Email")?.qualified ?? 0, color: "#93c5fd" },
                       ].map(({ label, value, color }) => (
                         <div key={label}>
                           <div className="flex items-center gap-2 mb-1">
