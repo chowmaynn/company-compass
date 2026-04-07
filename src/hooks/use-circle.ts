@@ -45,7 +45,7 @@ export function useCircle() {
 
   const eventsQuery = useQuery({
     queryKey: ["circle", "events"],
-    queryFn: () => circleFetch("/events?per_page=10&sort=starts_at"),
+    queryFn: () => circleFetch("/events?per_page=50&sort=starts_at&status=published"),
     staleTime: 5 * 60 * 1000,
   });
 
@@ -65,7 +65,8 @@ export function useCircle() {
   const upcomingEvents: CircleEvent[] = eventsQuery.data?.records
     ? eventsQuery.data.records
         .filter((e: CircleEvent) => new Date(e.starts_at) >= now)
-        .slice(0, 3)
+        .sort((a: CircleEvent, b: CircleEvent) => new Date(a.starts_at).getTime() - new Date(b.starts_at).getTime())
+        .slice(0, 10)
     : [];
 
   return {

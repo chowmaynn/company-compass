@@ -139,12 +139,17 @@ export function useCircleCharts() {
     return Object.entries(buckets).map(([label, count]) => ({ label, count }));
   })();
 
+  // Raw posts for client-side filtering
+  const rawPosts: { name: string; likes_count: number; comments_count: number; space_name: string; url: string; created_at: string }[] =
+    postsQuery.data ?? [];
+
   return {
     memberGrowth,
     postActivity,
     spaceActivity,
     topPosts,
     activityBuckets,
+    rawPosts,
     isLoading,
     isError,
   };
