@@ -62,9 +62,13 @@ export function useCircle() {
   const totalPosts: number | null = postsQuery.data?.count ?? null;
 
   const now = new Date();
+  const thirtyDaysOut = new Date(now.getTime() + 30 * 86400000);
   const upcomingEvents: CircleEvent[] = eventsQuery.data?.records
     ? eventsQuery.data.records
-        .filter((e: CircleEvent) => new Date(e.starts_at) >= now)
+        .filter((e: CircleEvent) => {
+          const start = new Date(e.starts_at);
+          return start >= now && start <= thirtyDaysOut;
+        })
         .sort((a: CircleEvent, b: CircleEvent) => new Date(a.starts_at).getTime() - new Date(b.starts_at).getTime())
         .slice(0, 10)
     : [];
