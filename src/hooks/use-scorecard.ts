@@ -346,7 +346,7 @@ export function useScorecard(month: string = DEFAULT_MONTH) {
     // Metrics where monthly is manually entered (don't auto-calculate)
     const manualMonthlyMetrics = new Set<string>([]);
     // Metrics where monthly comes from a dedicated full-range query (not sum of weeks)
-    const dedicatedMonthlyMetrics = new Set(["Website Views"]);
+    const dedicatedMonthlyMetrics = new Set<string>([]);
 
     return supabaseMetrics.map((m) => {
       // Step 1: Apply API overlay
@@ -393,7 +393,11 @@ export function useScorecard(month: string = DEFAULT_MONTH) {
         } else if (ratioMetrics.has(m.name)) {
           // Ratio metrics: compute from total numerator / total denominator
           if (m.name === "Website Booking Rate") {
-            const totalViews = typeof ga.monthlyViews === "number" ? ga.monthlyViews : 0;
+            // Sum website views from week actuals + catch-up
+            const viewsMetric = supabaseMetrics.find((sm) => sm.name === "Website Views");
+            const viewWeekVals = viewsMetric ? viewsMetric.weeks.map((w) => parseWeekVal(w.actual)).filter((v): v is number => v !== null) : [];
+            const viewCatchUp = viewsMetric ? parseWeekVal(viewsMetric.catchUp.actual) : null;
+            const totalViews = viewWeekVals.reduce((a, b) => a + b, 0) + (viewCatchUp ?? 0);
             const websiteEvent = salesMetrics.salesEventBreakdown.find((e) => e.name === "Website");
             const totalBookings = websiteEvent?.qualified ?? 0;
             if (totalViews > 0 && totalBookings > 0) {
