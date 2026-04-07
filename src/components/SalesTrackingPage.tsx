@@ -174,6 +174,7 @@ export function SalesTrackingPage() {
           <KPIStat label="CALLS TAKEN" value={summary.calls_taken} sub={`of ${summary.calls_booked} booked`} loading={rangeLoading} />
           <KPIStat label="SHOW RATE" value={`${summary.show_rate}%`} sub="Taken ÷ Booked" loading={rangeLoading} />
           <KPIStat label="CLOSES" value={summary.closes} sub="Deals closed" accent="text-status-green" loading={rangeLoading} />
+          <KPIStat label="CLOSE RATE" value={`${summary.close_rate}%`} sub="Closes ÷ Taken" accent="text-status-green" loading={rangeLoading} />
           <KPIStat label="CONTRACT VALUE" value={fmtCurrency(convert(summary.cc), symbol)} sub="Total CC" accent="text-status-green" loading={rangeLoading} />
           <KPIStat label="NO SHOWS" value={summary.no_shows} sub="Didn't attend" accent="text-red-500" loading={rangeLoading} />
           <KPIStat label="CANCELLATIONS" value={summary.cancellations} sub="Cancelled calls" accent="text-red-500" loading={rangeLoading} />
