@@ -36,9 +36,9 @@ const tabs: { id: Tab; label: string; icon: React.ElementType }[] = [
 
 const productTabs: { id: Tab; label: string; icon: React.ElementType }[] = [
   { id: "dashboard", label: "Overview",        icon: LayoutDashboard },
+  { id: "support",   label: "Support",         icon: HeadphonesIcon },
   { id: "coaches",   label: "Coaches",         icon: Shield },
   { id: "success",   label: "Success Tracker", icon: Trophy },
-  { id: "support",   label: "Support",         icon: HeadphonesIcon },
 ];
 
 const financeTabs: { id: Tab; label: string; icon: React.ElementType }[] = [
