@@ -118,19 +118,32 @@ Deno.serve(async (_req) => {
     const CURRENT_MONTH = getCurrentMonth();
 
     const cwi = getCurrentWeekIndex(WEEK_CONFIGS);
-    if (cwi < 0 || cwi >= WEEK_CONFIGS.length) {
-      return new Response(JSON.stringify({ skipped: true, reason: "Outside active week range", month: CURRENT_MONTH, weeks: WEEK_CONFIGS }), {
+    if (cwi >= WEEK_CONFIGS.length) {
+      return new Response(JSON.stringify({ skipped: true, reason: "Past all weeks", month: CURRENT_MONTH }), {
         headers: { "Content-Type": "application/json" },
       });
     }
 
-    const currentWeek = WEEK_CONFIGS[cwi];
-    const weekStart = new Date(currentWeek.start);
-    const daysSinceWeekStart = Math.ceil((Date.now() - weekStart.getTime()) / (1000 * 60 * 60 * 24)) + 1;
-    // Fetch enough days to cover the current week so far
-    const daysToFetch = Math.min(daysSinceWeekStart + 1, 8);
+    // Determine the period to aggregate: catch-up or active week
+    const isCatchUp = cwi < 0;
+    const offset = nzOffsetHours(new Date());
+    const nzNow = new Date(Date.now() + offset * 3600000);
+    const year = nzNow.getUTCFullYear();
+    const month = nzNow.getUTCMonth();
 
-    logs.push(`Week ${currentWeek.label}, fetching ${daysToFetch} days of Bitly clicks`);
+    // Catch-up: 1st of month → W1 start
+    const monthStartUTC = new Date(Date.UTC(year, month, 1) - offset * 3600000);
+    const periodStart = isCatchUp ? monthStartUTC.toISOString() : WEEK_CONFIGS[cwi].start;
+    const periodEnd = isCatchUp ? WEEK_CONFIGS[0].start : WEEK_CONFIGS[cwi].end;
+    const periodCol = isCatchUp ? "catchup_actual" : WEEK_CONFIGS[cwi].col;
+    const periodLabel = isCatchUp ? "Catch-up" : WEEK_CONFIGS[cwi].label;
+
+    const periodStartDate = toNZDate(periodStart);
+    const periodEndDate = toNZDate(periodEnd);
+    const daysSincePeriodStart = Math.ceil((Date.now() - new Date(periodStart).getTime()) / (1000 * 60 * 60 * 24)) + 1;
+    const daysToFetch = Math.min(daysSincePeriodStart + 1, 10);
+
+    logs.push(`${periodLabel}, fetching ${daysToFetch} days of Bitly clicks (${periodStartDate} → ${periodEndDate})`);
 
     // 1. Get all link IDs grouped by category
     const { data: allLinks, error: linkErr } = await supabase
@@ -152,10 +165,7 @@ Deno.serve(async (_req) => {
 
     logs.push(`Found ${allLinks.length} links across ${byCategory.size} categories`);
 
-    // 2. For each category, fetch clicks and aggregate for current week
-    const weekStartDate = toNZDate(currentWeek.start);
-    const weekEndDate = toNZDate(currentWeek.end);
-
+    // 2. For each category, fetch clicks and aggregate for the current period
     for (const [category, links] of byCategory) {
       const metricName = CATEGORY_TO_METRIC[category];
       if (!metricName) {
@@ -163,7 +173,7 @@ Deno.serve(async (_req) => {
         continue;
       }
 
-      let weekTotal = 0;
+      let periodTotal = 0;
       let processed = 0;
       let errors = 0;
       const BATCH_SIZE = 10;
@@ -178,8 +188,8 @@ Deno.serve(async (_req) => {
           if (result.status === "fulfilled") {
             for (const day of result.value) {
               const date = day.date.slice(0, 10);
-              if (date >= weekStartDate && date < weekEndDate) {
-                weekTotal += day.clicks;
+              if (date >= periodStartDate && date < periodEndDate) {
+                periodTotal += day.clicks;
               }
             }
             processed++;
@@ -193,7 +203,7 @@ Deno.serve(async (_req) => {
       const { error: writeErr } = await supabase
         .from("scorecard")
         .update({
-          [currentWeek.col]: String(weekTotal),
+          [periodCol]: String(periodTotal),
           updated_at: new Date().toISOString(),
         })
         .eq("metric", metricName)
@@ -202,25 +212,24 @@ Deno.serve(async (_req) => {
       if (writeErr) {
         logs.push(`Write error for ${metricName}: ${writeErr.message}`);
       } else {
-        logs.push(`${metricName}: ${weekTotal} clicks (${processed} links, ${errors} errors) → ${currentWeek.col}`);
+        logs.push(`${metricName}: ${periodTotal} clicks (${processed} links, ${errors} errors) → ${periodCol}`);
       }
     }
 
-    // 4. Also compute monthly totals for each category
+    // 4. Compute monthly totals (catch-up + all weeks)
     for (const [category, _links] of byCategory) {
       const metricName = CATEGORY_TO_METRIC[category];
       if (!metricName) continue;
 
-      // Read all week actuals for this metric
       const { data: row } = await supabase
         .from("scorecard")
-        .select("w1_actual, w2_actual, w3_actual, w4_actual")
+        .select("catchup_actual, w1_actual, w2_actual, w3_actual, w4_actual")
         .eq("metric", metricName)
         .eq("month", CURRENT_MONTH)
         .single();
 
       if (row) {
-        const monthlyTotal = [row.w1_actual, row.w2_actual, row.w3_actual, row.w4_actual]
+        const monthlyTotal = [row.catchup_actual, row.w1_actual, row.w2_actual, row.w3_actual, row.w4_actual]
           .map((v) => parseInt(String(v).replace(/,/g, "")) || 0)
           .reduce((a, b) => a + b, 0);
 

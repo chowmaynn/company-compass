@@ -155,25 +155,47 @@ Deno.serve(async (_req) => {
       logs.push(`Snapshotted ${competitors.length} competitor channels`);
     }
 
-    // 3. Calculate "New YouTube subscribers" for scorecard
-    if (cwi >= 0 && cwi < WEEK_CONFIGS.length) {
-      const currentWeek = WEEK_CONFIGS[cwi];
+    // 3. Calculate "New YouTube subscribers" and "YouTube views" for scorecard
+    // Works for both catch-up (cwi === -1) and active weeks (cwi 0-3)
+    const isCatchUp = cwi === -1;
+    if (isCatchUp || (cwi >= 0 && cwi < WEEK_CONFIGS.length)) {
+      // Determine period start date for snapshot delta
+      const offset = nzOffsetHours();
+      const nzNow = new Date(Date.now() + offset * 3600000);
+      const year = nzNow.getUTCFullYear();
+      const month = nzNow.getUTCMonth();
 
-      // Get snapshot from the day before this week started (or closest earlier)
-      const { data: weekStartSnapshot } = await supabase
+      let periodStartDate: string;
+      let periodCol: string;
+      let periodLabel: string;
+
+      if (isCatchUp) {
+        // Catch-up: 1st of month
+        periodStartDate = `${year}-${String(month + 1).padStart(2, "0")}-01`;
+        periodCol = "catchup_actual";
+        periodLabel = "Catch-up";
+      } else {
+        const currentWeek = WEEK_CONFIGS[cwi];
+        periodStartDate = currentWeek.startDate;
+        periodCol = currentWeek.col;
+        periodLabel = currentWeek.label;
+      }
+
+      // Get snapshot from the day before this period started (or closest earlier)
+      const { data: periodStartSnapshot } = await supabase
         .from("youtube_snapshots")
         .select("subscriber_count, view_count")
         .eq("channel_id", OWN_CHANNEL_ID)
-        .lte("snapshot_date", currentWeek.startDate)
+        .lte("snapshot_date", periodStartDate)
         .order("snapshot_date", { ascending: false })
         .limit(1)
         .single();
 
-      if (weekStartSnapshot) {
-        const newSubs = stats.subscriberCount - weekStartSnapshot.subscriber_count;
-        const newViews = stats.viewCount - weekStartSnapshot.view_count;
-        logs.push(`New subs (${currentWeek.label}): ${newSubs} (${weekStartSnapshot.subscriber_count} → ${stats.subscriberCount})`);
-        logs.push(`New views (${currentWeek.label}): ${newViews} (${weekStartSnapshot.view_count} → ${stats.viewCount})`);
+      if (periodStartSnapshot) {
+        const newSubs = stats.subscriberCount - periodStartSnapshot.subscriber_count;
+        const newViews = stats.viewCount - periodStartSnapshot.view_count;
+        logs.push(`New subs (${periodLabel}): ${newSubs} (${periodStartSnapshot.subscriber_count} → ${stats.subscriberCount})`);
+        logs.push(`New views (${periodLabel}): ${newViews} (${periodStartSnapshot.view_count} → ${stats.viewCount})`);
 
         // Write both metrics to scorecard
         const metrics: { name: string; value: number }[] = [
@@ -185,7 +207,7 @@ Deno.serve(async (_req) => {
           const { error: writeErr } = await supabase
             .from("scorecard")
             .update({
-              [currentWeek.col]: String(metric.value),
+              [periodCol]: String(metric.value),
               updated_at: new Date().toISOString(),
             })
             .eq("metric", metric.name)
@@ -195,16 +217,16 @@ Deno.serve(async (_req) => {
             logs.push(`Scorecard write error for ${metric.name}: ${writeErr.message}`);
           }
 
-          // Update monthly total
+          // Update monthly total (catch-up + all weeks)
           const { data: row } = await supabase
             .from("scorecard")
-            .select("w1_actual, w2_actual, w3_actual, w4_actual")
+            .select("catchup_actual, w1_actual, w2_actual, w3_actual, w4_actual")
             .eq("metric", metric.name)
             .eq("month", CURRENT_MONTH)
             .single();
 
           if (row) {
-            const monthlyTotal = [row.w1_actual, row.w2_actual, row.w3_actual, row.w4_actual]
+            const monthlyTotal = [row.catchup_actual, row.w1_actual, row.w2_actual, row.w3_actual, row.w4_actual]
               .map((v) => parseInt(String(v).replace(/,/g, "")) || 0)
               .reduce((a, b) => a + b, 0);
 
