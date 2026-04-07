@@ -1,5 +1,5 @@
 import { useState, useEffect, useCallback, useMemo } from "react";
-import { type Metric, type StatusColor, type Department, scorecardMonth, getCurrentWeekIndex, weekConfigs } from "@/data/scorecardData";
+import { type Metric, type StatusColor, type Department, scorecardMonth, getCurrentWeekIndex, getCompletedWeekIndex, weekConfigs } from "@/data/scorecardData";
 import { fetchScorecard, updateScorecardCell, type ScorecardRow } from "@/lib/supabase-scorecard";
 import { calculateStatus, invertedMetrics } from "@/lib/calculateStatus";
 import { useKit } from "@/hooks/use-kit";
@@ -441,10 +441,24 @@ export function useScorecard(month: string = DEFAULT_MONTH) {
     });
   }, [supabaseMetrics, kit, notion, ga.weeklyViews, ga.monthlyViews, salesTracking, intercom.inboxTotal, tallyNps.results, skoolJoins.weeklyJoins, skoolJoins.catchUpJoins, salesMetrics.salesEventBreakdown, salesMetrics.cube, salesMetrics.dates]);
 
-  // Auto-calculate statuses from most recent week's actual vs target
+  // Auto-calculate statuses from the last completed period
   const metricsWithStatus = useMemo(() => {
+    const completedIdx = getCompletedWeekIndex();
     return metrics.map((m) => {
-      const newStatus = calculateStatus(m.weeks, invertedMetrics.has(m.name));
+      const inverted = invertedMetrics.has(m.name);
+      let newStatus: StatusColor | null = null;
+
+      if (completedIdx >= 0) {
+        // Use the most recently completed week
+        newStatus = calculateStatus([m.weeks[completedIdx]], inverted);
+      } else {
+        // No weeks completed yet — use catch-up (covers both during catch-up and during W1)
+        newStatus = calculateStatus(
+          [{ actual: m.catchUp.actual, projection: m.catchUp.projection }],
+          inverted
+        );
+      }
+
       if (newStatus && newStatus !== m.status) {
         return { ...m, status: newStatus };
       }
