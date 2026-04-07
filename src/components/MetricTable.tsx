@@ -7,14 +7,23 @@ import { Info } from "lucide-react";
 import React, { useMemo } from "react";
 
 function getCatchUpDateLabel(usFormat: boolean): string {
+  // W1 start is midnight NZT expressed in UTC — add NZ offset to get the NZ date
   const w1Start = new Date(weekConfigs[0].start);
-  const monthStart = new Date(w1Start);
-  monthStart.setUTCDate(1);
-  const catchUpEnd = new Date(w1Start.getTime() - 24 * 60 * 60 * 1000);
-  const dd = (d: Date) => String(d.getUTCDate()).padStart(2, "0");
-  const mm = (d: Date) => String(d.getUTCMonth() + 1).padStart(2, "0");
-  const fmt = (d: Date) => usFormat ? `${mm(d)}/${dd(d)}` : `${dd(d)}/${mm(d)}`;
-  return `${fmt(monthStart)}\u2013${fmt(catchUpEnd)}`;
+  // Approximate NZ offset: months 10-12,1-3 = +13 (NZDT), 4-9 = +12 (NZST)
+  const nzOffset = 12; // safe for date-label purposes
+  const toNZDay = (d: Date) => {
+    const nz = new Date(d.getTime() + nzOffset * 60 * 60 * 1000);
+    return { day: nz.getUTCDate(), month: nz.getUTCMonth() + 1 };
+  };
+  // Catch-up: 1st of the month to the day before W1 starts in NZ
+  const w1NZ = toNZDay(w1Start);
+  const startDay = 1;
+  const endDay = w1NZ.day - 1;
+  const month = w1NZ.month;
+  const dd = (n: number) => String(n).padStart(2, "0");
+  const mmStr = dd(month);
+  const fmt = (d: number, m: string) => usFormat ? `${m}/${dd(d)}` : `${dd(d)}/${m}`;
+  return `${fmt(startDay, mmStr)}\u2013${fmt(endDay, mmStr)}`;
 }
 
 function formatDateLabel(dateLabel: string, usFormat: boolean): string {
