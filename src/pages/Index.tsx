@@ -3,76 +3,18 @@ import { scorecardData as initialData, departments, scorecardMonth, type Departm
 import { calculateStatus, invertedMetrics } from "@/lib/calculateStatus";
 import { SummaryCards } from "@/components/SummaryCards";
 import { DepartmentSection } from "@/components/DepartmentSection";
-import { useYouTube } from "@/hooks/use-youtube";
 import { useBitly } from "@/hooks/use-bitly";
 import { useGoogleAnalytics } from "@/hooks/use-google-analytics";
 import { useNotion } from "@/hooks/use-notion";
-import { isAuthorized } from "@/lib/youtube-auth";
 import { BarChart3 } from "lucide-react";
 
 const Index = () => {
   const [activeDepartment, setActiveDepartment] = useState<Department | "all">("all");
   const [metrics, setMetrics] = useState<Metric[]>(initialData);
 
-  const youtube = useYouTube();
   const bitly = useBitly();
   const ga = useGoogleAnalytics();
   const notion = useNotion();
-
-  const needsYouTubeAuth = !isAuthorized();
-
-  // Update Content metrics with live YouTube data
-  useEffect(() => {
-    if (!youtube.channelStats && youtube.recentVideos.length === 0) return;
-
-    const formatCount = (n: number) =>
-      n >= 1_000_000 ? `${(n / 1_000_000).toFixed(2)}m`
-        : n >= 1_000 ? `${(n / 1_000).toFixed(1)}k`
-          : String(n);
-
-    setMetrics((prev) =>
-      prev.map((m) => {
-        if (m.department !== "Content") return m;
-
-        if (m.name === "YouTube views") {
-          const numericCounts = youtube.weeklyViewCounts.filter((v): v is number => v !== "—");
-          const totalMonth = numericCounts.reduce((a, b) => a + b, 0);
-          return {
-            ...m,
-            weeks: m.weeks.map((w, i) => {
-              const val = youtube.weeklyViewCounts[i];
-              return { ...w, actual: val === "—" ? "—" : formatCount(val) };
-            }),
-            monthlyActual: formatCount(totalMonth),
-          };
-        }
-
-        if (m.name === "New YouTube subscribers") {
-          if (youtube.analyticsConnected) {
-            // Use real per-period subscriber gains from Analytics API
-            const numericCounts = youtube.weeklySubCounts.filter((v): v is number => v !== "—");
-            const totalMonth = numericCounts.reduce((a, b) => a + b, 0);
-            return {
-              ...m,
-              weeks: m.weeks.map((w, i) => {
-                const val = youtube.weeklySubCounts[i];
-                return { ...w, actual: val === "—" ? "—" : formatCount(val) };
-              }),
-              monthlyActual: formatCount(totalMonth),
-            };
-          } else if (youtube.channelStats) {
-            // Fallback: show total subscriber count
-            return {
-              ...m,
-              monthlyActual: `${formatCount(youtube.channelStats.subscriberCount)} (total)`,
-            };
-          }
-        }
-
-        return m;
-      })
-    );
-  }, [youtube.channelStats, youtube.recentVideos, youtube.weeklyVideoCounts, youtube.weeklyViewCounts, youtube.weeklySubCounts, youtube.analyticsConnected]);
 
   // Update Content metrics with live Bitly data
   useEffect(() => {
@@ -182,7 +124,7 @@ const Index = () => {
   const showCharts = activeDepartment !== "all";
 
   const autoMetrics = new Set([
-    "Videos posted last week", "Videos in the backlog", "YouTube views", "New YouTube subscribers",
+    "Videos posted last week", "Videos in the backlog",
     "Clicks: YouTube > Skool", "Clicks: YouTube > Accelerator", "Clicks: Skool > Accelerator",
     "Website Views",
   ]);
@@ -284,7 +226,7 @@ const Index = () => {
               onMetricChange={handleMetricChange}
               showCharts={showCharts}
               readOnlyMetrics={dept === "Content" || dept === "Marketing" ? autoMetrics : undefined}
-              needsAuth={(dept === "Content" || dept === "Marketing") && needsYouTubeAuth}
+              needsAuth={false}
             />
           ))}
         </div>

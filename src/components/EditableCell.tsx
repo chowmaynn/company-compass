@@ -26,6 +26,12 @@ export function EditableCell({ value, onChange, className, isProjection }: Edita
     const trimmed = editValue.trim();
     if (trimmed === String(value)) return;
 
+    // Empty or cleared → reset to "—"
+    if (trimmed === "" || trimmed === "—" || trimmed === "–") {
+      onChange?.("—");
+      return;
+    }
+
     // Try to parse as number
     const parsed = Number(trimmed.replace(/,/g, ""));
     if (!isNaN(parsed) && /^[\d,]+(\.\d+)?$/.test(trimmed.replace(/,/g, ""))) {

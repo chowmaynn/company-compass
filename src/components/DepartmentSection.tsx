@@ -94,6 +94,7 @@ export function DepartmentSection({ department, metrics, onMetricChange, showCha
         onMetricChange={onMetricChange}
         readOnlyMetrics={readOnlyMetrics}
         currencyRate={isFinance && currency === "USD" && rate ? rate : undefined}
+        usDateFormat={currency === "USD"}
         canEditMetric={() => true}
       />
     </div>

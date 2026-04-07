@@ -4,7 +4,25 @@ import { EditableCell } from "./EditableCell";
 import { formatValue } from "@/lib/formatNumber";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 import { Info } from "lucide-react";
-import React from "react";
+import React, { useMemo } from "react";
+
+function getCatchUpDateLabel(usFormat: boolean): string {
+  const w1Start = new Date(weekConfigs[0].start);
+  const monthStart = new Date(w1Start);
+  monthStart.setUTCDate(1);
+  const catchUpEnd = new Date(w1Start.getTime() - 24 * 60 * 60 * 1000);
+  const dd = (d: Date) => String(d.getUTCDate()).padStart(2, "0");
+  const mm = (d: Date) => String(d.getUTCMonth() + 1).padStart(2, "0");
+  const fmt = (d: Date) => usFormat ? `${mm(d)}/${dd(d)}` : `${dd(d)}/${mm(d)}`;
+  return `${fmt(monthStart)}\u2013${fmt(catchUpEnd)}`;
+}
+
+function formatDateLabel(dateLabel: string, usFormat: boolean): string {
+  if (!usFormat) return dateLabel;
+  // dateLabel is "dd/mm" — flip to "mm/dd"
+  const [day, month] = dateLabel.split("/");
+  return `${month}/${day}`;
+}
 
 interface MetricTableProps {
   metrics: Metric[];
@@ -12,11 +30,14 @@ interface MetricTableProps {
   readOnlyMetrics?: Set<string>;
   /** When set, multiplies all numeric values by this rate (NZD→USD conversion) */
   currencyRate?: number;
+  /** When true, display dates in mm/dd format instead of dd/mm */
+  usDateFormat?: boolean;
   /** Per-metric edit check. If provided, overrides onMetricChange for metrics where this returns false. */
   canEditMetric?: (metric: Metric) => boolean;
 }
 
-export function MetricTable({ metrics, onMetricChange, readOnlyMetrics, currencyRate, canEditMetric }: MetricTableProps) {
+export function MetricTable({ metrics, onMetricChange, readOnlyMetrics, currencyRate, usDateFormat, canEditMetric }: MetricTableProps) {
+  const usFormat = !!usDateFormat;
   const convert = (val: number | string | ""): number | string | "" => {
     if (!currencyRate || val === "" || val === "—") return val;
     if (typeof val === "number") return Math.round(val * currencyRate);
@@ -38,13 +59,14 @@ export function MetricTable({ metrics, onMetricChange, readOnlyMetrics, currency
             <th colSpan={2} className="px-1 py-2 text-center font-semibold text-foreground border-r border-border/30">
               <div className="flex flex-col items-center">
                 <span className="text-xs text-muted-foreground">Catch-Up</span>
+                <span className="text-[10px] font-normal text-muted-foreground">{getCatchUpDateLabel(usFormat)}</span>
               </div>
             </th>
             {weekConfigs.map((wc) => (
               <th key={wc.label} colSpan={2} className="px-1 py-2 text-center font-semibold text-foreground border-r border-border/30">
                 <div className="flex flex-col items-center">
                   <span>{wc.label}</span>
-                  <span className="text-[10px] font-normal text-muted-foreground">{wc.dateLabel}</span>
+                  <span className="text-[10px] font-normal text-muted-foreground">{formatDateLabel(wc.dateLabel, usFormat)}</span>
                 </div>
               </th>
             ))}
