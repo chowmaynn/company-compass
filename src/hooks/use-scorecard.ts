@@ -29,8 +29,10 @@ const METRIC_ORDER: string[] = [
   "Total Bookings",
   "Email Bookings",
   "Website Views",
+  "Website Bookings",
   "Website Booking Rate",
   "Skool Joins",
+  "Skool Bookings",
   "Skool Booking Rate",
   // Sales
   "Closing Calls Booked",
