@@ -226,14 +226,14 @@ export default function SuccessTrackingDashboard() {
           <CardContent className="p-5">
             <h3 className="text-sm font-semibold text-foreground mb-0.5">Solution Type</h3>
             <p className="text-xs text-muted-foreground mb-3">Distribution of win types</p>
-            <ResponsiveContainer width="100%" height={260}>
+            <ResponsiveContainer width="100%" height={220}>
               <PieChart>
                 <Pie
                   data={solutionData}
-                  cx="35%"
+                  cx="30%"
                   cy="50%"
-                  innerRadius={48}
-                  outerRadius={72}
+                  innerRadius={35}
+                  outerRadius={55}
                   paddingAngle={2}
                   dataKey="value"
                 >
