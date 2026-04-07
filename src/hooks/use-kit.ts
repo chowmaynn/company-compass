@@ -1,5 +1,5 @@
 import { useQuery } from "@tanstack/react-query";
-import { getCurrentWeekIndex, weekConfigs } from "@/data/scorecardData";
+import { getCurrentWeekIndex, generateWeekConfigs, getCurrentNZMonth } from "@/data/scorecardData";
 import { fetchGrowthStats, fetchSubscriberCount, fetchAllBroadcastStats } from "@/lib/kit";
 
 interface KitData {
@@ -21,7 +21,8 @@ const defaultData: KitData = {
 };
 
 async function fetchKitData(): Promise<KitData> {
-  const cwi = getCurrentWeekIndex();
+  const weekConfigs = generateWeekConfigs(getCurrentNZMonth());
+  const cwi = getCurrentWeekIndex(weekConfigs);
 
   // Only fetch current week's growth (historical weeks are in Supabase scorecard)
   const currentWeekGrowth = cwi >= 0 && cwi < 4

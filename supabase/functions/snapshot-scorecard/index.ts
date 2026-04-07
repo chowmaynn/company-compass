@@ -14,15 +14,49 @@ const BITLY_TOKEN = Deno.env.get("BITLY_TOKEN")!;
 
 const supabase = createClient(SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY);
 
-// --- Week definitions (March 2026, NZ time) ---
-const WEEK_CONFIGS = [
-  { label: "W1", start: "2026-03-01T11:00:00Z", end: "2026-03-08T11:00:00Z" },
-  { label: "W2", start: "2026-03-08T11:00:00Z", end: "2026-03-15T11:00:00Z" },
-  { label: "W3", start: "2026-03-15T11:00:00Z", end: "2026-03-22T11:00:00Z" },
-  { label: "W4", start: "2026-03-22T11:00:00Z", end: "2026-03-29T11:00:00Z" },
-];
+// NZ timezone offset
+function nzOffsetHours(): number {
+  const m = new Date().getUTCMonth();
+  return (m >= 9 || m <= 2) ? 13 : 12;
+}
 
-const CURRENT_MONTH = "2026-03";
+function getCurrentMonth(): string {
+  const offset = nzOffsetHours();
+  const nzNow = new Date(Date.now() + offset * 3600000);
+  return `${nzNow.getUTCFullYear()}-${String(nzNow.getUTCMonth() + 1).padStart(2, "0")}`;
+}
+
+/** Generate Monday-aligned week boundaries for the current month in NZ time */
+function generateWeekConfigs() {
+  const offset = nzOffsetHours();
+  const nzNow = new Date(Date.now() + offset * 3600000);
+  const year = nzNow.getUTCFullYear();
+  const month = nzNow.getUTCMonth();
+
+  const firstOfMonth = new Date(Date.UTC(year, month, 1));
+  const dow = firstOfMonth.getUTCDay();
+  const daysToMonday = dow === 0 ? 1 : dow === 1 ? 0 : 8 - dow;
+  const w1StartDay = 1 + daysToMonday;
+  const daysInMonth = new Date(Date.UTC(year, month + 1, 0)).getUTCDate();
+  const nzMidnightToUTC = (day: number) =>
+    new Date(Date.UTC(year, month, day) - offset * 3600000);
+
+  const configs = [];
+  for (let w = 0; w < 4; w++) {
+    const startDay = w1StartDay + w * 7;
+    if (startDay > daysInMonth) break;
+    const endDay = w < 3 ? startDay + 7 : daysInMonth + 1;
+    configs.push({
+      label: `W${w + 1}`,
+      start: nzMidnightToUTC(startDay).toISOString(),
+      end: nzMidnightToUTC(endDay).toISOString(),
+    });
+  }
+  return configs;
+}
+
+const WEEK_CONFIGS = generateWeekConfigs();
+const CURRENT_MONTH = getCurrentMonth();
 
 function getCompletedWeekIndex(): number {
   const now = new Date();

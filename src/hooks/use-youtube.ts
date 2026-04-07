@@ -2,7 +2,7 @@ import { useState, useEffect, useCallback } from "react";
 import { getChannelStats, getRecentVideos, type ChannelStats, type VideoItem } from "@/lib/youtube";
 import { getDailyAnalytics, bucketByWeek } from "@/lib/youtube-analytics";
 import { isAuthorized } from "@/lib/youtube-auth";
-import { weekConfigs } from "@/data/scorecardData";
+import { generateWeekConfigs, getCurrentNZMonth } from "@/data/scorecardData";
 import { LIAM_CHANNEL_ID } from "@/lib/constants";
 
 const CHANNEL_ID = LIAM_CHANNEL_ID;
@@ -24,6 +24,7 @@ export function useYouTube() {
     setError(null);
 
     try {
+      const weekConfigs = generateWeekConfigs(getCurrentNZMonth());
       // Fetch for the full month range (W1 start to W4 end)
       const monthStart = weekConfigs[0].start;
       const monthEnd = weekConfigs[weekConfigs.length - 1].end;
@@ -76,6 +77,7 @@ export function useYouTube() {
   }, []);
 
   function setFallbackViewCounts(videos: VideoItem[], now: Date) {
+    const weekConfigs = generateWeekConfigs(getCurrentNZMonth());
     const viewCounts: (number | "—")[] = weekConfigs.map((wc) => {
       const start = new Date(wc.start);
       if (start > now) return "—";

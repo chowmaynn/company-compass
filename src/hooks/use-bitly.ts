@@ -1,6 +1,6 @@
 import { useState, useEffect, useCallback } from "react";
 import { getCategorizedClicks, bucketClicksByWeek, type BitlyCategory, type DailyClickRow } from "@/lib/bitly";
-import { weekConfigs } from "@/data/scorecardData";
+import { generateWeekConfigs, getCurrentNZMonth } from "@/data/scorecardData";
 
 export interface BitlyWeeklyData {
   "yt-skool": (number | "—")[];
@@ -24,6 +24,7 @@ export function useBitly() {
     setError(null);
 
     try {
+      const weekConfigs = generateWeekConfigs(getCurrentNZMonth());
       const categorized = await getCategorizedClicks(31);
 
       const result: BitlyWeeklyData = {

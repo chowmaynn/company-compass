@@ -1,6 +1,6 @@
 import { useState, useMemo, useEffect } from "react";
 import { Card } from "@/components/ui/card";
-import { weekConfigs } from "@/data/scorecardData";
+import { generateWeekConfigs } from "@/data/scorecardData";
 import { useScorecard } from "@/hooks/use-scorecard";
 import { useCurrency, useSelectedMonth } from "@/components/AppLayout";
 import { fetchRevenueHistory, fetchFinancialSummary, type ScorecardRow } from "@/lib/supabase-scorecard";
@@ -137,13 +137,14 @@ export default function Dashboard() {
   const cashActual = multiMonthFinancials?.cash.actual ?? parseNum(cash?.monthlyActual ?? "—");
   const cashTarget = multiMonthFinancials?.cash.target ?? parseNum(cash?.monthlyTarget ?? "—");
 
+  const monthConfigs = useMemo(() => generateWeekConfigs(selectedMonth), [selectedMonth]);
   const revenueWeekly = useMemo(() =>
     revenue?.weeks.map((w, i) => ({
-      week: weekConfigs[i].label,
+      week: monthConfigs[i]?.label ?? `W${i + 1}`,
       actual: parseNum(w.actual) ?? 0,
       projection: parseNum(w.projection) ?? 0,
     })) ?? [],
-  [revenue]);
+  [revenue, monthConfigs]);
 
   const revPct = revActual !== null && revTarget !== null && revTarget !== 0 ? Math.round((revActual / revTarget) * 100) : null;
   const cashPct = cashActual !== null && cashTarget !== null && cashTarget !== 0 ? Math.round((cashActual / cashTarget) * 100) : null;

@@ -1,5 +1,5 @@
 import { useState, useEffect, useMemo } from "react";
-import { weekConfigs } from "@/data/scorecardData";
+import { generateWeekConfigs, getCurrentNZMonth, getCatchUpRange } from "@/data/scorecardData";
 
 const SKOOL_BASE = "/api/skool-supabase";
 const TABLE = "Skool%20Lead%20Logs";
@@ -63,10 +63,6 @@ async function fetchJoinCount(start: string, end: string): Promise<number> {
   return total;
 }
 
-// Catch-up period: month start (Apr 1 NZT) → W1 start
-// Apr 1 midnight NZDT (UTC+13) = 2026-03-31T11:00:00Z
-const CATCHUP_START = "2026-03-31T11:00:00Z";
-
 export interface SkoolJoinsData {
   weeklyJoins: (number | "—")[];
   catchUpJoins: number | "—";
@@ -74,22 +70,23 @@ export interface SkoolJoinsData {
 }
 
 export function useSkoolJoins(): SkoolJoinsData {
-  const [weeklyJoins, setWeeklyJoins] = useState<(number | "—")[]>(
-    weekConfigs.map(() => "—")
-  );
+  const [weeklyJoins, setWeeklyJoins] = useState<(number | "—")[]>(["—", "—", "—", "—"]);
   const [catchUpJoins, setCatchUpJoins] = useState<number | "—">("—");
 
   useEffect(() => {
     let cancelled = false;
     const now = new Date();
+    const currentMonth = getCurrentNZMonth();
+    const weekConfigs = generateWeekConfigs(currentMonth);
+    const catchUp = getCatchUpRange(currentMonth);
 
     // Build date ranges: catch-up + each week
-    const ranges: { key: string; start: string; end: string }[] = [
-      { key: "catchup", start: CATCHUP_START, end: weekConfigs[0].start },
-    ];
+    const ranges: { key: string; start: string; end: string }[] = [];
+    if (catchUp) {
+      ranges.push({ key: "catchup", start: catchUp.start, end: catchUp.end });
+    }
     for (let i = 0; i < weekConfigs.length; i++) {
       const wc = weekConfigs[i];
-      // Skip future weeks
       if (now < new Date(wc.start)) break;
       ranges.push({ key: `w${i}`, start: wc.start, end: wc.end });
     }

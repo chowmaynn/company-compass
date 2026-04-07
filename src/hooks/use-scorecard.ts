@@ -1,5 +1,5 @@
 import { useState, useEffect, useCallback, useMemo } from "react";
-import { type Metric, type StatusColor, type Department, scorecardMonth, getCurrentWeekIndex, getCompletedWeekIndex, weekConfigs } from "@/data/scorecardData";
+import { type Metric, type StatusColor, type Department, generateWeekConfigs, getCurrentWeekIndex, getCompletedWeekIndex, getCurrentNZMonth } from "@/data/scorecardData";
 import { fetchScorecard, updateScorecardCell, type ScorecardRow } from "@/lib/supabase-scorecard";
 import { calculateStatus, invertedMetrics } from "@/lib/calculateStatus";
 import { useKit } from "@/hooks/use-kit";
@@ -153,6 +153,7 @@ function resolveApiValue(
     tallyNps: ReturnType<typeof useTallyNps>;
     skoolJoins: SkoolJoinsData;
     currentMetrics: Metric[];
+    weekConfigs: import("@/data/scorecardData").WeekConfig[];
   }
 ): number | string | "—" {
   switch (source.hook) {
@@ -189,7 +190,7 @@ function resolveApiValue(
     }
     case "computed": {
       // Helper: sum qualified bookings from Casey's Supabase cube for a specific week and event(s)
-      const wc = weekConfigs[weekIndex];
+      const wc = apis.weekConfigs[weekIndex];
       if (!wc) return "—";
       const toNZ = (iso: string) => new Date(iso).toLocaleDateString("en-CA", { timeZone: "Pacific/Auckland" });
       const weekStart = toNZ(wc.start);
@@ -320,14 +321,17 @@ export function useScorecard(month: string = DEFAULT_MONTH) {
   }, [month]);
 
   // Merge: Supabase data + live API overlay for current week only
+  const monthConfigs = useMemo(() => generateWeekConfigs(month), [month]);
+  const isCurrentMonth = month === getCurrentNZMonth();
+
   const metrics = useMemo(() => {
     if (supabaseMetrics.length === 0) return supabaseMetrics;
 
-    const cwi = getCurrentWeekIndex();
-    // Overlay live API data when within an active week (0-3)
-    const shouldOverlayWeek = cwi >= 0 && cwi < 4;
+    const cwi = isCurrentMonth ? getCurrentWeekIndex(monthConfigs) : monthConfigs.length;
+    // Only overlay live API data when viewing the current month
+    const shouldOverlayWeek = isCurrentMonth && cwi >= 0 && cwi < 4;
     // During catch-up period (cwi === -1), we're in the month but before W1
-    const isCatchUp = cwi === -1;
+    const isCatchUp = isCurrentMonth && cwi === -1;
 
     const parseWeekVal = (raw: number | string): number | null => {
       if (typeof raw === "number") return raw;
@@ -358,7 +362,7 @@ export function useScorecard(month: string = DEFAULT_MONTH) {
         // During an active week: overlay API data into that week's actual
         const source = API_METRIC_MAP[m.name];
         if (source) {
-          const apiVal = resolveApiValue(source, cwi, { kit, notion, ga, salesTracking, intercom, tallyNps, skoolJoins, salesMetrics, currentMetrics: supabaseMetrics });
+          const apiVal = resolveApiValue(source, cwi, { kit, notion, ga, salesTracking, intercom, tallyNps, skoolJoins, salesMetrics, currentMetrics: supabaseMetrics, weekConfigs: monthConfigs });
           if (apiVal !== "—") {
             updated = { ...m, weeks: [...m.weeks] };
             updated.weeks[cwi] = { ...updated.weeks[cwi], actual: apiVal };
@@ -376,7 +380,7 @@ export function useScorecard(month: string = DEFAULT_MONTH) {
             }
           } else {
             // Use week index 0 for resolving — snapshot metrics (backlogCount) ignore the index
-            const apiVal = resolveApiValue(source, 0, { kit, notion, ga, salesTracking, intercom, tallyNps, skoolJoins, salesMetrics, currentMetrics: supabaseMetrics });
+            const apiVal = resolveApiValue(source, 0, { kit, notion, ga, salesTracking, intercom, tallyNps, skoolJoins, salesMetrics, currentMetrics: supabaseMetrics, weekConfigs: monthConfigs });
             if (apiVal !== "—") {
               updated = { ...m, catchUp: { ...m.catchUp, actual: apiVal } };
             }
@@ -439,11 +443,11 @@ export function useScorecard(month: string = DEFAULT_MONTH) {
 
       return updated;
     });
-  }, [supabaseMetrics, kit, notion, ga.weeklyViews, ga.monthlyViews, salesTracking, intercom.inboxTotal, tallyNps.results, skoolJoins.weeklyJoins, skoolJoins.catchUpJoins, salesMetrics.salesEventBreakdown, salesMetrics.cube, salesMetrics.dates]);
+  }, [supabaseMetrics, kit, notion, ga.weeklyViews, ga.monthlyViews, salesTracking, intercom.inboxTotal, tallyNps.results, skoolJoins.weeklyJoins, skoolJoins.catchUpJoins, salesMetrics.salesEventBreakdown, salesMetrics.cube, salesMetrics.dates, monthConfigs, isCurrentMonth]);
 
   // Auto-calculate statuses from the last completed period
   const metricsWithStatus = useMemo(() => {
-    const completedIdx = getCompletedWeekIndex();
+    const completedIdx = isCurrentMonth ? getCompletedWeekIndex(monthConfigs) : monthConfigs.length - 1;
     return metrics.map((m) => {
       const inverted = invertedMetrics.has(m.name);
       let newStatus: StatusColor | null = null;

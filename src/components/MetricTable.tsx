@@ -1,4 +1,4 @@
-import { type Metric, weekConfigs as defaultWeekConfigs, getWeekConfigs } from "@/data/scorecardData";
+import { type Metric, weekConfigs as defaultWeekConfigs, generateWeekConfigs } from "@/data/scorecardData";
 import { StatusBadge } from "./StatusBadge";
 import { EditableCell } from "./EditableCell";
 import { formatValue } from "@/lib/formatNumber";
@@ -50,7 +50,7 @@ interface MetricTableProps {
 
 export function MetricTable({ metrics, onMetricChange, readOnlyMetrics, currencyRate, usDateFormat, canEditMetric, month }: MetricTableProps) {
   const usFormat = !!usDateFormat;
-  const weekConfigs = month ? getWeekConfigs(month) : defaultWeekConfigs;
+  const weekConfigs = month ? generateWeekConfigs(month) : defaultWeekConfigs;
   const convert = (val: number | string | ""): number | string | "" => {
     if (!currencyRate || val === "" || val === "—") return val;
     if (typeof val === "number") return Math.round(val * currencyRate);

@@ -1,5 +1,5 @@
 import { useState, useEffect, useMemo } from "react";
-import { scorecardData as initialData, departments, scorecardMonth, type Department, type Metric } from "@/data/scorecardData";
+import { scorecardData as initialData, departments, formatScorecardMonth, getCurrentNZMonth, type Department, type Metric } from "@/data/scorecardData";
 import { calculateStatus, invertedMetrics } from "@/lib/calculateStatus";
 import { SummaryCards } from "@/components/SummaryCards";
 import { DepartmentSection } from "@/components/DepartmentSection";
@@ -182,7 +182,7 @@ const Index = () => {
             </div>
             <div>
               <h1 className="text-xl font-bold tracking-tight text-foreground">Company Scorecard</h1>
-              <p className="text-xs text-muted-foreground">{scorecardMonth}</p>
+              <p className="text-xs text-muted-foreground">{formatScorecardMonth(getCurrentNZMonth())}</p>
             </div>
           </div>
         </div>

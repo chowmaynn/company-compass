@@ -1,5 +1,5 @@
 import { useQuery } from "@tanstack/react-query";
-import { weekConfigs } from "@/data/scorecardData";
+import { generateWeekConfigs, getCurrentNZMonth } from "@/data/scorecardData";
 import { fetchBacklogCount, fetchPublishedCount } from "@/lib/notion";
 
 interface NotionData {
@@ -15,6 +15,7 @@ const defaultData: NotionData = {
 };
 
 async function fetchNotionData(): Promise<NotionData> {
+  const weekConfigs = generateWeekConfigs(getCurrentNZMonth());
   const publishedPromises = weekConfigs.map((wc) => {
     const start = wc.start.split("T")[0];
     const end = wc.end.split("T")[0];

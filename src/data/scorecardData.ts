@@ -27,61 +27,110 @@ export interface Metric {
   description: string;
 }
 
-// Monthly week configs (Monday–Sunday), NZ timezone (Pacific/Auckland)
-// Catch-up = 1st to day before first Monday. W1-W3 = 7 days. W4 = remainder.
-// NZDT (UTC+13) runs Oct–Apr, NZST (UTC+12) runs Apr–Sep.
-// DST change in April 2026: Apr 5 at 3am local NZDT → NZST.
+// Dynamic week config generation (Monday–Sunday), NZ timezone (Pacific/Auckland)
+// Catch-up = 1st to day before first Monday. W1-W3 = 7 days. W4 absorbs to month end.
+// NZDT (UTC+13) runs ~Oct–early Apr, NZST (UTC+12) runs ~Apr–Sep.
 
-const MONTH_WEEK_CONFIGS: Record<string, WeekConfig[]> = {
-  // March 2026: all NZDT (UTC+13). Midnight NZT = T11:00Z prev day.
-  // Mar 1 = Sunday → catch-up Mar 1, W1 starts Mar 2
-  "2026-03": [
-    { label: "W1", dateLabel: "02/03", start: "2026-03-01T11:00:00Z", end: "2026-03-08T11:00:00Z" },
-    { label: "W2", dateLabel: "09/03", start: "2026-03-08T11:00:00Z", end: "2026-03-15T11:00:00Z" },
-    { label: "W3", dateLabel: "16/03", start: "2026-03-15T11:00:00Z", end: "2026-03-22T11:00:00Z" },
-    { label: "W4", dateLabel: "23/03", start: "2026-03-22T11:00:00Z", end: "2026-03-31T11:00:00Z" },
-  ],
-  // April 2026: DST change Apr 5. Apr 1-4 = NZDT (T11:00Z), Apr 6+ = NZST (T12:00Z).
-  // Apr 1 = Wednesday → catch-up Apr 1-5, W1 starts Apr 6
-  "2026-04": [
-    { label: "W1", dateLabel: "06/04", start: "2026-04-05T12:00:00Z", end: "2026-04-12T12:00:00Z" },
-    { label: "W2", dateLabel: "13/04", start: "2026-04-12T12:00:00Z", end: "2026-04-19T12:00:00Z" },
-    { label: "W3", dateLabel: "20/04", start: "2026-04-19T12:00:00Z", end: "2026-04-26T12:00:00Z" },
-    { label: "W4", dateLabel: "27/04", start: "2026-04-26T12:00:00Z", end: "2026-04-30T12:00:00Z" },
-  ],
-};
+/** NZ offset in hours — approximate by month (sufficient for midnight boundaries) */
+function nzOffsetHours(month: number): number {
+  // NZDT: Oct(10) through Mar(3) = UTC+13; NZST: Apr(4) through Sep(9) = UTC+12
+  return (month >= 10 || month <= 3) ? 13 : 12;
+}
 
-// Default to current NZ month
-function getCurrentNZMonth(): string {
+/** Returns the current month in NZ timezone as "YYYY-MM" */
+export function getCurrentNZMonth(): string {
   const nz = new Date().toLocaleDateString("en-CA", { timeZone: "Pacific/Auckland" });
   return nz.slice(0, 7);
 }
 
-export function getWeekConfigs(month?: string): WeekConfig[] {
-  const key = month || getCurrentNZMonth();
-  return MONTH_WEEK_CONFIGS[key] || MONTH_WEEK_CONFIGS[getCurrentNZMonth()] || Object.values(MONTH_WEEK_CONFIGS)[0];
+/** Format "YYYY-MM" to display string like "April 2026" */
+export function formatScorecardMonth(yearMonth: string): string {
+  const [year, month] = yearMonth.split("-");
+  const names = ["", "January", "February", "March", "April", "May", "June", "July", "August", "September", "October", "November", "December"];
+  return `${names[parseInt(month)]} ${year}`;
 }
 
-// Keep backward-compatible export for hooks that don't know the month
-export const weekConfigs = getWeekConfigs();
+/**
+ * Generate Monday-aligned week configs for any month.
+ * - Find first Monday on or after the 1st
+ * - W1-W3: Monday-Sunday (7 days each)
+ * - W4: 4th Monday through end of month (absorbs remainder)
+ * - Catch-up: days before first Monday (handled separately)
+ */
+export function generateWeekConfigs(yearMonth: string): WeekConfig[] {
+  const [year, month] = yearMonth.split("-").map(Number);
+  const offset = nzOffsetHours(month);
+  const MS_DAY = 86400000;
 
-export const scorecardMonth = "April 2026";
+  // Day-of-week of the 1st (in NZ time — use UTC date since we just need the weekday)
+  const firstOfMonth = new Date(Date.UTC(year, month - 1, 1));
+  const dow = firstOfMonth.getUTCDay(); // 0=Sun, 1=Mon, ...
+  const daysToMonday = dow === 0 ? 1 : dow === 1 ? 0 : 8 - dow;
+
+  // W1 start day (NZ date), and month end (NZ date)
+  const w1StartDay = 1 + daysToMonday;
+  const daysInMonth = new Date(Date.UTC(year, month, 0)).getUTCDate();
+
+  // Convert NZ midnight to UTC for ISO strings
+  const nzMidnightToUTC = (nzDay: number) =>
+    new Date(Date.UTC(year, month - 1, nzDay) - offset * 3600000);
+
+  const configs: WeekConfig[] = [];
+  for (let w = 0; w < 4; w++) {
+    const startDay = w1StartDay + w * 7;
+    if (startDay > daysInMonth) break; // safety: month too short
+
+    const endDay = w < 3
+      ? startDay + 7               // W1-W3: strict 7 days (end = next Monday)
+      : daysInMonth + 1;           // W4: absorbs to end of month (end = 1st of next month)
+
+    const dd = (n: number) => String(n).padStart(2, "0");
+    const mm = dd(month);
+
+    configs.push({
+      label: `W${w + 1}`,
+      dateLabel: `${dd(startDay)}/${mm}`,
+      start: nzMidnightToUTC(startDay).toISOString().replace(".000Z", "Z"),
+      end: nzMidnightToUTC(endDay).toISOString().replace(".000Z", "Z"),
+    });
+  }
+  return configs;
+}
+
+/**
+ * Returns the catch-up date range for a month (days before first Monday).
+ * Returns null if the 1st is already a Monday (no catch-up).
+ */
+export function getCatchUpRange(yearMonth: string): { start: string; end: string } | null {
+  const configs = generateWeekConfigs(yearMonth);
+  const [year, month] = yearMonth.split("-").map(Number);
+  const offset = nzOffsetHours(month);
+  const monthStartUTC = new Date(Date.UTC(year, month - 1, 1) - offset * 3600000);
+  const w1Start = new Date(configs[0].start);
+
+  if (monthStartUTC.getTime() >= w1Start.getTime()) return null; // 1st is Monday
+  return { start: monthStartUTC.toISOString(), end: configs[0].start };
+}
+
+// Backward-compatible exports
+export const weekConfigs = generateWeekConfigs(getCurrentNZMonth());
+export const scorecardMonth = formatScorecardMonth(getCurrentNZMonth());
 
 /** Returns 0-3 for the current active week, 4 if past all weeks, -1 if before month */
-export function getCurrentWeekIndex(): number {
+export function getCurrentWeekIndex(configs: WeekConfig[] = weekConfigs): number {
   const now = new Date();
-  for (let i = 0; i < weekConfigs.length; i++) {
-    if (now >= new Date(weekConfigs[i].start) && now < new Date(weekConfigs[i].end)) return i;
+  for (let i = 0; i < configs.length; i++) {
+    if (now >= new Date(configs[i].start) && now < new Date(configs[i].end)) return i;
   }
-  if (now >= new Date(weekConfigs[weekConfigs.length - 1].end)) return weekConfigs.length;
+  if (now >= new Date(configs[configs.length - 1].end)) return configs.length;
   return -1;
 }
 
 /** Returns the index of the most recently completed week (0-3), or -1 if none completed */
-export function getCompletedWeekIndex(): number {
+export function getCompletedWeekIndex(configs: WeekConfig[] = weekConfigs): number {
   const now = new Date();
-  for (let i = weekConfigs.length - 1; i >= 0; i--) {
-    if (now >= new Date(weekConfigs[i].end)) return i;
+  for (let i = configs.length - 1; i >= 0; i--) {
+    if (now >= new Date(configs[i].end)) return i;
   }
   return -1;
 }

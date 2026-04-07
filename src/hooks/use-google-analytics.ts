@@ -1,12 +1,13 @@
 import { useQuery } from "@tanstack/react-query";
 import { fetchPageSessions } from "@/lib/google-analytics";
-import { getCurrentWeekIndex, weekConfigs } from "@/data/scorecardData";
+import { getCurrentWeekIndex, generateWeekConfigs, getCurrentNZMonth } from "@/data/scorecardData";
 import { toNZDate } from "@/lib/dates";
 
 async function fetchGA4Data(): Promise<{ weekly: (number | "—")[]; monthly: number | "—" }> {
   const today = toNZDate(new Date().toISOString());
   const monthStart = today.slice(0, 7) + "-01";
-  const cwi = getCurrentWeekIndex();
+  const weekConfigs = generateWeekConfigs(getCurrentNZMonth());
+  const cwi = getCurrentWeekIndex(weekConfigs);
 
   // Only fetch current week + monthly (historical weeks are in Supabase scorecard table)
   const weekly: (number | "—")[] = ["—", "—", "—", "—"];

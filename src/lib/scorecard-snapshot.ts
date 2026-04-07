@@ -7,13 +7,13 @@
  * for a standalone script.
  */
 
-import { weekConfigs, getCompletedWeekIndex } from "@/data/scorecardData";
+import { generateWeekConfigs, getCompletedWeekIndex, getCurrentNZMonth } from "@/data/scorecardData";
 import { updateScorecardCell } from "@/lib/supabase-scorecard";
 import { fetchPublishedCount, fetchBacklogCount } from "@/lib/notion";
 import { getCategorizedClicks, bucketClicksByWeek } from "@/lib/bitly";
 // GA4 requires OAuth token — skipped in snapshot (needs manual entry or service account)
 
-const CURRENT_MONTH = "2026-03";
+const CURRENT_MONTH = getCurrentNZMonth();
 
 interface SnapshotResult {
   metric: string;
@@ -27,7 +27,8 @@ interface SnapshotResult {
  * Returns a log of all writes attempted.
  */
 export async function snapshotWeeklyApiMetrics(): Promise<SnapshotResult[]> {
-  const completedIdx = getCompletedWeekIndex();
+  const weekConfigs = generateWeekConfigs(CURRENT_MONTH);
+  const completedIdx = getCompletedWeekIndex(weekConfigs);
   if (completedIdx < 0 || completedIdx >= 4) {
     console.log("[Snapshot] No completed week to snapshot");
     return [];

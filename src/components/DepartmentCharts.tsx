@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { type Metric, weekConfigs } from "@/data/scorecardData";
+import { type Metric, weekConfigs, generateWeekConfigs, getCurrentNZMonth } from "@/data/scorecardData";
 import { formatValue } from "@/lib/formatNumber";
 import {
   BarChart,

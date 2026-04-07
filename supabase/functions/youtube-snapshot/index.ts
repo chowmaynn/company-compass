@@ -30,31 +30,42 @@ function getCurrentMonth(): string {
   return `${nzNow.getUTCFullYear()}-${String(nzNow.getUTCMonth() + 1).padStart(2, "0")}`;
 }
 
-/** Generate 4 week boundaries for the current month in NZ time */
+/** Generate Monday-aligned week boundaries for the current month in NZ time.
+ *  W1-W3: Mon-Sun (7 days). W4: 4th Monday to end of month. */
 function generateWeekConfigs() {
   const offset = nzOffsetHours();
   const nzNow = new Date(Date.now() + offset * 60 * 60 * 1000);
   const year = nzNow.getUTCFullYear();
-  const month = nzNow.getUTCMonth();
-  const monthStartUTC = new Date(Date.UTC(year, month, 1) - offset * 60 * 60 * 1000);
+  const month = nzNow.getUTCMonth(); // 0-indexed
+
+  // Day-of-week of the 1st
+  const firstOfMonth = new Date(Date.UTC(year, month, 1));
+  const dow = firstOfMonth.getUTCDay(); // 0=Sun
+  const daysToMonday = dow === 0 ? 1 : dow === 1 ? 0 : 8 - dow;
+  const w1StartDay = 1 + daysToMonday;
+
+  const daysInMonth = new Date(Date.UTC(year, month + 1, 0)).getUTCDate();
+  const nzMidnightToUTC = (day: number) =>
+    new Date(Date.UTC(year, month, day) - offset * 3600000);
 
   const configs = [];
   for (let w = 0; w < 4; w++) {
-    const start = new Date(monthStartUTC.getTime() + w * 7 * 24 * 60 * 60 * 1000);
-    const end = w < 3
-      ? new Date(start.getTime() + 7 * 24 * 60 * 60 * 1000)
-      : new Date(Date.UTC(year, month + 1, 1) - offset * 60 * 60 * 1000);
+    const startDay = w1StartDay + w * 7;
+    if (startDay > daysInMonth) break;
+    const endDay = w < 3 ? startDay + 7 : daysInMonth + 1;
 
-    const startNZ = new Date(start.getTime() + offset * 60 * 60 * 1000);
-    const endNZ = new Date(end.getTime() + offset * 60 * 60 * 1000);
+    const startUTC = nzMidnightToUTC(startDay);
+    const endUTC = nzMidnightToUTC(endDay);
+    const startNZ = new Date(startUTC.getTime() + offset * 3600000);
+    const endNZ = new Date(endUTC.getTime() + offset * 3600000);
 
     configs.push({
       label: `W${w + 1}`,
       col: `w${w + 1}_actual`,
       startDate: startNZ.toISOString().slice(0, 10),
       endDate: endNZ.toISOString().slice(0, 10),
-      startUTC: start,
-      endUTC: end,
+      startUTC,
+      endUTC,
     });
   }
   return configs;
