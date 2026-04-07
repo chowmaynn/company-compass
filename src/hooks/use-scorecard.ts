@@ -484,7 +484,7 @@ export function useScorecard(month: string = DEFAULT_MONTH) {
         updateScorecardCell(metricName, month, column, dbValue);
       }
     },
-    []
+    [month]
   );
 
   return { metrics: metricsWithStatus, setMetrics: setSupabaseMetrics, loading, error, updateMetric };
