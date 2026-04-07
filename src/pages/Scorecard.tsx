@@ -1,5 +1,5 @@
 import { useState, useEffect } from "react";
-import { departments, type StatusColor } from "@/data/scorecardData";
+import { departments, type StatusColor, getWeekConfigs } from "@/data/scorecardData";
 import { DepartmentSection } from "@/components/DepartmentSection";
 import { useScorecard } from "@/hooks/use-scorecard";
 import { fetchAvailableMonths } from "@/lib/supabase-scorecard";
@@ -79,6 +79,7 @@ export default function Scorecard() {
             onMetricChange={updateMetric}
             onStatusChange={handleStatusChange}
             showCharts={false}
+            month={selectedMonth}
           />
         ))}
       </div>

@@ -27,15 +27,43 @@ export interface Metric {
   description: string;
 }
 
-// April 2026 weeks (Monday–Sunday), NZ timezone (Pacific/Auckland)
-// DST change: NZDT (UTC+13) → NZST (UTC+12) on Apr 5 at 3am local
-// So: Apr 1-4 midnight NZT = T11:00Z (NZDT), Apr 6+ midnight NZT = T12:00Z (NZST)
-export const weekConfigs: WeekConfig[] = [
-  { label: "W1", dateLabel: "06/04", start: "2026-04-05T12:00:00Z", end: "2026-04-12T12:00:00Z" },
-  { label: "W2", dateLabel: "13/04", start: "2026-04-12T12:00:00Z", end: "2026-04-19T12:00:00Z" },
-  { label: "W3", dateLabel: "20/04", start: "2026-04-19T12:00:00Z", end: "2026-04-26T12:00:00Z" },
-  { label: "W4", dateLabel: "27/04", start: "2026-04-26T12:00:00Z", end: "2026-04-30T12:00:00Z" },
-];
+// Monthly week configs (Monday–Sunday), NZ timezone (Pacific/Auckland)
+// Catch-up = 1st to day before first Monday. W1-W3 = 7 days. W4 = remainder.
+// NZDT (UTC+13) runs Oct–Apr, NZST (UTC+12) runs Apr–Sep.
+// DST change in April 2026: Apr 5 at 3am local NZDT → NZST.
+
+const MONTH_WEEK_CONFIGS: Record<string, WeekConfig[]> = {
+  // March 2026: all NZDT (UTC+13). Midnight NZT = T11:00Z prev day.
+  // Mar 1 = Sunday → catch-up Mar 1, W1 starts Mar 2
+  "2026-03": [
+    { label: "W1", dateLabel: "02/03", start: "2026-03-01T11:00:00Z", end: "2026-03-08T11:00:00Z" },
+    { label: "W2", dateLabel: "09/03", start: "2026-03-08T11:00:00Z", end: "2026-03-15T11:00:00Z" },
+    { label: "W3", dateLabel: "16/03", start: "2026-03-15T11:00:00Z", end: "2026-03-22T11:00:00Z" },
+    { label: "W4", dateLabel: "23/03", start: "2026-03-22T11:00:00Z", end: "2026-03-31T11:00:00Z" },
+  ],
+  // April 2026: DST change Apr 5. Apr 1-4 = NZDT (T11:00Z), Apr 6+ = NZST (T12:00Z).
+  // Apr 1 = Wednesday → catch-up Apr 1-5, W1 starts Apr 6
+  "2026-04": [
+    { label: "W1", dateLabel: "06/04", start: "2026-04-05T12:00:00Z", end: "2026-04-12T12:00:00Z" },
+    { label: "W2", dateLabel: "13/04", start: "2026-04-12T12:00:00Z", end: "2026-04-19T12:00:00Z" },
+    { label: "W3", dateLabel: "20/04", start: "2026-04-19T12:00:00Z", end: "2026-04-26T12:00:00Z" },
+    { label: "W4", dateLabel: "27/04", start: "2026-04-26T12:00:00Z", end: "2026-04-30T12:00:00Z" },
+  ],
+};
+
+// Default to current NZ month
+function getCurrentNZMonth(): string {
+  const nz = new Date().toLocaleDateString("en-CA", { timeZone: "Pacific/Auckland" });
+  return nz.slice(0, 7);
+}
+
+export function getWeekConfigs(month?: string): WeekConfig[] {
+  const key = month || getCurrentNZMonth();
+  return MONTH_WEEK_CONFIGS[key] || MONTH_WEEK_CONFIGS[getCurrentNZMonth()] || Object.values(MONTH_WEEK_CONFIGS)[0];
+}
+
+// Keep backward-compatible export for hooks that don't know the month
+export const weekConfigs = getWeekConfigs();
 
 export const scorecardMonth = "April 2026";
 

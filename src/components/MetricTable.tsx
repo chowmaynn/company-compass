@@ -1,4 +1,4 @@
-import { type Metric, weekConfigs } from "@/data/scorecardData";
+import { type Metric, weekConfigs as defaultWeekConfigs, getWeekConfigs } from "@/data/scorecardData";
 import { StatusBadge } from "./StatusBadge";
 import { EditableCell } from "./EditableCell";
 import { formatValue } from "@/lib/formatNumber";
@@ -6,11 +6,12 @@ import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip
 import { Info } from "lucide-react";
 import React, { useMemo } from "react";
 
-function getCatchUpDateLabel(usFormat: boolean): string {
+function getCatchUpDateLabel(usFormat: boolean, configs: typeof defaultWeekConfigs): string {
   // W1 start is midnight NZT expressed in UTC — add NZ offset to get the NZ date
-  const w1Start = new Date(weekConfigs[0].start);
-  // Approximate NZ offset: months 10-12,1-3 = +13 (NZDT), 4-9 = +12 (NZST)
-  const nzOffset = 12; // safe for date-label purposes
+  const w1Start = new Date(configs[0].start);
+  // Determine NZ offset from the W1 start month: Oct-Mar = +13 (NZDT), Apr-Sep = +12 (NZST)
+  const w1Month = w1Start.getUTCMonth(); // 0-based
+  const nzOffset = (w1Month >= 9 || w1Month <= 2) ? 13 : 12;
   const toNZDay = (d: Date) => {
     const nz = new Date(d.getTime() + nzOffset * 60 * 60 * 1000);
     return { day: nz.getUTCDate(), month: nz.getUTCMonth() + 1 };
@@ -43,10 +44,13 @@ interface MetricTableProps {
   usDateFormat?: boolean;
   /** Per-metric edit check. If provided, overrides onMetricChange for metrics where this returns false. */
   canEditMetric?: (metric: Metric) => boolean;
+  /** Selected month (YYYY-MM) — used to show correct week dates */
+  month?: string;
 }
 
-export function MetricTable({ metrics, onMetricChange, readOnlyMetrics, currencyRate, usDateFormat, canEditMetric }: MetricTableProps) {
+export function MetricTable({ metrics, onMetricChange, readOnlyMetrics, currencyRate, usDateFormat, canEditMetric, month }: MetricTableProps) {
   const usFormat = !!usDateFormat;
+  const weekConfigs = month ? getWeekConfigs(month) : defaultWeekConfigs;
   const convert = (val: number | string | ""): number | string | "" => {
     if (!currencyRate || val === "" || val === "—") return val;
     if (typeof val === "number") return Math.round(val * currencyRate);
@@ -68,7 +72,7 @@ export function MetricTable({ metrics, onMetricChange, readOnlyMetrics, currency
             <th colSpan={2} className="px-1 py-2 text-center font-semibold text-foreground border-r border-border/30">
               <div className="flex flex-col items-center">
                 <span className="text-xs text-muted-foreground">Catch-Up</span>
-                <span className="text-[10px] font-normal text-muted-foreground">{getCatchUpDateLabel(usFormat)}</span>
+                <span className="text-[10px] font-normal text-muted-foreground">{getCatchUpDateLabel(usFormat, weekConfigs)}</span>
               </div>
             </th>
             {weekConfigs.map((wc) => (

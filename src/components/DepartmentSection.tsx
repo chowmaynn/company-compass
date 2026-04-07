@@ -30,9 +30,10 @@ interface DepartmentSectionProps {
   showCharts?: boolean;
   readOnlyMetrics?: Set<string>;
   needsAuth?: boolean;
+  month?: string;
 }
 
-export function DepartmentSection({ department, metrics, onMetricChange, showCharts, readOnlyMetrics, needsAuth }: DepartmentSectionProps) {
+export function DepartmentSection({ department, metrics, onMetricChange, showCharts, readOnlyMetrics, needsAuth, month }: DepartmentSectionProps) {
   const Icon = departmentIcons[department];
   const colorClass = departmentColors[department];
   const { currency, rate } = useCurrency();
@@ -96,6 +97,7 @@ export function DepartmentSection({ department, metrics, onMetricChange, showCha
         currencyRate={isFinance && currency === "USD" && rate ? rate : undefined}
         usDateFormat={currency === "USD"}
         canEditMetric={() => true}
+        month={month}
       />
     </div>
   );
