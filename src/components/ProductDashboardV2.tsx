@@ -1,7 +1,10 @@
+import { useState, useMemo } from "react";
 import { useCircle } from "@/hooks/use-circle";
 import { useTallyNps, type NpsResult } from "@/hooks/use-tally-nps";
 import { scorecardData } from "@/data/scorecardData";
+import { DateRangePicker, type DateRangeValue } from "@/components/DateRangePicker";
 import { Loader2, ExternalLink, TrendingUp, TrendingDown, Minus } from "lucide-react";
+import { ResponsiveContainer, AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip, Legend } from "recharts";
 
 // ── Helpers ───────────────────────────────────────────────────
 function ft(iso: string) { return new Date(iso).toLocaleTimeString("en-NZ", { hour: "2-digit", minute: "2-digit" }); }
@@ -92,16 +95,76 @@ function KpiRow({ name, actual, target, status }: { name: string; actual: string
 }
 
 // ── Main ──────────────────────────────────────────────────────
+const GRID_STROKE = "rgba(255,255,255,0.06)";
+const TICK_FILL = "rgba(255,255,255,0.25)";
+const TOOLTIP_STYLE = { background: "rgba(20,20,30,0.95)", border: "1px solid rgba(255,255,255,0.1)", borderRadius: 6, fontSize: 12 };
+
+const NPS_COLORS: Record<string, string> = {
+  "2 months": "#34d399",  // emerald
+  "6 months": "#fbbf24",  // amber
+};
+
+function formatChartDate(date: string) {
+  const [, m, d] = date.split("-");
+  return `${d}/${m}`;
+}
+
 export function ProductDashboardV2() {
   const { totalMembers, newMembersThisMonth, totalPosts, upcomingEvents, recentMembers, isLoading } = useCircle();
-  const { results: npsResults, loading: npsLoading } = useTallyNps();
+  const [range, setRange] = useState<DateRangeValue>({ start: "", end: "", startDate: "", endDate: "" });
+  const dateRange = range.startDate && range.endDate ? { startDate: range.startDate, endDate: range.endDate } : undefined;
+  const { results: npsResults, loading: npsLoading } = useTallyNps(dateRange);
   const metrics = scorecardData.filter(m => m.department === "Product");
+
+  // Merge daily NPS data from both forms into a single chart dataset
+  const chartData = useMemo(() => {
+    if (npsResults.length === 0) return [];
+
+    // Collect all unique dates across both forms
+    const dateMap = new Map<string, Record<string, number>>();
+    for (const r of npsResults) {
+      const key = r.formName.replace("NPS Score Tracking - ", "").replace("NPS Score Tracking", "").trim();
+      for (const pt of r.dailyNps) {
+        const existing = dateMap.get(pt.date) || {};
+        existing[key] = pt.score;
+        dateMap.set(pt.date, existing);
+      }
+    }
+
+    // Sort by date and forward-fill missing values
+    const sorted = [...dateMap.entries()].sort((a, b) => a[0].localeCompare(b[0]));
+    const formKeys = npsResults.map((r) =>
+      r.formName.replace("NPS Score Tracking - ", "").replace("NPS Score Tracking", "").trim()
+    );
+
+    const result: Record<string, string | number>[] = [];
+    const lastVal: Record<string, number> = {};
+    for (const [date, vals] of sorted) {
+      const point: Record<string, string | number> = { date };
+      for (const key of formKeys) {
+        if (vals[key] !== undefined) lastVal[key] = vals[key];
+        if (lastVal[key] !== undefined) point[key] = lastVal[key];
+      }
+      result.push(point);
+    }
+    return result;
+  }, [npsResults]);
+
+  const formKeys = useMemo(() =>
+    npsResults.map((r) => r.formName.replace("NPS Score Tracking - ", "").replace("NPS Score Tracking", "").trim()),
+    [npsResults]
+  );
 
   return (
     <div
       className="-mx-6 -mt-6 min-h-screen p-5 pb-12"
       style={{ background: "linear-gradient(160deg, #080810 0%, #0c0c18 60%, #080c10 100%)" }}
     >
+
+      {/* ══ Date Range Picker ═══════════════════════════════ */}
+      <div className="flex justify-end mb-3">
+        <DateRangePicker onChange={setRange} />
+      </div>
 
       {/* ══ ROW 1 — four stat blocks ══════════════════════════ */}
       <div className="grid grid-cols-4 gap-px border border-white/[0.07] mb-3">
@@ -134,9 +197,56 @@ export function ProductDashboardV2() {
           ) : npsResults.length === 0 ? (
             <G className="px-5 py-10 text-center text-xs text-white/25">No NPS forms connected</G>
           ) : (
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-              {npsResults.map(r => <NpsCard key={r.formId} r={r} />)}
-            </div>
+            <>
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                {npsResults.map(r => <NpsCard key={r.formId} r={r} />)}
+              </div>
+              {/* NPS Trend Chart — attached below cards */}
+              {chartData.length > 0 && (
+                <G className="mt-3 overflow-hidden">
+                  <div className="px-5 py-4 border-b border-white/[0.06]">
+                    <p className="text-[10px] font-bold text-white/30 uppercase tracking-widest">NPS Score Over Time</p>
+                  </div>
+                  <div className="px-4 py-4">
+                    <ResponsiveContainer width="100%" height={180}>
+                      <AreaChart data={chartData} margin={{ left: -10, right: 8, top: 4, bottom: 0 }}>
+                        <defs>
+                          {formKeys.map((key) => (
+                            <linearGradient key={key} id={`npsGrad-${key}`} x1="0" y1="0" x2="0" y2="1">
+                              <stop offset="5%" stopColor={NPS_COLORS[key] || "#8884d8"} stopOpacity={0.2} />
+                              <stop offset="95%" stopColor={NPS_COLORS[key] || "#8884d8"} stopOpacity={0} />
+                            </linearGradient>
+                          ))}
+                        </defs>
+                        <CartesianGrid strokeDasharray="3 3" stroke={GRID_STROKE} vertical={false} />
+                        <XAxis dataKey="date" tickFormatter={formatChartDate} tick={{ fontSize: 10, fill: TICK_FILL }} axisLine={{ stroke: GRID_STROKE }} tickLine={false} interval="preserveStartEnd" />
+                        <YAxis tick={{ fontSize: 10, fill: TICK_FILL }} axisLine={false} tickLine={false} />
+                        <Tooltip
+                          cursor={false}
+                          contentStyle={TOOLTIP_STYLE}
+                          labelFormatter={(v) => `Date: ${v}`}
+                          formatter={(v: number, name: string) => [`${v > 0 ? "+" : ""}${v}`, name]}
+                        />
+                        <Legend wrapperStyle={{ fontSize: 11, color: "rgba(255,255,255,0.4)" }} />
+                        {formKeys.map((key) => (
+                          <Area
+                            key={key}
+                            type="monotone"
+                            dataKey={key}
+                            name={key}
+                            stroke={NPS_COLORS[key] || "#8884d8"}
+                            strokeWidth={2}
+                            fill={`url(#npsGrad-${key})`}
+                            dot={false}
+                            activeDot={{ r: 4, fill: NPS_COLORS[key] || "#8884d8" }}
+                          />
+                        ))}
+                      </AreaChart>
+                    </ResponsiveContainer>
+                  </div>
+                </G>
+              )}
+            </>
           )}
         </div>
 

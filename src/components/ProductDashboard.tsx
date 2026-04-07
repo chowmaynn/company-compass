@@ -1,7 +1,11 @@
+import { useState, useMemo, useRef, useEffect } from "react";
 import { useCircle } from "@/hooks/use-circle";
 import { useCircleCharts } from "@/hooks/use-circle-charts";
 import { useTallyNps } from "@/hooks/use-tally-nps";
 import { Card, CardContent } from "@/components/ui/card";
+import { Calendar } from "@/components/ui/calendar";
+import type { DateRange } from "react-day-picker";
+import { toNZDate } from "@/lib/dates";
 import { formatDay } from "@/lib/dates";
 import {
   Users,
@@ -10,6 +14,7 @@ import {
   Loader2,
   AlertCircle,
   Star,
+  ChevronDown,
 } from "lucide-react";
 import {
   AreaChart,
@@ -20,11 +25,110 @@ import {
   YAxis,
   CartesianGrid,
   Tooltip,
+  Legend,
   ResponsiveContainer,
 } from "recharts";
 
 import { GRID, TICK, TOOLTIP_STYLE } from "@/lib/chart-theme";
 import { LoadingDots } from "@/components/LoadingDots";
+
+const NPS_COLORS: Record<string, string> = {
+  "2 months": "#a855f7",  // purple-500
+  "6 months": "#3b82f6",  // blue-500
+};
+
+// ── NPS chart time range selector ────────────────────────────
+
+type NpsPreset = "90d" | "180d" | "all" | "custom";
+
+const NPS_PRESETS: { value: NpsPreset; label: string }[] = [
+  { value: "90d", label: "90 Days" },
+  { value: "180d", label: "180 Days" },
+  { value: "all", label: "All Time" },
+  { value: "custom", label: "Custom" },
+];
+
+function npsPresetToRange(preset: NpsPreset): { startDate: string; endDate: string } {
+  if (preset === "all") return { startDate: "", endDate: "" };
+  const today = toNZDate(new Date().toISOString());
+  const d = new Date();
+  switch (preset) {
+    case "90d": d.setDate(d.getDate() - 90); break;
+    case "180d": d.setDate(d.getDate() - 180); break;
+    default: return { startDate: "", endDate: "" };
+  }
+  return { startDate: toNZDate(d.toISOString()), endDate: today };
+}
+
+function NpsRangeSelector({ onChange }: { onChange: (range: { startDate: string; endDate: string }) => void }) {
+  const [active, setActive] = useState<NpsPreset>("90d");
+  const [showCal, setShowCal] = useState(false);
+  const [calRange, setCalRange] = useState<DateRange | undefined>();
+  const ref = useRef<HTMLDivElement>(null);
+
+  // Fire initial range on mount
+  useEffect(() => { onChange(npsPresetToRange("90d")); }, []);
+
+  // Close calendar on outside click
+  useEffect(() => {
+    function handler(e: MouseEvent) {
+      if (ref.current && !ref.current.contains(e.target as Node)) setShowCal(false);
+    }
+    document.addEventListener("mousedown", handler);
+    return () => document.removeEventListener("mousedown", handler);
+  }, []);
+
+  function selectPreset(p: NpsPreset) {
+    setActive(p);
+    setShowCal(false);
+    if (p !== "custom") {
+      onChange(npsPresetToRange(p));
+    } else {
+      setShowCal(true);
+    }
+  }
+
+  function handleCalSelect(range: DateRange | undefined) {
+    setCalRange(range);
+    if (range?.from && range?.to) {
+      onChange({
+        startDate: toNZDate(range.from.toISOString()),
+        endDate: toNZDate(range.to.toISOString()),
+      });
+      setShowCal(false);
+    }
+  }
+
+  return (
+    <div className="relative flex items-center gap-1" ref={ref}>
+      {NPS_PRESETS.map((p) => (
+        <button
+          key={p.value}
+          onClick={() => selectPreset(p.value)}
+          className={`px-2.5 py-1 text-[11px] font-medium rounded-full transition-colors ${
+            active === p.value
+              ? "bg-foreground text-background"
+              : "text-muted-foreground hover:text-foreground"
+          }`}
+        >
+          {p.label}
+          {p.value === "custom" && <ChevronDown className="inline h-3 w-3 ml-0.5" />}
+        </button>
+      ))}
+      {showCal && (
+        <div className="fixed right-8 z-50 bg-popover border border-border rounded-lg shadow-lg p-2" style={{ marginTop: 4 }}>
+          <Calendar
+            mode="range"
+            selected={calRange}
+            onSelect={handleCalSelect}
+            numberOfMonths={2}
+            disabled={{ after: new Date() }}
+          />
+        </div>
+      )}
+    </div>
+  );
+}
 
 function formatTime(iso: string) {
   return new Date(iso).toLocaleTimeString("en-NZ", { hour: "2-digit", minute: "2-digit" });
@@ -35,8 +139,8 @@ function formatTime(iso: string) {
 function NpsGauge({ score }: { score: number }) {
   const clamped = Math.max(-100, Math.min(100, score));
   const pct = ((clamped + 100) / 200) * 100;
-  const color = clamped >= 50 ? "bg-status-green" : clamped >= 0 ? "bg-status-yellow" : "bg-status-red";
-  const textColor = clamped >= 50 ? "text-status-green" : clamped >= 0 ? "text-status-yellow" : "text-status-red";
+  const color = clamped > 0 ? "bg-status-green" : clamped === 0 ? "bg-status-yellow" : "bg-status-red";
+  const textColor = clamped > 0 ? "text-status-green" : clamped === 0 ? "text-status-yellow" : "text-status-red";
 
   return (
     <div className="space-y-1.5">
@@ -64,6 +168,59 @@ export function ProductDashboard() {
   const { totalMembers, newMembersThisMonth, upcomingEvents, isLoading: circleLoading, isError: circleError } = useCircle();
   const { memberGrowth, postActivity, isLoading: chartsLoading } = useCircleCharts();
   const { results: npsResults, loading: npsLoading, error: npsError } = useTallyNps();
+  const [chartRange, setChartRange] = useState<{ startDate: string; endDate: string }>({ startDate: "", endDate: "" });
+
+  const formKeys = useMemo(() =>
+    npsResults.map((r) => r.formName.replace("NPS Score Tracking - ", "").replace("NPS Score Tracking", "").trim()),
+    [npsResults]
+  );
+
+  // Build chart data: merge daily NPS from all forms, filtered by chart range
+  const chartData = useMemo(() => {
+    if (npsResults.length === 0) return [];
+
+    const dateMap = new Map<string, Record<string, number>>();
+    for (const r of npsResults) {
+      const key = r.formName.replace("NPS Score Tracking - ", "").replace("NPS Score Tracking", "").trim();
+      for (const pt of r.dailyNps) {
+        const existing = dateMap.get(pt.date) || {};
+        existing[key] = pt.score;
+        dateMap.set(pt.date, existing);
+      }
+    }
+
+    const sorted = [...dateMap.entries()].sort((a, b) => a[0].localeCompare(b[0]));
+
+    // Filter to chart range (x-axis zoom only — the NPS values are still cumulative all-time)
+    const startFilter = chartRange.startDate || "";
+    const endFilter = chartRange.endDate || "";
+    const filtered = sorted.filter(([date]) => {
+      if (startFilter && date < startFilter) return false;
+      if (endFilter && date > endFilter) return false;
+      return true;
+    });
+
+    const result: Record<string, string | number>[] = [];
+    const lastVal: Record<string, number> = {};
+
+    // Seed lastVal from data before the filter range so lines don't start from 0
+    for (const [date, vals] of sorted) {
+      if (startFilter && date >= startFilter) break;
+      for (const key of formKeys) {
+        if (vals[key] !== undefined) lastVal[key] = vals[key];
+      }
+    }
+
+    for (const [date, vals] of filtered) {
+      const point: Record<string, string | number> = { date };
+      for (const key of formKeys) {
+        if (vals[key] !== undefined) lastVal[key] = vals[key];
+        if (lastVal[key] !== undefined) point[key] = lastVal[key];
+      }
+      result.push(point);
+    }
+    return result;
+  }, [npsResults, formKeys, chartRange.startDate, chartRange.endDate]);
 
   return (
     <div className="space-y-5">
@@ -76,7 +233,7 @@ export function ProductDashboard() {
               <Star className="h-4 w-4" />
             </div>
             <div>
-              <h3 className="text-sm font-semibold text-foreground">NPS Scores</h3>
+              <h3 className="text-xl font-bold text-foreground">NPS Scores</h3>
               <p className="text-xs text-muted-foreground">Member satisfaction — Tally Forms</p>
             </div>
             {npsError && (
@@ -89,16 +246,42 @@ export function ProductDashboard() {
             )}
           </div>
 
-          {npsResults.length > 0 && (
-            <div className={`grid gap-6 ${npsResults.length > 1 ? "grid-cols-1 md:grid-cols-2" : "grid-cols-1 max-w-sm"}`}>
-              {npsResults.map((r, i) => (
+          <div className="grid gap-6 grid-cols-1 md:grid-cols-2 min-h-[200px]">
+            {npsLoading && npsResults.length === 0 ? (
+              <>
+                {/* Skeleton placeholders while loading */}
+                {[0, 1].map((i) => (
+                  <div key={i} className={`space-y-4 ${i > 0 ? "md:pl-6 md:border-l border-border" : ""}`}>
+                    <div>
+                      <p className="text-lg font-semibold text-foreground">NPS - {i === 0 ? "6" : "2"} Months</p>
+                      <p className="text-[11px] text-muted-foreground"><LoadingDots /></p>
+                    </div>
+                    <NpsGauge score={0} />
+                    <div className="grid grid-cols-3 gap-2 pt-3 border-t border-border">
+                      <div className="text-center">
+                        <p className="text-lg font-bold text-status-red"><LoadingDots /></p>
+                        <p className="text-[10px] text-muted-foreground">Detractors</p>
+                      </div>
+                      <div className="text-center">
+                        <p className="text-lg font-bold text-status-yellow"><LoadingDots /></p>
+                        <p className="text-[10px] text-muted-foreground">Passives</p>
+                      </div>
+                      <div className="text-center">
+                        <p className="text-lg font-bold text-status-green"><LoadingDots /></p>
+                        <p className="text-[10px] text-muted-foreground">Promoters</p>
+                      </div>
+                    </div>
+                  </div>
+                ))}
+              </>
+            ) : (
+              npsResults.map((r, i) => (
                 <div key={r.formId} className={`space-y-4 ${i > 0 ? "md:pl-6 md:border-l border-border" : ""}`}>
                   <div className="flex items-center justify-between">
                     <div>
-                      <p className="text-xs font-semibold text-foreground">{r.formName}</p>
-                      <p className="text-[11px] text-muted-foreground">{r.totalResponses} responses</p>
+                      <p className="text-lg font-semibold text-foreground">{r.formName.replace(/NPS Score Tracking\s*-?\s*/i, "").replace(/(\d+)\s*months?/i, (_, n) => `${n} Months`)}</p>
+                      <p className="text-[11px] text-muted-foreground">{npsLoading ? <LoadingDots /> : `${r.totalResponses} responses`}</p>
                     </div>
-                    {r.loading && <LoadingDots />}
                   </div>
                   {r.error ? (
                     <p className="text-xs text-status-red">{r.error}</p>
@@ -107,28 +290,73 @@ export function ProductDashboard() {
                       <NpsGauge score={r.score} />
                       <div className="grid grid-cols-3 gap-2 pt-3 border-t border-border">
                         <div className="text-center">
-                          <p className="text-lg font-bold text-status-green">{r.promoters}</p>
-                          <p className="text-[10px] text-muted-foreground">Promoters</p>
-                          <p className="text-[10px] text-muted-foreground/60">9–10</p>
+                          <p className="text-lg font-bold text-status-red">{npsLoading ? <LoadingDots /> : r.detractors}</p>
+                          <p className="text-[10px] text-muted-foreground">Detractors</p>
+                          <p className="text-[10px] text-muted-foreground/60">0–6</p>
                         </div>
                         <div className="text-center">
-                          <p className="text-lg font-bold text-status-yellow">{r.passives}</p>
+                          <p className="text-lg font-bold text-status-yellow">{npsLoading ? <LoadingDots /> : r.passives}</p>
                           <p className="text-[10px] text-muted-foreground">Passives</p>
                           <p className="text-[10px] text-muted-foreground/60">7–8</p>
                         </div>
                         <div className="text-center">
-                          <p className="text-lg font-bold text-status-red">{r.detractors}</p>
-                          <p className="text-[10px] text-muted-foreground">Detractors</p>
-                          <p className="text-[10px] text-muted-foreground/60">0–6</p>
+                          <p className="text-lg font-bold text-status-green">{npsLoading ? <LoadingDots /> : r.promoters}</p>
+                          <p className="text-[10px] text-muted-foreground">Promoters</p>
+                          <p className="text-[10px] text-muted-foreground/60">9–10</p>
                         </div>
                       </div>
                     </>
                   )}
                 </div>
-              ))}
-            </div>
-          )}
+              ))
+            )}
+          </div>
         </CardContent>
+
+        {/* ── NPS Trend Chart — attached below NPS cards ──────── */}
+        {npsResults.length > 0 && (
+          <div className="border-t border-border px-5 py-4">
+            <div className="flex items-center justify-between mb-3">
+              <p className="text-xs font-semibold text-muted-foreground">NPS Score Over Time</p>
+              <NpsRangeSelector onChange={setChartRange} />
+            </div>
+            <ResponsiveContainer width="100%" height={180}>
+              <AreaChart data={chartData} margin={{ left: -20, right: 8, top: 4, bottom: 0 }}>
+                <defs>
+                  {formKeys.map((key) => (
+                    <linearGradient key={key} id={`npsGrad-${key.replace(/\s/g, "")}`} x1="0" y1="0" x2="0" y2="1">
+                      <stop offset="5%" stopColor={NPS_COLORS[key] || "#8884d8"} stopOpacity={0.15} />
+                      <stop offset="95%" stopColor={NPS_COLORS[key] || "#8884d8"} stopOpacity={0} />
+                    </linearGradient>
+                  ))}
+                </defs>
+                <CartesianGrid strokeDasharray="3 3" stroke={GRID} vertical={false} />
+                <XAxis dataKey="date" tickFormatter={formatDay} tick={{ fontSize: 11, fill: TICK }} axisLine={{ stroke: GRID }} tickLine={false} interval="preserveStartEnd" />
+                <YAxis tick={{ fontSize: 11, fill: TICK }} axisLine={false} tickLine={false} />
+                <Tooltip
+                  cursor={false}
+                  contentStyle={TOOLTIP_STYLE}
+                  labelFormatter={(v) => `Date: ${v}`}
+                  formatter={(v: number, name: string) => [`${v > 0 ? "+" : ""}${v}`, name]}
+                />
+                <Legend wrapperStyle={{ fontSize: 11 }} />
+                {formKeys.map((key) => (
+                  <Area
+                    key={key}
+                    type="monotone"
+                    dataKey={key}
+                    name={key}
+                    stroke={NPS_COLORS[key] || "#8884d8"}
+                    strokeWidth={2}
+                    fill={`url(#npsGrad-${key.replace(/\s/g, "")})`}
+                    dot={false}
+                    activeDot={{ r: 4, fill: NPS_COLORS[key] || "#8884d8" }}
+                  />
+                ))}
+              </AreaChart>
+            </ResponsiveContainer>
+          </div>
+        )}
       </Card>
 
       {/* ── Community Card ───────────────────────────────────── */}

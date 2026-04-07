@@ -76,7 +76,7 @@ const navItems = [
   { title: "Content", url: "/departments/content", icon: Video },
   { title: "Marketing", url: "/departments/marketing", icon: Megaphone },
   { title: "Sales", url: "/departments/sales", icon: Phone },
-  { title: "Product", url: "/departments/community-management", icon: Users },
+  { title: "Product", url: "/departments/product", icon: Users },
 ];
 
 

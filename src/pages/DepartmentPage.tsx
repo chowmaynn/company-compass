@@ -24,6 +24,7 @@ const slugToDepartment: Record<string, Department> = {
   "marketing": "Marketing",
   "sales": "Sales",
   "community-management": "Product",
+  "product": "Product",
 };
 
 type Tab = "dashboard" | "charts" | "coaches" | "success" | "support" | "finance" | "competitors" | "marketing" | "tracking";
