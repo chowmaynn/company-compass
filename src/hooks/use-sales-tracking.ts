@@ -8,6 +8,7 @@ import {
   type SalesTrackingRow,
   type SalesMetricField,
 } from "@/lib/supabase-sales";
+import { generateWeekConfigs } from "@/data/scorecardData";
 
 export interface WeekMetrics {
   calls_booked: number;
@@ -25,6 +26,7 @@ export interface WeeklyRepData {
   rep_name: string;
   weeks: WeekMetrics[];
   monthly: WeekMetrics;
+  catchUp: WeekMetrics;
   dailyRows: SalesTrackingRow[]; // raw daily data for expandable view
 }
 
@@ -58,15 +60,25 @@ function sumMetrics(rows: SalesTrackingRow[]): WeekMetrics {
   return m;
 }
 
-function getWeekIndex(date: string): number {
-  const day = parseInt(date.split("-")[2]);
-  if (day <= 7) return 0;
-  if (day <= 14) return 1;
-  if (day <= 21) return 2;
-  return 3; // W4 = 22-end
+/**
+ * Returns the week index (0-3) for a date, or -1 for catch-up days.
+ * Uses Monday-aligned week boundaries from generateWeekConfigs.
+ */
+function getWeekIndex(date: string, month: string): number {
+  const configs = generateWeekConfigs(month);
+  // Convert date to a comparable NZ date string (YYYY-MM-DD)
+  for (let i = 0; i < configs.length; i++) {
+    const startNZ = new Date(configs[i].start).toLocaleDateString("en-CA", { timeZone: "Pacific/Auckland" });
+    const endNZ = new Date(configs[i].end).toLocaleDateString("en-CA", { timeZone: "Pacific/Auckland" });
+    if (date >= startNZ && date < endNZ) return i;
+  }
+  // Before W1 = catch-up
+  const w1StartNZ = new Date(configs[0].start).toLocaleDateString("en-CA", { timeZone: "Pacific/Auckland" });
+  if (date < w1StartNZ) return -1;
+  return 3; // After W4 end — shouldn't happen but fallback to W4
 }
 
-function aggregateByRep(rows: SalesTrackingRow[]): WeeklyRepData[] {
+function aggregateByRep(rows: SalesTrackingRow[], month: string): WeeklyRepData[] {
   // Group by rep
   const byRep = new Map<string, SalesTrackingRow[]>();
   for (const row of rows) {
@@ -77,16 +89,23 @@ function aggregateByRep(rows: SalesTrackingRow[]): WeeklyRepData[] {
 
   const result: WeeklyRepData[] = [];
   for (const [repName, repRows] of byRep) {
-    // Bucket into weeks
+    // Bucket into catch-up (-1) + weeks (0-3)
+    const catchUpRows: SalesTrackingRow[] = [];
     const weekBuckets: SalesTrackingRow[][] = [[], [], [], []];
     for (const row of repRows) {
-      weekBuckets[getWeekIndex(row.date)].push(row);
+      const wi = getWeekIndex(row.date, month);
+      if (wi === -1) {
+        catchUpRows.push(row);
+      } else {
+        weekBuckets[wi].push(row);
+      }
     }
 
     const weeks = weekBuckets.map(sumMetrics);
     const monthly = sumMetrics(repRows);
+    const catchUp = sumMetrics(catchUpRows);
 
-    result.push({ rep_name: repName, weeks, monthly, dailyRows: repRows });
+    result.push({ rep_name: repName, weeks, monthly, dailyRows: repRows, catchUp });
   }
 
   // Sort reps alphabetically
@@ -116,6 +135,19 @@ function computeTeamTotals(reps: WeeklyRepData[]): WeeklyRepData {
     weeks.push(m);
   }
 
+  const catchUp = emptyMetrics();
+  for (const rep of reps) {
+    catchUp.calls_booked += rep.catchUp.calls_booked;
+    catchUp.calls_taken += rep.catchUp.calls_taken;
+    catchUp.closes += rep.catchUp.closes;
+    catchUp.cc += rep.catchUp.cc;
+    catchUp.no_shows += rep.catchUp.no_shows;
+    catchUp.cancellations += rep.catchUp.cancellations;
+    catchUp.reschedules += rep.catchUp.reschedules;
+  }
+  catchUp.show_rate = catchUp.calls_booked > 0 ? Math.round((catchUp.calls_taken / catchUp.calls_booked) * 100) : null;
+  catchUp.close_rate = catchUp.calls_taken > 0 ? Math.round((catchUp.closes / catchUp.calls_taken) * 100) : null;
+
   const monthly = emptyMetrics();
   for (const rep of reps) {
     monthly.calls_booked += rep.monthly.calls_booked;
@@ -129,7 +161,7 @@ function computeTeamTotals(reps: WeeklyRepData[]): WeeklyRepData {
   monthly.show_rate = monthly.calls_booked > 0 ? Math.round((monthly.calls_taken / monthly.calls_booked) * 100) : null;
   monthly.close_rate = monthly.calls_taken > 0 ? Math.round((monthly.closes / monthly.calls_taken) * 100) : null;
 
-  return { rep_name: "TEAM", weeks, monthly, dailyRows: [] };
+  return { rep_name: "TEAM", weeks, monthly, catchUp, dailyRows: [] };
 }
 
 export function useSalesTracking(month: string) {
@@ -157,8 +189,8 @@ export function useSalesTracking(month: string) {
   const isTodayInMonth = todayDate.startsWith(month);
 
   const reps = useMemo(
-    () => aggregateByRep(dataQuery.data ?? []),
-    [dataQuery.data]
+    () => aggregateByRep(dataQuery.data ?? [], month),
+    [dataQuery.data, month]
   );
 
   const teamTotals = useMemo(() => computeTeamTotals(reps), [reps]);

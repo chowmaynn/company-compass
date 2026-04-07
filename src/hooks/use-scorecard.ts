@@ -131,9 +131,14 @@ const API_METRIC_MAP: Record<string, ApiSource> = {
   "Skool Joins":                          { hook: "skoolJoins", field: "weeklyJoins" },
   // Bitly clicks are written to scorecard by the bitly-daily edge function — no live overlay needed
   // Total Bookings, Email Bookings: manual entry
-  // Closing Calls metrics: manual entry (Close CRM API data available on Sales page)
   "Website Booking Rate":                 { hook: "computed",  field: "websiteBookingRate" },
   "Skool Booking Rate":                   { hook: "computed",  field: "skoolBookingRate" },
+  // Sales metrics from sales_tracking table
+  "Closing Calls Booked":                 { hook: "salesTracking", field: "calls_booked" },
+  "Closing Call Show Rate":               { hook: "salesTracking", field: "show_rate" },
+  "Closing Calls Taken":                  { hook: "salesTracking", field: "calls_taken" },
+  "Closing Call Close Rate":              { hook: "salesTracking", field: "close_rate" },
+  "Revenue":                              { hook: "salesTracking", field: "cc" },
   // Customer support complaints, NPS: manual entry
 };
 
@@ -147,7 +152,7 @@ function resolveApiValue(
     kit: ReturnType<typeof useKit>;
     notion: ReturnType<typeof useNotion>;
     ga: { weeklyViews: (number | "—")[] };
-    salesTracking: { wonCount: number; callsAnswered: number; showRate: number | null; winRate: number | null };
+    salesTracking: { weekly: import("@/hooks/use-sales-tracking").WeekMetrics[]; monthly: import("@/hooks/use-sales-tracking").WeekMetrics | null; catchUp: import("@/hooks/use-sales-tracking").WeekMetrics | null };
     salesMetrics: ReturnType<typeof useSupabaseMetrics>;
     intercom: ReturnType<typeof useIntercom>;
     tallyNps: ReturnType<typeof useTallyNps>;
@@ -171,9 +176,13 @@ function resolveApiValue(
     case "skoolJoins":
       return apis.skoolJoins.weeklyJoins[weekIndex] ?? "—";
     case "salesTracking": {
-      const val = apis.salesTracking[source.field as keyof typeof apis.salesTracking];
-      if (typeof val === "number") return val;
-      return "—";
+      const weekData = apis.salesTracking.weekly[weekIndex];
+      if (!weekData) return "—";
+      const field = source.field as keyof import("@/hooks/use-sales-tracking").WeekMetrics;
+      const val = weekData[field];
+      if (val === null) return "—";
+      if (field === "show_rate" || field === "close_rate") return `${val}%`;
+      return val;
     }
     case "intercom": {
       // Inbox conversations = complaints count (monthly, not weekly)
@@ -277,12 +286,11 @@ export function useScorecard(month: string = DEFAULT_MONTH) {
   const notion = useNotion();
   const ga = useGoogleAnalytics();
   const salesTrackingData = useSalesTracking(month);
-  const stTeam = salesTrackingData.teamTotals?.monthly;
+  const stTeam = salesTrackingData.teamTotals;
   const salesTracking = useMemo(() => ({
-    wonCount: stTeam?.closes ?? 0,
-    callsAnswered: stTeam?.calls_taken ?? 0,
-    showRate: stTeam?.show_rate ?? null,
-    winRate: stTeam?.close_rate ?? null,
+    weekly: stTeam?.weeks ?? [],
+    monthly: stTeam?.monthly ?? null,
+    catchUp: stTeam?.catchUp ?? null,
   }), [stTeam]);
   const intercom = useIntercom();
   const tallyNps = useTallyNps();
@@ -354,13 +362,50 @@ export function useScorecard(month: string = DEFAULT_MONTH) {
     // Metrics where monthly comes from a dedicated full-range query (not sum of weeks)
     const dedicatedMonthlyMetrics = new Set<string>([]);
 
+    const formatSalesVal = (field: string, val: number | null): number | string | "—" => {
+      if (val === null) return "—";
+      if (field === "show_rate" || field === "close_rate") return `${val}%`;
+      return val;
+    };
+
     return supabaseMetrics.map((m) => {
       // Step 1: Apply API overlay
       let updated = m;
+      const source = API_METRIC_MAP[m.name];
 
-      if (shouldOverlayWeek) {
+      // Sales tracking: overlay ALL weeks + catch-up (data comes from Supabase sales_tracking table)
+      if (source?.hook === "salesTracking") {
+        const field = source.field as keyof import("@/hooks/use-sales-tracking").WeekMetrics;
+        let changed = false;
+        const newWeeks = [...m.weeks];
+
+        // Overlay each week
+        for (let w = 0; w < newWeeks.length; w++) {
+          const weekData = salesTracking.weekly[w];
+          if (weekData) {
+            const val = formatSalesVal(field, weekData[field]);
+            if (val !== "—") {
+              newWeeks[w] = { ...newWeeks[w], actual: val };
+              changed = true;
+            }
+          }
+        }
+
+        // Overlay catch-up
+        let newCatchUp = m.catchUp;
+        if (salesTracking.catchUp) {
+          const cuVal = formatSalesVal(field, salesTracking.catchUp[field]);
+          if (cuVal !== "—") {
+            newCatchUp = { ...m.catchUp, actual: cuVal };
+            changed = true;
+          }
+        }
+
+        if (changed) {
+          updated = { ...m, weeks: newWeeks, catchUp: newCatchUp };
+        }
+      } else if (shouldOverlayWeek) {
         // During an active week: overlay API data into that week's actual
-        const source = API_METRIC_MAP[m.name];
         if (source) {
           const apiVal = resolveApiValue(source, cwi, { kit, notion, ga, salesTracking, intercom, tallyNps, skoolJoins, salesMetrics, currentMetrics: supabaseMetrics, weekConfigs: monthConfigs });
           if (apiVal !== "—") {
@@ -370,16 +415,13 @@ export function useScorecard(month: string = DEFAULT_MONTH) {
         }
       } else if (isCatchUp) {
         // During catch-up period: overlay snapshot metrics into catch-up actual
-        const source = API_METRIC_MAP[m.name];
         if (source) {
-          // For Skool Joins, use the dedicated catchUpJoins value
           if (source.hook === "skoolJoins") {
             const catchUpVal = skoolJoins.catchUpJoins;
             if (catchUpVal !== "—") {
               updated = { ...m, catchUp: { ...m.catchUp, actual: catchUpVal } };
             }
           } else {
-            // Use week index 0 for resolving — snapshot metrics (backlogCount) ignore the index
             const apiVal = resolveApiValue(source, 0, { kit, notion, ga, salesTracking, intercom, tallyNps, skoolJoins, salesMetrics, currentMetrics: supabaseMetrics, weekConfigs: monthConfigs });
             if (apiVal !== "—") {
               updated = { ...m, catchUp: { ...m.catchUp, actual: apiVal } };
