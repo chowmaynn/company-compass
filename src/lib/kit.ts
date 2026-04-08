@@ -24,6 +24,7 @@ interface BroadcastStatsEntry {
 
 interface Broadcast {
   id: number;
+  publication_id: number | null;
   subject: string;
   created_at: string;
   send_at: string | null;
@@ -179,6 +180,7 @@ export async function fetchAllBroadcastStats(
 
 export interface BroadcastItem {
   id: number;
+  publicationId: number | null;
   subject: string;
   sentAt: string;
   recipients: number;
@@ -244,13 +246,18 @@ export async function fetchBroadcastsInRange(
       const sentAt = b.published_at || b.send_at;
       if (!sentAt) return false;
       const d = new Date(sentAt);
-      return d >= startDate && d <= endDate;
+      if (d < startDate || d > endDate) return false;
+      // Exclude drafts that were never actually sent
+      const s = statsMap.get(b.id);
+      if (s?.stats.status === "draft") return false;
+      return true;
     })
     .map((b) => {
       const sentAt = b.published_at || b.send_at || "";
       const s = statsMap.get(b.id);
       return {
         id: b.id,
+        publicationId: b.publication_id ?? null,
         subject: b.subject,
         sentAt,
         recipients: s?.stats.recipients ?? 0,
