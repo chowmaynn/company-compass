@@ -186,7 +186,7 @@ interface Section {
 
 const SECTIONS: Section[] = [
   {
-    label: "QF Calls Booked",
+    label: "QF CALLS BOOKED",
     textColor: "#a78bfa",
     accentBorder: "3px solid rgba(139,92,246,0.8)",
     rowTint: "rgba(139,92,246,0.14)",
@@ -735,7 +735,6 @@ export function BookingKPITracker() {
                         color: section.inline ? section.textColor : "var(--foreground)", whiteSpace: "nowrap",
                       }}>
                         {section.inline ? section.label : metric}
-                        {isAuto && <span style={{ marginLeft: 6, fontSize: 9, color: "rgba(255,255,255,0.3)", fontStyle: "italic" }}>auto</span>}
                       </td>
 
                       {/* Target */}
