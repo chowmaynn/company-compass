@@ -531,14 +531,16 @@ export function BookingKPITracker() {
   }
 
   function getAvg(metric: MetricName): string {
-    const vals = days.map(d => {
-      // Prefer API data
-      if (METRIC_SOURCE_MAP[metric]) {
-        const api = getApiValue(toISO(d), metric);
-        if (api !== null) return api;
-      }
-      return getComputed(d, metric);
-    }).filter((v): v is number => v !== null);
+    const vals = days
+      .filter(d => d <= now) // Only include days up to today
+      .map(d => {
+        // Prefer API data
+        if (METRIC_SOURCE_MAP[metric]) {
+          const api = getApiValue(toISO(d), metric);
+          if (api !== null) return api;
+        }
+        return getComputed(d, metric);
+      }).filter((v): v is number => v !== null);
     if (!vals.length) return "—";
     const avg = vals.reduce((s, v) => s + v, 0) / vals.length;
     return PCT_FORMAT.has(metric) ? avg.toFixed(2) + "%" : (Number.isInteger(avg) ? String(avg) : avg.toFixed(2));
