@@ -594,7 +594,7 @@ export function BookingKPITracker() {
 
           <thead>
             <tr>
-              <th style={{ ...S.metric({ borderBottom: B_FROZEN }), padding: "10px 16px", textAlign: "left", fontSize: 10, fontWeight: 600, color: "var(--muted-foreground)", textTransform: "uppercase", letterSpacing: "0.08em" }}>
+              <th style={{ ...S.metric({ borderBottom: B_FROZEN }), padding: "10px 16px", textAlign: "left", fontSize: 10, fontWeight: 600, color: "rgba(255,255,255,0.3)", textTransform: "uppercase", letterSpacing: "0.08em" }}>
                 Metric
               </th>
               <th style={{ ...S.target({ borderBottom: B_FROZEN }), padding: "10px 8px", textAlign: "center", fontSize: 10, fontWeight: 700, color: "hsl(var(--primary))", textTransform: "uppercase", letterSpacing: "0.08em" }}>
