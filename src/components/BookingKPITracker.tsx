@@ -477,7 +477,7 @@ export function BookingKPITracker() {
                           target="_blank"
                           rel="noreferrer"
                           title={b.subject}
-                          style={{ display: "flex", alignItems: "center", justifyContent: "center", width: "100%", height: 36, background: "rgba(59,130,246,0.15)", color: "#3b82f6", fontSize: 18, fontWeight: 700, cursor: "pointer", textDecoration: "none" }}
+                          style={{ display: "flex", alignItems: "center", justifyContent: "center", width: "100%", height: 36, background: "rgba(59,130,246,0.15)", color: "#3b82f6", fontSize: 26, lineHeight: 1, cursor: "pointer", textDecoration: "none" }}
                         >
                           ✉
                         </a>
