@@ -310,27 +310,23 @@ export function BookingKPITracker() {
       const lastDay = new Date(year, month + 1, 0).getDate();
       const endUTC = `${year}-${mm}-${String(lastDay).padStart(2, "0")}T23:59:59Z`;
 
+      // Fetch per day in parallel (each day stays under row limits)
       const result: Record<string, number> = {};
-      let page = 0;
-      const PAGE_SIZE = 5000;
-      let hasMore = true;
-
-      while (hasMore) {
-        const url = `${SKOOL_BASE}/rest/v1/${TABLE}?select=${COL}&${COL}=gte.${startUTC}&${COL}=lte.${endUTC}&limit=${PAGE_SIZE}&offset=${page * PAGE_SIZE}`;
-        try {
-          const res = await fetch(url);
-          if (!res.ok) break;
-          const rows: { "Date Added": string }[] = await res.json();
-          for (const row of rows) {
-            const date = (row["Date Added"] ?? "").substring(0, 10);
-            if (date) result[date] = (result[date] || 0) + 1;
-          }
-          hasMore = rows.length === PAGE_SIZE;
-          page++;
-        } catch {
-          break;
-        }
+      const lastDay = new Date(year, month + 1, 0).getDate();
+      const dayFetches = [];
+      for (let d = 1; d <= lastDay; d++) {
+        const dayStr = `${year}-${mm}-${String(d).padStart(2, "0")}`;
+        const nextD = d < lastDay
+          ? `${year}-${mm}-${String(d + 1).padStart(2, "0")}`
+          : month === 11 ? `${year + 1}-01-01` : `${year}-${String(month + 2).padStart(2, "0")}-01`;
+        dayFetches.push(
+          fetch(`${SKOOL_BASE}/rest/v1/${TABLE}?select=${COL}&${COL}=gte.${dayStr}T00:00:00Z&${COL}=lt.${nextD}T00:00:00Z&limit=5000`)
+            .then(r => r.ok ? r.json() : [])
+            .then((rows: unknown[]) => { if (rows.length > 0) result[dayStr] = rows.length; })
+            .catch(() => {})
+        );
       }
+      await Promise.all(dayFetches);
 
       if (!cancelled && Object.keys(result).length > 0) {
         setSkoolJoinsByDate(result);
