@@ -138,7 +138,7 @@ const API_METRIC_MAP: Record<string, ApiSource> = {
   "Closing Call Show Rate":               { hook: "salesTracking", field: "show_rate" },
   "Closing Calls Taken":                  { hook: "salesTracking", field: "calls_taken" },
   "Closing Call Close Rate":              { hook: "salesTracking", field: "close_rate" },
-  "Revenue":                              { hook: "salesTracking", field: "cc" },
+  // Revenue, Cash Collected: manual entry
   // Customer support complaints, NPS: manual entry
 };
 
