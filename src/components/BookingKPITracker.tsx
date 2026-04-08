@@ -313,26 +313,43 @@ export function BookingKPITracker() {
       const lastDay = new Date(year, month + 1, 0).getDate();
       const endUTC = `${year}-${mm}-${String(lastDay).padStart(2, "0")}T23:59:59Z`;
 
-      // Fetch in batches of 3 days at a time to avoid overwhelming the Skool Supabase
+      // If cache exists and has data, skip refetch unless it's the current month
+      const cached = localStorage.getItem(skoolCacheKey);
+      if (cached) {
+        try {
+          const parsed = JSON.parse(cached);
+          const currentMonth = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, "0")}`;
+          const isCurrentMonth = `${year}-${mm}` === currentMonth;
+          // Past months: use cache only, don't refetch
+          if (!isCurrentMonth && Object.keys(parsed).length > 0) {
+            if (!cancelled) setSkoolJoinsByDate(parsed);
+            return;
+          }
+        } catch {}
+      }
+
+      // Fetch one day at a time sequentially to avoid 500s
       const result: Record<string, number> = {};
       const daysInMo = new Date(year, month + 1, 0).getDate();
-      const BATCH_SIZE = 3;
-      for (let start = 1; start <= daysInMo; start += BATCH_SIZE) {
+      const todayDay = now.getDate();
+      const isCurrentMonth = year === now.getFullYear() && month === now.getMonth();
+      const maxDay = isCurrentMonth ? todayDay : daysInMo;
+
+      for (let d = 1; d <= maxDay; d++) {
         if (cancelled) break;
-        const batch = [];
-        for (let d = start; d < start + BATCH_SIZE && d <= daysInMo; d++) {
-          const dayStr = `${year}-${mm}-${String(d).padStart(2, "0")}`;
-          const nextD = d < daysInMo
-            ? `${year}-${mm}-${String(d + 1).padStart(2, "0")}`
-            : month === 11 ? `${year + 1}-01-01` : `${year}-${String(month + 2).padStart(2, "0")}-01`;
-          batch.push(
-            fetch(`${SKOOL_BASE}/rest/v1/${TABLE}?select=${COL}&${COL}=gte.${dayStr}T00:00:00Z&${COL}=lt.${nextD}T00:00:00Z&limit=5000`)
-              .then(r => r.ok ? r.json() : [])
-              .then((rows: unknown[]) => { if (rows.length > 0) result[dayStr] = rows.length; })
-              .catch(() => {})
-          );
-        }
-        await Promise.all(batch);
+        const dayStr = `${year}-${mm}-${String(d).padStart(2, "0")}`;
+        const nextD = d < daysInMo
+          ? `${year}-${mm}-${String(d + 1).padStart(2, "0")}`
+          : month === 11 ? `${year + 1}-01-01` : `${year}-${String(month + 2).padStart(2, "0")}-01`;
+        try {
+          const res = await fetch(`${SKOOL_BASE}/rest/v1/${TABLE}?select=${COL}&${COL}=gte.${dayStr}T00:00:00Z&${COL}=lt.${nextD}T00:00:00Z&limit=5000`);
+          if (res.ok) {
+            const rows: unknown[] = await res.json();
+            result[dayStr] = rows.length;
+          }
+        } catch {}
+        // Small delay between requests
+        await new Promise(r => setTimeout(r, 100));
       }
 
       if (!cancelled && Object.keys(result).length > 0) {

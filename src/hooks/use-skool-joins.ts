@@ -91,25 +91,30 @@ export function useSkoolJoins(): SkoolJoinsData {
       ranges.push({ key: `w${i}`, start: wc.start, end: wc.end });
     }
 
-    Promise.all(ranges.map((r) => fetchJoinCount(r.start, r.end))).then(
-      (counts) => {
+    // Fetch sequentially to avoid overwhelming the Skool Supabase
+    (async () => {
+      const counts: number[] = [];
+      for (const r of ranges) {
         if (cancelled) return;
-        const weekly: (number | "—")[] = weekConfigs.map(() => "—");
-        let catchUp: number | "—" = "—";
-
-        for (let i = 0; i < ranges.length; i++) {
-          const { key } = ranges[i];
-          if (key === "catchup") {
-            catchUp = counts[i];
-          } else {
-            const weekIdx = parseInt(key.replace("w", ""));
-            weekly[weekIdx] = counts[i];
-          }
-        }
-
-        setWeeklyJoins(weekly);
-        setCatchUpJoins(catchUp);
+        counts.push(await fetchJoinCount(r.start, r.end));
       }
+      if (cancelled) return;
+      const weekly: (number | "—")[] = weekConfigs.map(() => "—");
+      let catchUpVal: number | "—" = "—";
+
+      for (let i = 0; i < ranges.length; i++) {
+        const { key } = ranges[i];
+        if (key === "catchup") {
+          catchUpVal = counts[i];
+        } else {
+          const weekIdx = parseInt(key.replace("w", ""));
+          weekly[weekIdx] = counts[i];
+        }
+      }
+
+      setWeeklyJoins(weekly);
+      setCatchUpJoins(catchUpVal);
+    })(
     );
 
     return () => { cancelled = true; };
