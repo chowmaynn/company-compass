@@ -180,16 +180,19 @@ interface Section {
   rowTint: string;
   headerTint: string;
   metrics: MetricName[];
+  /** If true, collapse header + single metric into one styled row */
+  inline?: boolean;
 }
 
 const SECTIONS: Section[] = [
   {
-    label: "QF Calls",
+    label: "QF Calls Booked",
     textColor: "#a78bfa",
     accentBorder: "3px solid rgba(139,92,246,0.8)",
-    rowTint: "rgba(139,92,246,0.04)",
+    rowTint: "rgba(139,92,246,0.14)",
     headerTint: "rgba(139,92,246,0.14)",
     metrics: ["QF Calls Booked"],
+    inline: true,
   },
   {
     label: "Skool",
@@ -695,7 +698,8 @@ export function BookingKPITracker() {
             {SECTIONS.map((section, si) => (
               <React.Fragment key={section.label}>
 
-                {/* Section header row */}
+                {/* Section header row — skip for inline sections */}
+                {!section.inline && (
                 <tr>
                   <td style={{
                     ...S.metric({ borderLeft: section.accentBorder, borderBottom: B_SECTION, borderTop: si === 0 ? "none" : B_SECTION }),
@@ -711,6 +715,7 @@ export function BookingKPITracker() {
                     <td key={toISO(d)} style={{ width: W_DAY, minWidth: W_DAY, borderRight: B_ROW, borderBottom: B_SECTION, backgroundColor: section.headerTint }} />
                   ))}
                 </tr>
+                )}
 
                 {/* Metric rows */}
                 {section.metrics.map((metric, mi) => {
@@ -722,11 +727,12 @@ export function BookingKPITracker() {
                     <tr key={metric}>
                       {/* Metric name */}
                       <td style={{
-                        ...S.metric({ borderLeft: section.accentBorder, borderBottom: rowBorderBottom }),
-                        padding: "8px 14px",
-                        fontSize: 13, fontWeight: 500, color: "var(--foreground)", whiteSpace: "nowrap",
+                        ...S.metric({ borderLeft: section.accentBorder, borderBottom: rowBorderBottom, borderTop: section.inline && si > 0 ? B_SECTION : undefined }),
+                        padding: section.inline ? "8px 14px" : "8px 14px",
+                        fontSize: section.inline ? 13 : 13, fontWeight: section.inline ? 700 : 500,
+                        color: section.inline ? section.textColor : "var(--foreground)", whiteSpace: "nowrap",
                       }}>
-                        {metric}
+                        {section.inline ? section.label : metric}
                         {isAuto && <span style={{ marginLeft: 6, fontSize: 9, color: "rgba(255,255,255,0.3)", fontStyle: "italic" }}>auto</span>}
                       </td>
 
