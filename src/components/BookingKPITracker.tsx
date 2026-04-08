@@ -310,23 +310,27 @@ export function BookingKPITracker() {
       const lastDay = new Date(year, month + 1, 0).getDate();
       const endUTC = `${year}-${mm}-${String(lastDay).padStart(2, "0")}T23:59:59Z`;
 
-      // Fetch per day in parallel (each day stays under row limits)
+      // Fetch in batches of 3 days at a time to avoid overwhelming the Skool Supabase
       const result: Record<string, number> = {};
       const daysInMo = new Date(year, month + 1, 0).getDate();
-      const dayFetches = [];
-      for (let d = 1; d <= daysInMo; d++) {
-        const dayStr = `${year}-${mm}-${String(d).padStart(2, "0")}`;
-        const nextD = d < daysInMo
-          ? `${year}-${mm}-${String(d + 1).padStart(2, "0")}`
-          : month === 11 ? `${year + 1}-01-01` : `${year}-${String(month + 2).padStart(2, "0")}-01`;
-        dayFetches.push(
-          fetch(`${SKOOL_BASE}/rest/v1/${TABLE}?select=${COL}&${COL}=gte.${dayStr}T00:00:00Z&${COL}=lt.${nextD}T00:00:00Z&limit=5000`)
-            .then(r => r.ok ? r.json() : [])
-            .then((rows: unknown[]) => { if (rows.length > 0) result[dayStr] = rows.length; })
-            .catch(() => {})
-        );
+      const BATCH_SIZE = 3;
+      for (let start = 1; start <= daysInMo; start += BATCH_SIZE) {
+        if (cancelled) break;
+        const batch = [];
+        for (let d = start; d < start + BATCH_SIZE && d <= daysInMo; d++) {
+          const dayStr = `${year}-${mm}-${String(d).padStart(2, "0")}`;
+          const nextD = d < daysInMo
+            ? `${year}-${mm}-${String(d + 1).padStart(2, "0")}`
+            : month === 11 ? `${year + 1}-01-01` : `${year}-${String(month + 2).padStart(2, "0")}-01`;
+          batch.push(
+            fetch(`${SKOOL_BASE}/rest/v1/${TABLE}?select=${COL}&${COL}=gte.${dayStr}T00:00:00Z&${COL}=lt.${nextD}T00:00:00Z&limit=5000`)
+              .then(r => r.ok ? r.json() : [])
+              .then((rows: unknown[]) => { if (rows.length > 0) result[dayStr] = rows.length; })
+              .catch(() => {})
+          );
+        }
+        await Promise.all(batch);
       }
-      await Promise.all(dayFetches);
 
       if (!cancelled && Object.keys(result).length > 0) {
         setSkoolJoinsByDate(result);
