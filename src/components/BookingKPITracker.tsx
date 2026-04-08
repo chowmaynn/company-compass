@@ -312,11 +312,11 @@ export function BookingKPITracker() {
 
       // Fetch per day in parallel (each day stays under row limits)
       const result: Record<string, number> = {};
-      const lastDay = new Date(year, month + 1, 0).getDate();
+      const daysInMo = new Date(year, month + 1, 0).getDate();
       const dayFetches = [];
-      for (let d = 1; d <= lastDay; d++) {
+      for (let d = 1; d <= daysInMo; d++) {
         const dayStr = `${year}-${mm}-${String(d).padStart(2, "0")}`;
-        const nextD = d < lastDay
+        const nextD = d < daysInMo
           ? `${year}-${mm}-${String(d + 1).padStart(2, "0")}`
           : month === 11 ? `${year + 1}-01-01` : `${year}-${String(month + 2).padStart(2, "0")}-01`;
         dayFetches.push(
