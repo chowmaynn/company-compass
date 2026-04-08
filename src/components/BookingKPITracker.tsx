@@ -285,55 +285,33 @@ export function BookingKPITracker() {
 
   // Map metric names to source-level data from the cube
   // Source qualified = total_bookings - casey_cancelled per day
-  // Fetch Skool joins for the entire month in one request, then bucket by UTC date
-  // Cache in localStorage to avoid refetching on month switches
-  const skoolCacheKey = `skool-joins-${year}-${String(month + 1).padStart(2, "0")}`;
-  const [skoolJoinsByDate, setSkoolJoinsByDate] = useState<Record<string, number>>(() => {
-    try { const c = localStorage.getItem(skoolCacheKey); if (c) return JSON.parse(c); } catch {}
-    return {};
-  });
+  // Fetch Skool joins per day — cached in React state (useRef) across month switches
+  const skoolCache = useRef<Record<string, Record<string, number>>>({});
+  const [skoolJoinsByDate, setSkoolJoinsByDate] = useState<Record<string, number>>({});
   useEffect(() => {
     let cancelled = false;
+    const mm = String(month + 1).padStart(2, "0");
+    const cacheKey = `${year}-${mm}`;
+
+    // Use in-memory cache if available
+    if (skoolCache.current[cacheKey] && Object.keys(skoolCache.current[cacheKey]).length > 0) {
+      setSkoolJoinsByDate(skoolCache.current[cacheKey]);
+      // Past months: don't refetch
+      const currentMonth = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, "0")}`;
+      if (cacheKey !== currentMonth) return;
+    } else {
+      setSkoolJoinsByDate({});
+    }
+
     const SKOOL_BASE = "/api/skool-supabase";
     const TABLE = "Skool%20Lead%20Logs";
     const COL = "%22Date%20Added%22";
 
-    // Load from cache first
-    try {
-      const cached = localStorage.getItem(skoolCacheKey);
-      if (cached) {
-        const parsed = JSON.parse(cached);
-        if (Object.keys(parsed).length > 0) setSkoolJoinsByDate(parsed);
-      }
-    } catch {}
-
     async function fetchSkoolMonth() {
-      const mm = String(month + 1).padStart(2, "0");
-      const startUTC = `${year}-${mm}-01T00:00:00Z`;
-      const lastDay = new Date(year, month + 1, 0).getDate();
-      const endUTC = `${year}-${mm}-${String(lastDay).padStart(2, "0")}T23:59:59Z`;
-
-      // If cache exists and has data, skip refetch unless it's the current month
-      const cached = localStorage.getItem(skoolCacheKey);
-      if (cached) {
-        try {
-          const parsed = JSON.parse(cached);
-          const currentMonth = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, "0")}`;
-          const isCurrentMonth = `${year}-${mm}` === currentMonth;
-          // Past months: use cache only, don't refetch
-          if (!isCurrentMonth && Object.keys(parsed).length > 0) {
-            if (!cancelled) setSkoolJoinsByDate(parsed);
-            return;
-          }
-        } catch {}
-      }
-
-      // Fetch one day at a time sequentially to avoid 500s
       const result: Record<string, number> = {};
       const daysInMo = new Date(year, month + 1, 0).getDate();
-      const todayDay = now.getDate();
-      const isCurrentMonth = year === now.getFullYear() && month === now.getMonth();
-      const maxDay = isCurrentMonth ? todayDay : daysInMo;
+      const isCurrentMo = year === now.getFullYear() && month === now.getMonth();
+      const maxDay = isCurrentMo ? now.getDate() : daysInMo;
 
       for (let d = 1; d <= maxDay; d++) {
         if (cancelled) break;
@@ -348,19 +326,18 @@ export function BookingKPITracker() {
             result[dayStr] = rows.length;
           }
         } catch {}
-        // Small delay between requests
         await new Promise(r => setTimeout(r, 100));
       }
 
       if (!cancelled && Object.keys(result).length > 0) {
+        skoolCache.current[cacheKey] = result;
         setSkoolJoinsByDate(result);
-        try { localStorage.setItem(skoolCacheKey, JSON.stringify(result)); } catch {}
       }
     }
 
     fetchSkoolMonth();
     return () => { cancelled = true; };
-  }, [year, month, skoolCacheKey]);
+  }, [year, month]);
 
   // Fetch GA4 active users per day for the displayed month
   const [ga4ActiveByDate, setGa4ActiveByDate] = useState<Record<string, number>>({});
