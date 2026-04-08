@@ -56,6 +56,12 @@ const marketingTabs: { id: Tab; label: string; icon: React.ElementType }[] = [
 
 export default function DepartmentPage() {
   const { slug } = useParams<{ slug: string }>();
+  // Force full remount when navigating between departments
+  return <DepartmentPageInner key={slug} />;
+}
+
+function DepartmentPageInner() {
+  const { slug } = useParams<{ slug: string }>();
   const department = slug ? slugToDepartment[slug] : undefined;
 
   const [activeTab, setActiveTab] = useState<Tab>(
