@@ -26,10 +26,12 @@ function buildCube(rows: RawMetricRow[]): DataCube {
 }
 
 async function fetchDynamicMetrics(from: string, to: string): Promise<RawMetricRow[]> {
-  const res = await fetch(`${BASE}/rest/v1/rpc/get_dynamic_metrics`, {
+  // Use execute_sql to get full output including source-level data
+  // (direct RPC call to get_dynamic_metrics drops source_ rows due to NULL join paths)
+  const res = await fetch(`${BASE}/rest/v1/rpc/execute_sql`, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ from_date: from, to_date: to }),
+    body: JSON.stringify({ sql_query: `SELECT * FROM get_dynamic_metrics('${from}', '${to}')` }),
   });
   if (!res.ok) throw new Error(`Supabase ${res.status}`);
   return res.json();
@@ -75,16 +77,39 @@ export function useSupabaseMetrics(from: string, to: string) {
   const cube = buildCube(rows);
   const dates = Object.keys(cube).sort();
 
-  // ── Public sales bookings (event-level, scoped to public sources) ───
-  // totalBookings = sum of qualified from the 6 public-facing event types only.
-  // This matches what's shown in the "Qualified by Source" chart.
-  const publicEventTotals: Record<string, number> = {};
-  PUBLIC_SALES_EVENTS.forEach((name) => {
-    let q = 0;
-    dates.forEach((date) => { q += cube[date]?.[`event_${name}`]?.qualified ?? 0; });
-    publicEventTotals[name] = q;
+  // ── Source-level bookings (qualified = total_bookings - casey_cancelled) ───
+  // Uses source_ categories from get_dynamic_metrics which match the Google Sheet calculation.
+  const SOURCE_DISPLAY_NAMES: Record<string, string> = {
+    "source_website": "Website",
+    "source_website b": "Website B",
+    "source_website c": "Website C",
+    "source_skool setter": "Skool A",
+    "source_skool classroom": "Skool C",
+    "source_skool post": "Skool P",
+    "source_email general": "Email",
+    "source_email welcome": "Welcome Email",
+    "source_masterclass": "Masterclass",
+  };
+
+  const sourceQualified: Record<string, number> = {};
+  const allSourceCategories = new Set<string>();
+  dates.forEach((date) => {
+    Object.keys(cube[date] || {}).forEach((cat) => {
+      if (cat.startsWith("source_")) allSourceCategories.add(cat);
+    });
   });
-  const totalBookings = Object.values(publicEventTotals).reduce((s, v) => s + v, 0);
+
+  allSourceCategories.forEach((sourceCat) => {
+    let totalBk = 0, caseyCx = 0;
+    dates.forEach((date) => {
+      totalBk += cube[date]?.[sourceCat]?.total_bookings ?? 0;
+      caseyCx += cube[date]?.[sourceCat]?.casey_cancelled ?? 0;
+    });
+    const displayName = SOURCE_DISPLAY_NAMES[sourceCat] || sourceCat.replace("source_", "");
+    sourceQualified[displayName] = totalBk - caseyCx;
+  });
+
+  const totalBookings = Object.values(sourceQualified).reduce((s, v) => s + v, 0);
 
   // ── Overall funnel metrics (null category — all call types) ──────────
   // Used for cancellation and show-rate context. Labels clarify this scope.
@@ -110,20 +135,23 @@ export function useSupabaseMetrics(from: string, to: string) {
   const totalQualified = totalBookings; // scoped to public events for KPI display
   const totalHeld = allHeld;
 
-  // ── Daily booking trend (public events only) ─────────
+  // ── Daily booking trend (source-level qualified) ─────────
   const dailyBookings: DailyBooking[] = dates.map((date) => {
-    const bookings = PUBLIC_SALES_EVENTS.reduce(
-      (s, name) => s + (cube[date]?.[`event_${name}`]?.qualified ?? 0), 0
-    );
+    let bookings = 0;
+    allSourceCategories.forEach((sourceCat) => {
+      const totalBk = cube[date]?.[sourceCat]?.total_bookings ?? 0;
+      const caseyCx = cube[date]?.[sourceCat]?.casey_cancelled ?? 0;
+      bookings += totalBk - caseyCx;
+    });
     const o = cube[date]?.[OVERALL] ?? {};
     return { date, bookings, qualified: bookings, held: o.held ?? 0 };
   });
 
-  // ── Sales event breakdown (public sources only for chart) ────────────
-  const salesEventBreakdown: EventBreakdown[] = PUBLIC_SALES_EVENTS.map((name) => {
-    const shortName = name.match(/\(([^)]+)\)/)?.[1] ?? name;
-    return { name: shortName, qualified: publicEventTotals[name] };
-  }).filter((e) => e.qualified > 0).sort((a, b) => b.qualified - a.qualified);
+  // ── Sales event breakdown (source-level qualified for chart) ────────────
+  const salesEventBreakdown: EventBreakdown[] = Object.entries(sourceQualified)
+    .map(([name, qualified]) => ({ name, qualified }))
+    .filter((e) => e.qualified > 0)
+    .sort((a, b) => b.qualified - a.qualified);
 
   // ── Follow-up breakdown ───────────────────────────────
   const followupBreakdown: EventBreakdown[] = FOLLOWUP_EVENTS.map((name) => {

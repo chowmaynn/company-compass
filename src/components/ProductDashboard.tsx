@@ -429,7 +429,7 @@ export function ProductDashboard() {
             <DateRangePicker onChange={setCommunityRange} />
           </div>
 
-          {/* Top row: Total Members (1/3) + Post Activity (2/3) */}
+          {/* Top row: Total Members (1/3) + New Members chart (2/3) */}
           <div className="grid grid-cols-3 gap-4 mb-6">
             <div className="rounded-xl bg-blue-50 dark:bg-blue-950/40 p-4">
               <div className="flex items-center gap-2 mb-2">
@@ -445,45 +445,47 @@ export function ProductDashboard() {
               </p>
               <p className="text-[11px] text-muted-foreground mt-1">All time</p>
             </div>
-            <div className="col-span-2 rounded-xl bg-indigo-50 dark:bg-indigo-950/40 p-4">
+            <div className="col-span-2 rounded-xl bg-emerald-50 dark:bg-emerald-950/40 p-4">
               <div className="flex items-center gap-2 mb-2">
-                <div className="h-7 w-7 rounded-lg bg-indigo-100 dark:bg-indigo-900/50 flex items-center justify-center">
-                  <Star className="h-3.5 w-3.5 text-indigo-600 dark:text-indigo-400" />
+                <div className="h-7 w-7 rounded-lg bg-emerald-100 dark:bg-emerald-900/50 flex items-center justify-center">
+                  <UserPlus className="h-3.5 w-3.5 text-emerald-600 dark:text-emerald-400" />
                 </div>
-                <span className="text-xs font-medium text-muted-foreground">Post Activity</span>
+                <span className="text-xs font-medium text-muted-foreground">New Members</span>
+                <span className="text-lg font-bold text-foreground ml-auto">
+                  {circleLoading && newMembersThisMonth === null
+                    ? <LoadingDots />
+                    : (filteredNewMembers ?? "—").toLocaleString()}
+                </span>
               </div>
               {chartsLoading ? (
                 <div className="h-[100px] flex items-center justify-center"><LoadingDots /></div>
               ) : (
                 <ResponsiveContainer width="100%" height={100}>
-                  <BarChart data={filteredPostActivity} barSize={6}>
+                  <AreaChart data={filteredMemberGrowth}>
+                    <defs>
+                      <linearGradient id="memberGrad" x1="0" y1="0" x2="0" y2="1">
+                        <stop offset="5%" stopColor="#10b981" stopOpacity={0.15} />
+                        <stop offset="95%" stopColor="#10b981" stopOpacity={0} />
+                      </linearGradient>
+                    </defs>
                     <CartesianGrid strokeDasharray="3 3" stroke={GRID} vertical={false} />
                     <XAxis dataKey="date" tickFormatter={formatDay} tick={{ fontSize: 9, fill: TICK }} axisLine={{ stroke: GRID }} tickLine={false} interval="preserveStartEnd" />
                     <YAxis tick={{ fontSize: 9, fill: TICK }} axisLine={false} tickLine={false} allowDecimals={false} width={25} />
-                    <Tooltip cursor={false} contentStyle={TOOLTIP_STYLE} labelFormatter={(v) => `Date: ${v}`} formatter={(v: number) => [v, "Posts"]} />
-                    <Bar dataKey="count" fill="#6366f1" radius={[2, 2, 0, 0]} />
-                  </BarChart>
+                    <Tooltip cursor={false} contentStyle={TOOLTIP_STYLE} labelFormatter={(v) => `Date: ${v}`} formatter={(v: number) => [v, "New members"]} />
+                    <Area type="monotone" dataKey="count" stroke="#10b981" strokeWidth={2} fill="url(#memberGrad)" dot={false} activeDot={{ r: 4 }} />
+                  </AreaChart>
                 </ResponsiveContainer>
               )}
             </div>
           </div>
 
-          {/* New Members — stat + chart connected */}
-          <div className="rounded-xl bg-emerald-50 dark:bg-emerald-950/40 p-4">
-            <div className="flex items-center justify-between mb-3">
-              <div className="flex items-center gap-2">
-                <div className="h-7 w-7 rounded-lg bg-emerald-100 dark:bg-emerald-900/50 flex items-center justify-center">
-                  <UserPlus className="h-3.5 w-3.5 text-emerald-600 dark:text-emerald-400" />
-                </div>
-                <div>
-                  <span className="text-xs font-medium text-muted-foreground">New Members</span>
-                  <p className="text-2xl font-bold text-foreground leading-tight">
-                    {circleLoading && newMembersThisMonth === null
-                      ? <LoadingDots />
-                      : (filteredNewMembers ?? "—").toLocaleString()}
-                  </p>
-                </div>
+          {/* Post Activity — full width chart */}
+          <div className="rounded-xl bg-indigo-50 dark:bg-indigo-950/40 p-4">
+            <div className="flex items-center gap-2 mb-3">
+              <div className="h-7 w-7 rounded-lg bg-indigo-100 dark:bg-indigo-900/50 flex items-center justify-center">
+                <Star className="h-3.5 w-3.5 text-indigo-600 dark:text-indigo-400" />
               </div>
+              <span className="text-xs font-medium text-muted-foreground">Post Activity</span>
             </div>
             {chartsLoading ? (
               <div className="flex items-center justify-center h-[160px]">
@@ -491,88 +493,80 @@ export function ProductDashboard() {
               </div>
             ) : (
               <ResponsiveContainer width="100%" height={160}>
-                <AreaChart data={filteredMemberGrowth}>
-                  <defs>
-                    <linearGradient id="memberGrad" x1="0" y1="0" x2="0" y2="1">
-                      <stop offset="5%" stopColor="#10b981" stopOpacity={0.15} />
-                      <stop offset="95%" stopColor="#10b981" stopOpacity={0} />
-                    </linearGradient>
-                  </defs>
+                <BarChart data={filteredPostActivity} barSize={10}>
                   <CartesianGrid strokeDasharray="3 3" stroke={GRID} vertical={false} />
                   <XAxis dataKey="date" tickFormatter={formatDay} tick={{ fontSize: 11, fill: TICK }} axisLine={{ stroke: GRID }} tickLine={false} interval="preserveStartEnd" />
                   <YAxis tick={{ fontSize: 11, fill: TICK }} axisLine={false} tickLine={false} allowDecimals={false} />
-                  <Tooltip cursor={false} contentStyle={TOOLTIP_STYLE} labelFormatter={(v) => `Date: ${v}`} formatter={(v: number) => [v, "New members"]} />
-                  <Area type="monotone" dataKey="count" stroke="#10b981" strokeWidth={2} fill="url(#memberGrad)" dot={false} activeDot={{ r: 4 }} />
-                </AreaChart>
+                  <Tooltip cursor={false} contentStyle={TOOLTIP_STYLE} labelFormatter={(v) => `Date: ${v}`} formatter={(v: number) => [v, "Posts"]} />
+                  <Bar dataKey="count" fill="#6366f1" radius={[3, 3, 0, 0]} />
+                </BarChart>
               </ResponsiveContainer>
             )}
+
+            {/* Most Active Spaces + Top Posts — inside Post Activity block */}
+            <div className="grid grid-cols-1 lg:grid-cols-2 gap-5 mt-4 pt-4 border-t border-indigo-200/30 dark:border-indigo-500/10">
+              {/* Most Active Spaces */}
+              <div>
+                <p className="text-xs font-semibold text-muted-foreground mb-3">Most Active Spaces</p>
+                {chartsLoading ? (
+                  <div className="flex items-center justify-center h-32"><LoadingDots /></div>
+                ) : filteredSpaceActivity.length === 0 ? (
+                  <p className="text-xs text-muted-foreground text-center py-4">No data</p>
+                ) : (
+                  <div className="space-y-2">
+                    {filteredSpaceActivity.slice(0, 6).map((s) => {
+                      const maxCount = filteredSpaceActivity[0]?.count || 1;
+                      return (
+                        <div key={s.name} className="flex items-center gap-3">
+                          <span className="text-xs text-foreground truncate w-32 shrink-0">{s.name}</span>
+                          <div className="flex-1 bg-muted rounded-full h-2 overflow-hidden">
+                            <div
+                              className="h-full bg-indigo-500 rounded-full transition-all"
+                              style={{ width: `${(s.count / maxCount) * 100}%` }}
+                            />
+                          </div>
+                          <span className="text-xs font-mono text-muted-foreground w-8 text-right shrink-0">{s.count}</span>
+                        </div>
+                      );
+                    })}
+                  </div>
+                )}
+              </div>
+
+              {/* Top Posts */}
+              <div>
+                <p className="text-xs font-semibold text-muted-foreground mb-3">Top Posts by Engagement</p>
+                {chartsLoading ? (
+                  <div className="flex items-center justify-center h-32"><LoadingDots /></div>
+                ) : filteredTopPosts.length === 0 ? (
+                  <p className="text-xs text-muted-foreground text-center py-4">No data</p>
+                ) : (
+                  <div className="space-y-2">
+                    {filteredTopPosts.slice(0, 6).map((p, i) => (
+                      <a
+                        key={i}
+                        href={p.url}
+                        target="_blank"
+                        rel="noreferrer"
+                        className="flex items-center gap-3 p-2 rounded-lg hover:bg-indigo-100/50 dark:hover:bg-indigo-900/20 transition-colors group"
+                      >
+                        <span className="text-xs font-mono text-muted-foreground/50 w-4 shrink-0">{i + 1}</span>
+                        <div className="flex-1 min-w-0">
+                          <p className="text-xs text-foreground truncate group-hover:text-indigo-600 dark:group-hover:text-indigo-400 transition-colors">{p.name}</p>
+                          <p className="text-[10px] text-muted-foreground">{p.space}</p>
+                        </div>
+                        <div className="flex items-center gap-2 shrink-0 text-[10px] text-muted-foreground">
+                          <span>❤️ {p.likes}</span>
+                          <span>💬 {p.comments}</span>
+                        </div>
+                      </a>
+                    ))}
+                  </div>
+                )}
+              </div>
+            </div>
           </div>
         </CardContent>
-
-        {/* ── Most Active Spaces + Top Posts ─────────────────── */}
-        <div className="border-t border-border px-5 py-5">
-          <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-            {/* Most Active Spaces */}
-            <div>
-              <p className="text-xs font-semibold text-muted-foreground mb-3">Most Active Spaces</p>
-              {chartsLoading ? (
-                <div className="flex items-center justify-center h-32"><LoadingDots /></div>
-              ) : filteredSpaceActivity.length === 0 ? (
-                <p className="text-xs text-muted-foreground text-center py-4">No data</p>
-              ) : (
-                <div className="space-y-2">
-                  {filteredSpaceActivity.slice(0, 6).map((s) => {
-                    const maxCount = filteredSpaceActivity[0]?.count || 1;
-                    return (
-                      <div key={s.name} className="flex items-center gap-3">
-                        <span className="text-xs text-foreground truncate w-32 shrink-0">{s.name}</span>
-                        <div className="flex-1 bg-muted rounded-full h-2 overflow-hidden">
-                          <div
-                            className="h-full bg-indigo-500 rounded-full transition-all"
-                            style={{ width: `${(s.count / maxCount) * 100}%` }}
-                          />
-                        </div>
-                        <span className="text-xs font-mono text-muted-foreground w-8 text-right shrink-0">{s.count}</span>
-                      </div>
-                    );
-                  })}
-                </div>
-              )}
-            </div>
-
-            {/* Top Posts */}
-            <div>
-              <p className="text-xs font-semibold text-muted-foreground mb-3">Top Posts by Engagement</p>
-              {chartsLoading ? (
-                <div className="flex items-center justify-center h-32"><LoadingDots /></div>
-              ) : filteredTopPosts.length === 0 ? (
-                <p className="text-xs text-muted-foreground text-center py-4">No data</p>
-              ) : (
-                <div className="space-y-2">
-                  {filteredTopPosts.slice(0, 6).map((p, i) => (
-                    <a
-                      key={i}
-                      href={p.url}
-                      target="_blank"
-                      rel="noreferrer"
-                      className="flex items-center gap-3 p-2 rounded-lg hover:bg-muted/50 transition-colors group"
-                    >
-                      <span className="text-xs font-mono text-muted-foreground/50 w-4 shrink-0">{i + 1}</span>
-                      <div className="flex-1 min-w-0">
-                        <p className="text-xs text-foreground truncate group-hover:text-primary transition-colors">{p.name}</p>
-                        <p className="text-[10px] text-muted-foreground">{p.space}</p>
-                      </div>
-                      <div className="flex items-center gap-2 shrink-0 text-[10px] text-muted-foreground">
-                        <span>❤️ {p.likes}</span>
-                        <span>💬 {p.comments}</span>
-                      </div>
-                    </a>
-                  ))}
-                </div>
-              )}
-            </div>
-          </div>
-        </div>
 
         {/* ── Upcoming Events — attached to Community card ───── */}
         <div className="border-t border-border px-5 py-5">
