@@ -1,5 +1,5 @@
 import React, { useState, useMemo, useEffect, useRef } from "react";
-import { ChevronLeft, ChevronRight, StickyNote, X } from "lucide-react";
+import { ChevronLeft, ChevronRight, StickyNote, X, Play, Mail, MessageCircle } from "lucide-react";
 import { getRecentVideos, type VideoItem } from "@/lib/youtube";
 import { fetchBroadcastsInRange, type BroadcastItem } from "@/lib/kit";
 import { LIAM_CHANNEL_ID } from "@/lib/constants";
@@ -244,7 +244,7 @@ const NOTE_CHANNELS = [
   { key: "social", label: "Socials Posted" },
 ];
 
-interface DayData { note: string; values: Partial<Record<MetricName, string>>; }
+interface DayData { note: string; socialUrls?: string[]; values: Partial<Record<MetricName, string>>; }
 interface TrackerState { days: Record<string, DayData>; targets: Partial<Record<MetricName, string>>; }
 
 function storageKey(y: number, m: number) { return `booking-kpi-${y}-${String(m + 1).padStart(2, "0")}`; }
@@ -326,6 +326,16 @@ export function BookingKPITracker() {
 
   function updateNote(d: Date, note: string) {
     setState(p => ({ ...p, days: { ...p.days, [toISO(d)]: { ...getDayData(d), note } } }));
+  }
+  function addSocialUrl(d: Date, url: string) {
+    const cur = getDayData(d);
+    const urls = [...(cur.socialUrls || []), url];
+    setState(p => ({ ...p, days: { ...p.days, [toISO(d)]: { ...cur, socialUrls: urls } } }));
+  }
+  function removeSocialUrl(d: Date, index: number) {
+    const cur = getDayData(d);
+    const urls = (cur.socialUrls || []).filter((_, i) => i !== index);
+    setState(p => ({ ...p, days: { ...p.days, [toISO(d)]: { ...cur, socialUrls: urls } } }));
   }
   function updateValue(d: Date, metric: MetricName, value: string) {
     const cur = getDayData(d);
@@ -465,11 +475,41 @@ export function BookingKPITracker() {
                           target="_blank"
                           rel="noreferrer"
                           title={v.title}
-                          style={{ display: "flex", alignItems: "center", justifyContent: "center", width: "100%", height: 36, background: "rgba(239,68,68,0.15)", color: "#ef4444", fontSize: 16, fontWeight: 700, cursor: "pointer", textDecoration: "none" }}
+                          style={{ display: "flex", alignItems: "center", justifyContent: "center", width: "100%", height: 36, background: "rgba(239,68,68,0.15)", color: "#ef4444", cursor: "pointer", textDecoration: "none" }}
                         >
-                          {dayVideos.length > 1 ? vi + 1 : "▶"}
+                          <Play size={18} fill="#ef4444" />
                         </a>
                       ))}
+                      {ch.key === "social" && (() => {
+                        const urls = getDayData(d).socialUrls || [];
+                        return (
+                          <div
+                            style={{ display: "flex", flexDirection: "column", width: "100%", minHeight: 36, cursor: "pointer" }}
+                            onClick={() => {
+                              const url = prompt("Paste social post URL:");
+                              if (url?.trim()) addSocialUrl(d, url.trim());
+                            }}
+                          >
+                            {urls.map((url, ui) => (
+                              <a
+                                key={ui}
+                                href={url}
+                                target="_blank"
+                                rel="noreferrer"
+                                title={url}
+                                onClick={(e) => e.stopPropagation()}
+                                onContextMenu={(e) => {
+                                  e.preventDefault();
+                                  if (confirm("Remove this social link?")) removeSocialUrl(d, ui);
+                                }}
+                                style={{ display: "flex", alignItems: "center", justifyContent: "center", width: "100%", height: 36, background: "rgba(250,204,21,0.15)", color: "#facc15", cursor: "pointer", textDecoration: "none", borderBottom: ui < urls.length - 1 ? "1px solid rgba(250,204,21,0.2)" : "none" }}
+                              >
+                                <MessageCircle size={18} fill="#facc15" />
+                              </a>
+                            ))}
+                          </div>
+                        );
+                      })()}
                       {ch.key === "email" && (broadcastsByDate[iso] || []).map((b, bi) => (
                         <a
                           key={bi}
@@ -477,9 +517,9 @@ export function BookingKPITracker() {
                           target="_blank"
                           rel="noreferrer"
                           title={b.subject}
-                          style={{ display: "flex", alignItems: "center", justifyContent: "center", width: "100%", height: 36, background: "rgba(59,130,246,0.15)", color: "#3b82f6", fontSize: 26, lineHeight: 1, cursor: "pointer", textDecoration: "none" }}
+                          style={{ display: "flex", alignItems: "center", justifyContent: "center", width: "100%", height: 36, background: "rgba(59,130,246,0.15)", color: "#3b82f6", cursor: "pointer", textDecoration: "none" }}
                         >
-                          ✉
+                          <Mail size={18} />
                         </a>
                       ))}
                     </td>
