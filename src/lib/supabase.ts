@@ -5,8 +5,8 @@
 
 import { createClient } from "@supabase/supabase-js";
 
-export const SUPABASE_URL = import.meta.env.VITE_COMPASS_SUPABASE_URL;
-export const SUPABASE_KEY = import.meta.env.VITE_COMPASS_SUPABASE_ANON_KEY;
+export const SUPABASE_URL = import.meta.env.VITE_SUPABASE_URL;
+export const SUPABASE_KEY = import.meta.env.VITE_SUPABASE_ANON_KEY;
 
 /** Supabase JS client — used for auth and realtime features */
 export const supabase = createClient(SUPABASE_URL, SUPABASE_KEY);

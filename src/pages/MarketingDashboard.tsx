@@ -1,4 +1,5 @@
 import { useState, useMemo } from "react";
+import { BookingKPITracker } from "@/components/BookingKPITracker";
 import {
   AreaChart, Area, BarChart, Bar, XAxis, YAxis, CartesianGrid,
   Tooltip, ResponsiveContainer, Cell, PieChart, Pie, LabelList,
@@ -89,6 +90,8 @@ function SectionHeader({ icon: Icon, title, sub }: { icon: React.ElementType; ti
 // ── Main ──────────────────────────────────────────────────────────────────────
 
 export default function MarketingDashboard() {
+  const [activeTab, setActiveTab] = useState<"overview" | "booking-tracker">("overview");
+
   // Each section gets its own date range state via the shared component
   const [range, setRange] = useState<DateRangeValue>({ start: "", end: "", startDate: "", endDate: "" });
   const [emailRange, setEmailRange] = useState<DateRangeValue>({ start: "", end: "", startDate: "", endDate: "" });
@@ -141,7 +144,33 @@ export default function MarketingDashboard() {
   const totalBooked = supabase.totalBookings + supabase.caseyCancel;
 
   return (
-    <div className="p-6 max-w-7xl mx-auto space-y-8">
+    <div className="p-6 max-w-7xl mx-auto space-y-6">
+
+      {/* ══ Tabs ══════════════════════════════════════════════════════════ */}
+      <div className="flex gap-1 border-b border-border">
+        {[
+          { key: "overview", label: "Overview" },
+          { key: "booking-tracker", label: "Booking KPI Tracker" },
+        ].map(({ key, label }) => (
+          <button
+            key={key}
+            onClick={() => setActiveTab(key as typeof activeTab)}
+            className={`px-4 py-2 text-sm font-medium transition-colors border-b-2 -mb-px ${
+              activeTab === key
+                ? "border-primary text-primary"
+                : "border-transparent text-muted-foreground hover:text-foreground"
+            }`}
+          >
+            {label}
+          </button>
+        ))}
+      </div>
+
+      {/* ══ Booking KPI Tracker ═══════════════════════════════════════════ */}
+      {activeTab === "booking-tracker" && <BookingKPITracker />}
+
+      {/* ══ Overview content ══════════════════════════════════════════════ */}
+      {activeTab === "overview" && <div className="space-y-8">
 
       {/* ══ Unified Booking Card ═══════════════════════════════════════════ */}
       <div className="bg-card border border-border rounded-xl overflow-hidden">
@@ -511,6 +540,7 @@ export default function MarketingDashboard() {
             )}
       </div>
 
+      </div>} {/* end overview */}
     </div>
   );
 }

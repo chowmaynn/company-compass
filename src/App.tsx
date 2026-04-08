@@ -28,6 +28,8 @@ const queryClient = new QueryClient({
 function RequireAuth({ children }: { children: React.ReactNode }) {
   const { user, loading } = useAuth();
 
+  if (import.meta.env.DEV) return <>{children}</>;
+
   if (loading) {
     return (
       <div className="min-h-screen flex items-center justify-center bg-background">
