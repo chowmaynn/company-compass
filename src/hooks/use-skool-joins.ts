@@ -133,13 +133,9 @@ export function useSkoolJoins(): SkoolJoinsData {
  * NZ is UTC+12 (NZST) or UTC+13 (NZDT). We approximate using a fixed offset;
  * for exact accuracy we'd need a timezone library, but ±1h is acceptable here.
  */
-function nzDayToUtc(nzDate: string, endOfDay = false): string {
-  // Current NZ offset: April = NZST (UTC+12), Oct-Mar = NZDT (UTC+13)
-  const month = parseInt(nzDate.split("-")[1]);
-  const offsetHours = (month >= 4 && month <= 9) ? 12 : 13;
-  const d = new Date(`${nzDate}T${endOfDay ? "23:59:59" : "00:00:00"}Z`);
-  d.setHours(d.getHours() - offsetHours);
-  return d.toISOString();
+function dayToUtc(date: string, endOfDay = false): string {
+  // Use UTC day boundaries to match Skool lead log timestamps
+  return `${date}T${endOfDay ? "23:59:59" : "00:00:00"}Z`;
 }
 
 /**
@@ -155,9 +151,9 @@ export function useSkoolJoinsRange(startDate: string, endDate: string): { joins:
     let cancelled = false;
     setLoading(true);
     // Convert NZ dates to UTC boundaries
-    const utcStart = nzDayToUtc(startDate);
+    const utcStart = dayToUtc(startDate);
     // End is inclusive (end of day), so add 1 second to cover the full day
-    const utcEnd = nzDayToUtc(endDate, true);
+    const utcEnd = dayToUtc(endDate, true);
     fetchJoinCount(utcStart, utcEnd).then((count) => {
       if (!cancelled) { setJoins(count); setLoading(false); }
     });

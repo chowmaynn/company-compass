@@ -2,6 +2,8 @@ import React, { useState, useMemo, useEffect, useRef } from "react";
 import { ChevronLeft, ChevronRight, StickyNote, X, Play, Mail, MessageCircle } from "lucide-react";
 import { getRecentVideos, type VideoItem } from "@/lib/youtube";
 import { fetchBroadcastsInRange, type BroadcastItem } from "@/lib/kit";
+import { fetchDailyActiveUsers } from "@/lib/google-analytics";
+import { useSupabaseMetrics } from "@/hooks/use-supabase-metrics";
 import { LIAM_CHANNEL_ID } from "@/lib/constants";
 
 // ─── Note Popover ─────────────────────────────────────────────────────────────
@@ -272,6 +274,117 @@ export function BookingKPITracker() {
   const days  = useMemo(() => getDaysInMonth(year, month), [year, month]);
   const today = toISO(now);
 
+  // Fetch booking data from Supabase for the displayed month
+  const monthStr = `${year}-${String(month + 1).padStart(2, "0")}`;
+  const supabaseFrom = useMemo(() => new Date(Date.UTC(year, month, 1)).toISOString(), [year, month]);
+  const supabaseTo = useMemo(() => new Date(Date.UTC(year, month + 1, 0, 23, 59, 59)).toISOString(), [year, month]);
+  const bookingData = useSupabaseMetrics(supabaseFrom, supabaseTo);
+
+  // Map metric names to source-level data from the cube
+  // Source qualified = total_bookings - casey_cancelled per day
+  // Fetch Skool joins per day for the displayed month
+  const [skoolJoinsByDate, setSkoolJoinsByDate] = useState<Record<string, number>>({});
+  useEffect(() => {
+    const SKOOL_BASE = "/api/skool-supabase";
+    const TABLE = "Skool%20Lead%20Logs";
+    const COL = "%22Date%20Added%22";
+
+    async function fetchSkoolDaily() {
+      const result: Record<string, number> = {};
+      // Use UTC day boundaries to match the other app's counting
+      const fetches = days
+        .filter(d => d <= now)
+        .map(async (d) => {
+          const iso = toISO(d);
+          const startUTC = `${iso}T00:00:00Z`;
+          const nextDay = new Date(d.getFullYear(), d.getMonth(), d.getDate() + 1);
+          const endUTC = `${toISO(nextDay)}T00:00:00Z`;
+          const url = `${SKOOL_BASE}/rest/v1/${TABLE}?select=${COL}&${COL}=gte.${startUTC}&${COL}=lt.${endUTC}&limit=5000`;
+          try {
+            const res = await fetch(url);
+            if (res.ok) {
+              const rows: unknown[] = await res.json();
+              result[iso] = rows.length;
+            }
+          } catch {}
+        });
+      await Promise.all(fetches);
+      setSkoolJoinsByDate(result);
+    }
+    fetchSkoolDaily();
+  }, [year, month]);
+
+  // Fetch GA4 active users per day for the displayed month
+  const [ga4ActiveByDate, setGa4ActiveByDate] = useState<Record<string, number>>({});
+  useEffect(() => {
+    const startDate = `${year}-${String(month + 1).padStart(2, "0")}-01`;
+    const lastDay = new Date(year, month + 1, 0).getDate();
+    const endDate = `${year}-${String(month + 1).padStart(2, "0")}-${String(lastDay).padStart(2, "0")}`;
+    fetchDailyActiveUsers(startDate, endDate)
+      .then(rows => {
+        const map: Record<string, number> = {};
+        for (const r of rows) map[r.date] = r.activeUsers;
+        setGa4ActiveByDate(map);
+      })
+      .catch(() => setGa4ActiveByDate({}));
+  }, [year, month]);
+
+  const METRIC_SOURCE_MAP: Record<string, { type: "source"; sources: string[] } | { type: "event"; events: string[] } | { type: "allSources" } | { type: "cube"; category: string; metric: string } | { type: "skoolJoins" } | { type: "ga4ActiveUsers" }> = useMemo(() => ({
+    "QF Calls Booked": { type: "allSources" },
+    "Skool Joins": { type: "skoolJoins" as const },
+    "Skool Bookings DM Setter": { type: "source", sources: ["source_skool setter"] },
+    "Skool Bookings Post": { type: "event", events: ["AAA Accelerator Business Call (Skool P)"] },
+    "Skool Bookings Classroom": { type: "source", sources: ["source_skool classroom"] },
+    "Email Bookings": { type: "source", sources: ["source_email general"] },
+    "Welcome Sequence Email Bookings": { type: "source", sources: ["source_email welcome"] },
+    "Website Visitors (Active Users)": { type: "ga4ActiveUsers" as const },
+    "Website Bookings (Total)": { type: "source", sources: ["source_website", "source_website b", "source_website c"] },
+    "Google Bookings": { type: "source", sources: ["source_google"] },
+    "Webinar Bookings": { type: "source", sources: ["source_aios lp"] },
+  }), []);
+
+  function getApiValue(date: string, metric: MetricName): number | null {
+    const mapping = METRIC_SOURCE_MAP[metric];
+    if (!mapping || bookingData.isLoading) return null;
+    const cube = bookingData.cube;
+
+    switch (mapping.type) {
+      case "source": {
+        let total = 0;
+        for (const src of mapping.sources) {
+          const totalBk = cube[date]?.[src]?.total_bookings ?? 0;
+          const casey = cube[date]?.[src]?.casey_cancelled ?? 0;
+          total += totalBk - casey;
+        }
+        return total;
+      }
+      case "event": {
+        let total = 0;
+        for (const ev of mapping.events) {
+          total += cube[date]?.[`event_${ev}`]?.qualified ?? 0;
+        }
+        return total;
+      }
+      case "allSources": {
+        let total = 0;
+        for (const cat of Object.keys(cube[date] ?? {})) {
+          if (cat.startsWith("source_")) {
+            const totalBk = cube[date]?.[cat]?.total_bookings ?? 0;
+            const casey = cube[date]?.[cat]?.casey_cancelled ?? 0;
+            total += totalBk - casey;
+          }
+        }
+        return total;
+      }
+      case "cube":
+        return cube[date]?.[mapping.category]?.[mapping.metric] ?? null;
+      case "skoolJoins":
+        return skoolJoinsByDate[date] ?? null;
+      case "ga4ActiveUsers":
+        return ga4ActiveByDate[date] ?? null;
+    }
+  }
+
   // Fetch YouTube videos for the displayed month
   const [videos, setVideos] = useState<VideoItem[]>([]);
   useEffect(() => {
@@ -345,17 +458,32 @@ export function BookingKPITracker() {
     setState(p => ({ ...p, targets: { ...p.targets, [metric]: value } }));
   }
 
+  // Helper to get the effective value for a metric on a day (API or localStorage)
+  function getEffectiveValue(d: Date, metric: MetricName): number | null {
+    const iso = toISO(d);
+    if (METRIC_SOURCE_MAP[metric]) {
+      const api = getApiValue(iso, metric);
+      if (api !== null) return api;
+    }
+    const n = parseFloat(getDayData(d).values[metric] ?? "");
+    return isNaN(n) ? null : n;
+  }
+
   function getComputed(d: Date, metric: MetricName): number | null {
-    const v = getDayData(d).values;
     if (metric === "Skool Booking %") {
-      const s = parseFloat(v["Skool Bookings DM Setter"] ?? ""), j = parseFloat(v["Skool Joins"] ?? "");
-      return (!isNaN(s) && !isNaN(j) && j > 0) ? (s / j) * 100 : null;
+      const dm = getEffectiveValue(d, "Skool Bookings DM Setter") ?? 0;
+      const post = getEffectiveValue(d, "Skool Bookings Post") ?? 0;
+      const classroom = getEffectiveValue(d, "Skool Bookings Classroom") ?? 0;
+      const totalBookings = dm + post + classroom;
+      const j = getEffectiveValue(d, "Skool Joins");
+      return (j !== null && j > 0) ? (totalBookings / j) * 100 : null;
     }
     if (metric === "Website Booking %") {
-      const b = parseFloat(v["Website Bookings (Total)"] ?? ""), vis = parseFloat(v["Website Visitors (Active Users)"] ?? "");
-      return (!isNaN(b) && !isNaN(vis) && vis > 0) ? (b / vis) * 100 : null;
+      const b = getEffectiveValue(d, "Website Bookings (Total)");
+      const vis = getEffectiveValue(d, "Website Visitors (Active Users)");
+      return (b !== null && vis !== null && vis > 0) ? (b / vis) * 100 : null;
     }
-    const n = parseFloat(v[metric] ?? ""); return isNaN(n) ? null : n;
+    return getEffectiveValue(d, metric);
   }
 
   function fmtVal(val: number | null, metric: MetricName): string {
@@ -372,7 +500,14 @@ export function BookingKPITracker() {
   }
 
   function getAvg(metric: MetricName): string {
-    const vals = days.map(d => getComputed(d, metric)).filter((v): v is number => v !== null);
+    const vals = days.map(d => {
+      // Prefer API data
+      if (METRIC_SOURCE_MAP[metric]) {
+        const api = getApiValue(toISO(d), metric);
+        if (api !== null) return api;
+      }
+      return getComputed(d, metric);
+    }).filter((v): v is number => v !== null);
     if (!vals.length) return "—";
     const avg = vals.reduce((s, v) => s + v, 0) / vals.length;
     return PCT_FORMAT.has(metric) ? avg.toFixed(2) + "%" : (Number.isInteger(avg) ? String(avg) : avg.toFixed(2));
@@ -592,12 +727,27 @@ export function BookingKPITracker() {
                         const computed = getComputed(d, metric);
                         const cs       = cellStyle(computed, metric);
                         const todayBg  = "rgba(99,102,241,0.1)";
+                        const apiVal   = METRIC_SOURCE_MAP[metric] ? getApiValue(iso, metric) : null;
+                        const hasApi   = apiVal !== null && apiVal > 0;
 
-                        if (isAuto) {
+                        if (isAuto || hasApi) {
+                          const displayVal = isAuto ? computed : apiVal;
+                          const displayCs  = isAuto ? cs : cellStyle(displayVal, metric);
                           return (
                             <td key={iso} style={{ width: W_DAY, minWidth: W_DAY, borderRight: B_ROW, borderBottom: rowBorderBottom, padding: 2, backgroundColor: isToday ? todayBg : section.rowTint }}>
-                              <span style={{ display: "block", borderRadius: 4, padding: "4px 2px", textAlign: "center", fontSize: 11, fontFamily: "monospace", color: computed !== null ? undefined : "rgba(255,255,255,0.15)", ...cs }}>
-                                {fmtVal(computed, metric)}
+                              <span style={{ display: "block", borderRadius: 4, padding: "4px 2px", textAlign: "center", fontSize: 11, fontFamily: "monospace", color: displayVal !== null ? undefined : "rgba(255,255,255,0.15)", ...displayCs }}>
+                                {fmtVal(displayVal, metric)}
+                              </span>
+                            </td>
+                          );
+                        }
+
+                        // Show API zero or null as empty for non-auto metrics with API mapping
+                        if (METRIC_SOURCE_MAP[metric] && apiVal === 0) {
+                          return (
+                            <td key={iso} style={{ width: W_DAY, minWidth: W_DAY, borderRight: B_ROW, borderBottom: rowBorderBottom, padding: 2, backgroundColor: isToday ? todayBg : section.rowTint }}>
+                              <span style={{ display: "block", borderRadius: 4, padding: "4px 2px", textAlign: "center", fontSize: 11, fontFamily: "monospace", color: "rgba(255,255,255,0.15)" }}>
+                                0
                               </span>
                             </td>
                           );

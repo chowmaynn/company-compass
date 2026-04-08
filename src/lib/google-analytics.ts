@@ -61,6 +61,42 @@ export async function fetchPageSessions(startDate: string, endDate: string): Pro
 }
 
 /**
+ * Fetches daily active users for the accelerator site in a date range.
+ * Returns an array of { date: "YYYY-MM-DD", activeUsers: number }.
+ */
+export async function fetchDailyActiveUsers(startDate: string, endDate: string): Promise<{ date: string; activeUsers: number }[]> {
+  const data = await runGA4Report({
+    dateRanges: [{ startDate, endDate }],
+    dimensions: [{ name: "date" }],
+    metrics: [{ name: "activeUsers" }],
+    dimensionFilter: {
+      andGroup: {
+        expressions: [
+          {
+            filter: {
+              fieldName: "hostName",
+              stringFilter: { matchType: "EXACT", value: "www.aaaaccelerator.com" },
+            },
+          },
+          {
+            filter: {
+              fieldName: "pageTitle",
+              stringFilter: { matchType: "EXACT", value: "AAA Accelerator \u2014 Build a Profitable AI Automation Agency" },
+            },
+          },
+        ],
+      },
+    },
+    orderBys: [{ dimension: { dimensionName: "date" } }],
+  });
+
+  return (data.rows || []).map((row) => ({
+    date: row.dimensionValues[0].value.replace(/(\d{4})(\d{2})(\d{2})/, "$1-$2-$3"),
+    activeUsers: parseInt(row.metricValues[0].value, 10),
+  }));
+}
+
+/**
  * Fetches sessions broken down by site variant (A/B/C) for the given date range.
  */
 export async function fetchVariantVisitors(
