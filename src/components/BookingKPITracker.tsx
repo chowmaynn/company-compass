@@ -704,7 +704,7 @@ export function BookingKPITracker() {
                   <td style={{
                     ...S.metric({ borderLeft: section.accentBorder, borderBottom: B_SECTION, borderTop: si === 0 ? "none" : B_SECTION }),
                     padding: "6px 14px",
-                    fontSize: 10, fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.1em",
+                    fontSize: 14, fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.1em",
                     color: section.textColor,
                   }}>
                     {section.label}
@@ -729,7 +729,7 @@ export function BookingKPITracker() {
                       <td style={{
                         ...S.metric({ borderLeft: section.accentBorder, borderBottom: rowBorderBottom, borderTop: section.inline && si > 0 ? B_SECTION : undefined }),
                         padding: section.inline ? "8px 14px" : "8px 14px",
-                        fontSize: section.inline ? 13 : 13, fontWeight: section.inline ? 700 : 500,
+                        fontSize: section.inline ? 14 : 13, fontWeight: section.inline ? 700 : 500,
                         color: section.inline ? section.textColor : "var(--foreground)", whiteSpace: "nowrap",
                       }}>
                         {section.inline ? section.label : metric}
