@@ -89,6 +89,8 @@ export function useSupabaseMetrics(from: string, to: string) {
     "source_email general": "Email",
     "source_email welcome": "Welcome Email",
     "source_masterclass": "Masterclass",
+    "source_google": "Google",
+    "source_aios lp": "AIOS LP",
   };
 
   const sourceQualified: Record<string, number> = {};
