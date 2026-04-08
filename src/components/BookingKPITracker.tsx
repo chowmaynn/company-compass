@@ -1,10 +1,9 @@
 import React, { useState, useMemo, useEffect, useRef } from "react";
 import { ChevronLeft, ChevronRight, StickyNote, X, Play, Mail, MessageCircle } from "lucide-react";
-import { getRecentVideos, type VideoItem } from "@/lib/youtube";
+import { type VideoItem } from "@/lib/youtube";
 import { fetchBroadcastsInRange, type BroadcastItem } from "@/lib/kit";
 import { fetchDailyActiveUsers } from "@/lib/google-analytics";
 import { useSupabaseMetrics } from "@/hooks/use-supabase-metrics";
-import { LIAM_CHANNEL_ID } from "@/lib/constants";
 
 // ─── Note Popover ─────────────────────────────────────────────────────────────
 
@@ -410,23 +409,45 @@ export function BookingKPITracker() {
     }
   }
 
-  // Fetch YouTube videos for the displayed month
+  // Fetch published videos from liam_videos Supabase table (no YouTube API needed)
   const [videos, setVideos] = useState<VideoItem[]>([]);
   useEffect(() => {
-    const monthStart = new Date(Date.UTC(year, month, 1)).toISOString();
-    const monthEnd = new Date(Date.UTC(year, month + 1, 1)).toISOString();
-    getRecentVideos(LIAM_CHANNEL_ID, monthStart, monthEnd, 50)
-      .then(setVideos)
+    const mm = String(month + 1).padStart(2, "0");
+    const monthStart = `${year}-${mm}-01T00:00:00Z`;
+    const monthEnd = month === 11
+      ? `${year + 1}-01-01T00:00:00Z`
+      : `${year}-${String(month + 2).padStart(2, "0")}-01T00:00:00Z`;
+
+    const COMPASS_URL = import.meta.env.VITE_COMPASS_SUPABASE_URL;
+    const COMPASS_KEY = import.meta.env.VITE_COMPASS_SUPABASE_ANON_KEY;
+
+    fetch(`${COMPASS_URL}/rest/v1/liam_videos?select=video_id,video_title,published_at&published_at=gte.${monthStart}&published_at=lt.${monthEnd}&order=published_at.desc`, {
+      headers: {
+        apikey: COMPASS_KEY,
+        Authorization: `Bearer ${COMPASS_KEY}`,
+      },
+    })
+      .then(r => r.ok ? r.json() : [])
+      .then((rows: { video_id: string; video_title: string; published_at: string }[]) => {
+        setVideos(rows.map(r => ({
+          id: r.video_id,
+          title: r.video_title,
+          publishedAt: r.published_at,
+          viewCount: 0,
+          likeCount: 0,
+          commentCount: 0,
+        })));
+      })
       .catch(() => setVideos([]));
   }, [year, month]);
 
-  // Map videos by publish date (NZ time)
+  // Map videos by publish date (UTC date from Supabase)
   const videosByDate = useMemo(() => {
     const map: Record<string, VideoItem[]> = {};
     for (const v of videos) {
-      const nzDate = new Date(v.publishedAt).toLocaleDateString("en-CA", { timeZone: "Pacific/Auckland" });
-      if (!map[nzDate]) map[nzDate] = [];
-      map[nzDate].push(v);
+      const date = v.publishedAt.substring(0, 10);
+      if (!map[date]) map[date] = [];
+      map[date].push(v);
     }
     return map;
   }, [videos]);
