@@ -282,37 +282,65 @@ export function BookingKPITracker() {
 
   // Map metric names to source-level data from the cube
   // Source qualified = total_bookings - casey_cancelled per day
-  // Fetch Skool joins per day for the displayed month
-  const [skoolJoinsByDate, setSkoolJoinsByDate] = useState<Record<string, number>>({});
+  // Fetch Skool joins for the entire month in one request, then bucket by UTC date
+  // Cache in localStorage to avoid refetching on month switches
+  const skoolCacheKey = `skool-joins-${year}-${String(month + 1).padStart(2, "0")}`;
+  const [skoolJoinsByDate, setSkoolJoinsByDate] = useState<Record<string, number>>(() => {
+    try { const c = localStorage.getItem(skoolCacheKey); if (c) return JSON.parse(c); } catch {}
+    return {};
+  });
   useEffect(() => {
+    let cancelled = false;
     const SKOOL_BASE = "/api/skool-supabase";
     const TABLE = "Skool%20Lead%20Logs";
     const COL = "%22Date%20Added%22";
 
-    async function fetchSkoolDaily() {
+    // Load from cache first
+    try {
+      const cached = localStorage.getItem(skoolCacheKey);
+      if (cached) {
+        const parsed = JSON.parse(cached);
+        if (Object.keys(parsed).length > 0) setSkoolJoinsByDate(parsed);
+      }
+    } catch {}
+
+    async function fetchSkoolMonth() {
+      const mm = String(month + 1).padStart(2, "0");
+      const startUTC = `${year}-${mm}-01T00:00:00Z`;
+      const lastDay = new Date(year, month + 1, 0).getDate();
+      const endUTC = `${year}-${mm}-${String(lastDay).padStart(2, "0")}T23:59:59Z`;
+
       const result: Record<string, number> = {};
-      // Use UTC day boundaries to match the other app's counting
-      const fetches = days
-        .filter(d => d <= now)
-        .map(async (d) => {
-          const iso = toISO(d);
-          const startUTC = `${iso}T00:00:00Z`;
-          const nextDay = new Date(d.getFullYear(), d.getMonth(), d.getDate() + 1);
-          const endUTC = `${toISO(nextDay)}T00:00:00Z`;
-          const url = `${SKOOL_BASE}/rest/v1/${TABLE}?select=${COL}&${COL}=gte.${startUTC}&${COL}=lt.${endUTC}&limit=5000`;
-          try {
-            const res = await fetch(url);
-            if (res.ok) {
-              const rows: unknown[] = await res.json();
-              result[iso] = rows.length;
-            }
-          } catch {}
-        });
-      await Promise.all(fetches);
-      setSkoolJoinsByDate(result);
+      let page = 0;
+      const PAGE_SIZE = 5000;
+      let hasMore = true;
+
+      while (hasMore) {
+        const url = `${SKOOL_BASE}/rest/v1/${TABLE}?select=${COL}&${COL}=gte.${startUTC}&${COL}=lte.${endUTC}&limit=${PAGE_SIZE}&offset=${page * PAGE_SIZE}`;
+        try {
+          const res = await fetch(url);
+          if (!res.ok) break;
+          const rows: { "Date Added": string }[] = await res.json();
+          for (const row of rows) {
+            const date = (row["Date Added"] ?? "").substring(0, 10);
+            if (date) result[date] = (result[date] || 0) + 1;
+          }
+          hasMore = rows.length === PAGE_SIZE;
+          page++;
+        } catch {
+          break;
+        }
+      }
+
+      if (!cancelled && Object.keys(result).length > 0) {
+        setSkoolJoinsByDate(result);
+        try { localStorage.setItem(skoolCacheKey, JSON.stringify(result)); } catch {}
+      }
     }
-    fetchSkoolDaily();
-  }, [year, month]);
+
+    fetchSkoolMonth();
+    return () => { cancelled = true; };
+  }, [year, month, skoolCacheKey]);
 
   // Fetch GA4 active users per day for the displayed month
   const [ga4ActiveByDate, setGa4ActiveByDate] = useState<Record<string, number>>({});
