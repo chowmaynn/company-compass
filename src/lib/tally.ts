@@ -50,8 +50,17 @@ async function tallyFetch<T>(path: string): Promise<T | null> {
 }
 
 export async function fetchForms(): Promise<TallyForm[]> {
-  const data = await tallyFetch<TallyFormsResponse>("/forms");
-  return data?.items ?? [];
+  const all: TallyForm[] = [];
+  let page = 1;
+  let hasMore = true;
+  while (hasMore) {
+    const data = await tallyFetch<TallyFormsResponse>(`/forms?page=${page}&limit=100`);
+    if (!data) break;
+    all.push(...data.items);
+    hasMore = data.hasMore;
+    page++;
+  }
+  return all;
 }
 
 export async function fetchSubmissions(formId: string, page = 1): Promise<TallySubmissionsResponse | null> {
