@@ -139,7 +139,8 @@ const API_METRIC_MAP: Record<string, ApiSource> = {
   "Closing Calls Taken":                  { hook: "salesTracking", field: "calls_taken" },
   "Closing Call Close Rate":              { hook: "salesTracking", field: "close_rate" },
   // Revenue, Cash Collected: manual entry
-  // Customer support complaints, NPS: manual entry
+  // Customer support complaints: manual entry
+  // NPS: handled as dedicated monthly metrics below, not per-week overlay
 };
 
 /** Set of metric names that are API-sourced (read-only for current week) */
@@ -360,7 +361,7 @@ export function useScorecard(month: string = DEFAULT_MONTH) {
     // Metrics where monthly is manually entered (don't auto-calculate)
     const manualMonthlyMetrics = new Set<string>([]);
     // Metrics where monthly comes from a dedicated full-range query (not sum of weeks)
-    const dedicatedMonthlyMetrics = new Set<string>([]);
+    const dedicatedMonthlyMetrics = new Set<string>(["NPS Score - 2 months", "NPS Score - 6 Months"]);
 
     const formatSalesVal = (field: string, val: number | null): number | string | "—" => {
       if (val === null) return "—";
@@ -433,10 +434,16 @@ export function useScorecard(month: string = DEFAULT_MONTH) {
       // Step 2: Auto-calculate monthly from week actuals (for all non-manual metrics)
       if (!manualMonthlyMetrics.has(m.name)) {
         if (dedicatedMonthlyMetrics.has(m.name)) {
-          // Use dedicated full-month query (avoids sum-of-weeks discrepancy)
-          if (m.name === "Website Views" && typeof ga.monthlyViews === "number") {
-            if (updated === m) updated = { ...m };
-            updated.monthlyActual = ga.monthlyViews;
+          // NPS: set monthly from Tally NPS score (all-time, not per-week)
+          if (m.name === "NPS Score - 2 months" || m.name === "NPS Score - 6 Months") {
+            const field = m.name.includes("2") ? "2 months" : "6 months";
+            const match = tallyNps.results.find((r) =>
+              r.formName.toLowerCase().includes(field.toLowerCase())
+            );
+            if (match && !match.loading) {
+              if (updated === m) updated = { ...m };
+              updated.monthlyActual = match.score;
+            }
           }
         } else if (ratioMetrics.has(m.name)) {
           // Ratio metrics: compute from total numerator / total denominator
