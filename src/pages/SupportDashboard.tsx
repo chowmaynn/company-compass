@@ -214,46 +214,6 @@ export default function SupportDashboard() {
         </CardContent>
       </Card>
 
-      {/* ── Tracker Breakdown Table ────────────────────────── */}
-      <Card className="border-border/50">
-        <CardContent className="p-5">
-          <div className="flex items-center justify-between mb-4">
-            <div>
-              <h3 className="text-sm font-semibold text-foreground">Tracker Breakdown</h3>
-              <p className="text-xs text-muted-foreground mt-0.5">Issue categorization via tracker tickets</p>
-            </div>
-            <a
-              href="https://app.intercom.com"
-              target="_blank"
-              rel="noopener noreferrer"
-              className="flex items-center gap-1.5 text-xs text-primary hover:underline font-medium"
-            >
-              Open Intercom <ExternalLink className="h-3 w-3" />
-            </a>
-          </div>
-
-          {loading ? (
-            <div className="flex items-center justify-center py-16"><LoadingDots /></div>
-          ) : trackerBreakdown.length > 0 ? (
-            <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
-              {trackerBreakdown.map((t) => (
-                <div key={t.id} className="rounded-xl border border-border/50 p-4 hover:bg-muted/20 transition-colors">
-                  <div className="flex items-center gap-2 mb-2">
-                    <span className="w-2.5 h-2.5 rounded-full shrink-0" style={{ background: t.color }} />
-                    <span className="text-xs font-medium text-muted-foreground">{t.label}</span>
-                  </div>
-                  <p className="text-3xl font-bold text-foreground">{t.total}</p>
-                  <p className="text-[11px] text-muted-foreground mt-1">
-                    {t.total === 1 ? "ticket" : "tickets"} in period
-                  </p>
-                </div>
-              ))}
-            </div>
-          ) : (
-            <p className="text-sm text-muted-foreground text-center py-8">No tracker tickets in this period</p>
-          )}
-        </CardContent>
-      </Card>
 
       {/* ── Open Tickets ──────────────────────────────────── */}
       <Card className="border-border/50">
