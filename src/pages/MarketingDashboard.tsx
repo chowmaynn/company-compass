@@ -516,11 +516,14 @@ export default function MarketingDashboard() {
                 </div>
                 <div className="overflow-y-auto max-h-72">
                   {kit.broadcasts.map((b) => (
-                    <div
+                    <a
                       key={b.id}
+                      href={b.publicationId ? `https://app.kit.com/publications/${b.publicationId}/reports/overview` : undefined}
+                      target="_blank"
+                      rel="noreferrer"
                       className="grid grid-cols-[1fr_70px_90px_70px_70px_70px_80px] gap-2 px-5 py-2.5 items-center border-b border-border/30 hover:bg-muted/10 transition-colors last:border-0"
                     >
-                      <span className="text-sm text-foreground truncate" title={b.subject}>{b.subject}</span>
+                      <span className="text-sm text-foreground truncate hover:text-primary transition-colors" title={b.subject}>{b.subject}</span>
                       <span className="text-xs text-muted-foreground text-center">{fmtDate(b.sentAt)}</span>
                       <span className="text-xs font-mono text-foreground text-right">{fmt(b.recipients)}</span>
                       <span className="text-xs font-mono text-foreground text-right">{fmt(b.opens)}</span>
@@ -531,7 +534,7 @@ export default function MarketingDashboard() {
                           ? <span className="text-primary font-semibold">{fmt(b.calendlyClicks)}</span>
                           : <span className="text-muted-foreground">—</span>}
                       </span>
-                    </div>
+                    </a>
                   ))}
                 </div>
               </>
