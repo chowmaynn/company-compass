@@ -316,23 +316,30 @@ export function BookingKPITracker() {
       const isCurrentMo = year === now.getFullYear() && month === now.getMonth();
       const maxDay = isCurrentMo ? now.getDate() : daysInMo;
 
-      // Fetch in weekly chunks to minimize requests (max ~5 requests instead of 30)
-      const CHUNK_DAYS = 7;
+      // Fetch in weekly chunks with NZ timezone overlap.
+      // Timestamps are UTC but we need NZ calendar dates, so extend boundaries
+      // by 13 hours (max NZ offset) and bucket by NZ date.
+      const CHUNK_DAYS = 2;
       for (let startDay = 1; startDay <= maxDay; startDay += CHUNK_DAYS) {
         if (cancelled) break;
-        const endDay = Math.min(startDay + CHUNK_DAYS, daysInMo + 1);
-        const chunkStart = `${year}-${mm}-${String(startDay).padStart(2, "0")}T00:00:00Z`;
-        const chunkEndStr = endDay > daysInMo
-          ? (month === 11 ? `${year + 1}-01-01` : `${year}-${String(month + 2).padStart(2, "0")}-01`)
-          : `${year}-${mm}-${String(endDay).padStart(2, "0")}`;
-        const chunkEnd = `${chunkEndStr}T00:00:00Z`;
+        const endDay = Math.min(startDay + CHUNK_DAYS, maxDay + 1);
+        // Extend start 13h earlier and end 13h later to capture NZ timezone overlap
+        const chunkStartDate = new Date(Date.UTC(year, month, startDay) - 13 * 3600000);
+        const chunkEndDate = new Date(Date.UTC(year, month, endDay) - 11 * 3600000);
+        const chunkStart = chunkStartDate.toISOString();
+        const chunkEnd = chunkEndDate.toISOString();
         try {
           const res = await fetch(`${SKOOL_BASE}/rest/v1/${TABLE}?select=${COL}&${COL}=gte.${chunkStart}&${COL}=lt.${chunkEnd}&limit=5000`);
           if (res.ok) {
             const rows: { "Date Added": string }[] = await res.json();
             for (const row of rows) {
-              const date = (row["Date Added"] ?? "").substring(0, 10);
-              if (date) result[date] = (result[date] || 0) + 1;
+              // Bucket by NZ date
+              const nzDate = new Date(row["Date Added"]).toLocaleDateString("en-CA", { timeZone: "Pacific/Auckland" });
+              // Only count if within the chunk's NZ day range
+              const nzDay = parseInt(nzDate.split("-")[2]);
+              if (nzDay >= startDay && nzDay < endDay && nzDate.startsWith(`${year}-${mm}`)) {
+                result[nzDate] = (result[nzDate] || 0) + 1;
+              }
             }
           }
         } catch {}
