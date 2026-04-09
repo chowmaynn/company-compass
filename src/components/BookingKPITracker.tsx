@@ -72,7 +72,7 @@ function NotePopover({
           zIndex: 9999,
           width: 280,
           background: "hsl(var(--card))",
-          border: "1px solid rgba(255,255,255,0.15)",
+          border: "1px solid hsl(var(--border))",
           borderRadius: 10,
           boxShadow: "0 8px 32px rgba(0,0,0,0.5)",
           padding: 0,
@@ -83,12 +83,12 @@ function NotePopover({
           top: 36,
         }}>
           {/* Header */}
-          <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", padding: "10px 12px", borderBottom: "1px solid rgba(255,255,255,0.1)", background: "rgba(250,204,21,0.08)" }}>
+          <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", padding: "10px 12px", borderBottom: "1px solid hsl(var(--border))", background: "rgba(250,204,21,0.08)" }}>
             <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
               <StickyNote size={13} color="#facc15" />
               <span style={{ fontSize: 11, fontWeight: 600, color: "#facc15" }}>{dayLabel}</span>
             </div>
-            <button onClick={() => { onChange(draft); setOpen(false); }} style={{ background: "none", border: "none", cursor: "pointer", color: "rgba(255,255,255,0.4)", padding: 2, display: "flex" }}>
+            <button onClick={() => { onChange(draft); setOpen(false); }} style={{ background: "none", border: "none", cursor: "pointer", color: "var(--muted-foreground)", padding: 2, display: "flex" }}>
               <X size={13} />
             </button>
           </div>
@@ -104,8 +104,8 @@ function NotePopover({
               placeholder="What changed today? (e.g. launched new ad, changed CTA, sent email blast...)"
               style={{
                 width: "100%", resize: "vertical",
-                background: "rgba(255,255,255,0.04)",
-                border: "1px solid rgba(255,255,255,0.1)",
+                background: "hsl(var(--muted))",
+                border: "1px solid hsl(var(--border))",
                 borderRadius: 6, outline: "none",
                 fontSize: 12, color: "var(--foreground)",
                 padding: "8px 10px", lineHeight: 1.6,
@@ -113,14 +113,14 @@ function NotePopover({
                 boxSizing: "border-box",
               }}
               onFocus={e => (e.currentTarget.style.borderColor = "hsl(var(--primary))")}
-              onBlur={e => (e.currentTarget.style.borderColor = "rgba(255,255,255,0.1)")}
+              onBlur={e => (e.currentTarget.style.borderColor = "transparent")}
             />
           </div>
 
           {/* Footer */}
           <div style={{ display: "flex", gap: 6, padding: "0 10px 10px", justifyContent: "flex-end" }}>
             {draft.trim() && (
-              <button onClick={clear} style={{ fontSize: 11, padding: "4px 10px", borderRadius: 5, border: "1px solid rgba(255,255,255,0.1)", background: "none", color: "rgba(255,255,255,0.4)", cursor: "pointer" }}>
+              <button onClick={clear} style={{ fontSize: 11, padding: "4px 10px", borderRadius: 5, border: "1px solid hsl(var(--border))", background: "none", color: "var(--muted-foreground)", cursor: "pointer" }}>
                 Clear
               </button>
             )}
@@ -165,11 +165,11 @@ const L_METRIC = 0;
 const L_TARGET = W_METRIC;
 const L_AVG    = W_METRIC + W_TARGET;
 
-// Shared border tokens
-const B_ROW      = "1px solid rgba(255,255,255,0.08)";   // horizontal row divider
-const B_FROZEN   = "1px solid rgba(255,255,255,0.15)";   // dividers inside frozen panel
-const B_PANEL    = "2px solid rgba(255,255,255,0.25)";   // right edge of frozen panel (separator from days)
-const B_SECTION  = "1px solid rgba(255,255,255,0.12)";   // between sections
+// Shared border tokens — use CSS vars for theme awareness
+const B_ROW      = "1px solid hsl(var(--border) / 0.5)";
+const B_FROZEN   = "1px solid hsl(var(--border))";
+const B_PANEL    = "2px solid hsl(var(--border))";
+const B_SECTION  = "1px solid hsl(var(--border) / 0.7)";
 
 // ─── Sections ─────────────────────────────────────────────────────────────────
 
@@ -336,7 +336,7 @@ export function BookingKPITracker() {
   const now = new Date();
   const [year, setYear]   = useState(now.getFullYear());
   const [month, setMonth] = useState(now.getMonth());
-  const [bg, setBg]       = useState("#1B1B1B");
+  const [bg, setBg]       = useState("hsl(var(--card))");
   const [state, setState] = useState<TrackerState>({ days: {}, targets: {} });
 
   const days  = useMemo(() => getDaysInMonth(year, month), [year, month]);
@@ -578,9 +578,15 @@ export function BookingKPITracker() {
     return map;
   }, [broadcasts]);
 
-  // Use a fully opaque dark grey for the frozen sidebar
+  // Resolve the actual card background color so sticky cells are truly opaque
   useEffect(() => {
-    setBg("#1B1B1B");
+    const el = document.createElement("div");
+    el.className = "bg-card";
+    el.style.cssText = "position:absolute;visibility:hidden";
+    document.body.appendChild(el);
+    const c = getComputedStyle(el).backgroundColor;
+    document.body.removeChild(el);
+    if (c && c !== "rgba(0, 0, 0, 0)") setBg(c);
   }, []);
 
   // Load from Supabase when month changes
@@ -733,7 +739,7 @@ export function BookingKPITracker() {
 
           <thead>
             <tr>
-              <th style={{ ...S.metric({ borderBottom: B_FROZEN }), padding: "10px 16px", textAlign: "left", fontSize: 10, fontWeight: 600, color: "rgba(255,255,255,0.3)", textTransform: "uppercase", letterSpacing: "0.08em" }}>
+              <th style={{ ...S.metric({ borderBottom: B_FROZEN }), padding: "10px 16px", textAlign: "left", fontSize: 10, fontWeight: 600, color: "var(--muted-foreground)", textTransform: "uppercase", letterSpacing: "0.08em" }}>
                 Metric
               </th>
               <th style={{ ...S.target({ borderBottom: B_FROZEN }), padding: "10px 8px", textAlign: "center", fontSize: 10, fontWeight: 700, color: "hsl(var(--primary))", textTransform: "uppercase", letterSpacing: "0.08em" }}>
@@ -921,7 +927,7 @@ export function BookingKPITracker() {
                           const displayCs  = isAuto ? cs : cellStyle(displayVal, metric);
                           return (
                             <td key={iso} style={{ width: W_DAY, minWidth: W_DAY, borderRight: B_ROW, borderBottom: rowBorderBottom, padding: 2, backgroundColor: isToday ? todayBg : section.rowTint }}>
-                              <span style={{ display: "block", borderRadius: 4, padding: "4px 2px", textAlign: "center", fontSize: 11, fontFamily: "monospace", color: displayVal !== null ? undefined : "rgba(255,255,255,0.15)", ...displayCs }}>
+                              <span style={{ display: "block", borderRadius: 4, padding: "4px 2px", textAlign: "center", fontSize: 11, fontFamily: "monospace", color: displayVal !== null ? undefined : "hsl(var(--muted-foreground) / 0.4)", ...displayCs }}>
                                 {fmtVal(displayVal, metric)}
                               </span>
                             </td>
@@ -932,7 +938,7 @@ export function BookingKPITracker() {
                         if (METRIC_SOURCE_MAP[metric] && apiVal === 0) {
                           return (
                             <td key={iso} style={{ width: W_DAY, minWidth: W_DAY, borderRight: B_ROW, borderBottom: rowBorderBottom, padding: 2, backgroundColor: isToday ? todayBg : section.rowTint }}>
-                              <span style={{ display: "block", borderRadius: 4, padding: "4px 2px", textAlign: "center", fontSize: 11, fontFamily: "monospace", color: "rgba(255,255,255,0.15)" }}>
+                              <span style={{ display: "block", borderRadius: 4, padding: "4px 2px", textAlign: "center", fontSize: 11, fontFamily: "monospace", color: "hsl(var(--muted-foreground) / 0.4)" }}>
                                 0
                               </span>
                             </td>
