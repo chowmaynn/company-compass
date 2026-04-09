@@ -374,7 +374,9 @@ export function BookingKPITracker() {
 
     const SKOOL_BASE = "/api/skool-supabase";
     const TABLE = "Skool%20Lead%20Logs";
-    const COL = "%22Date%20Added%22";
+    const COL = "%22Created%20At%22";
+    const PID = "%22Project%20ID%22";
+    const PROJECT_ID = "recW9TFcHNzEYV7ql";
 
     async function fetchSkoolMonth() {
       const result: Record<string, number> = {};
@@ -382,29 +384,25 @@ export function BookingKPITracker() {
       const isCurrentMo = year === now.getFullYear() && month === now.getMonth();
       const maxDay = isCurrentMo ? now.getDate() : daysInMo;
 
-      // Fetch in weekly chunks with NZ timezone overlap.
-      // Timestamps are UTC but we need NZ calendar dates, so extend boundaries
-      // by 13 hours (max NZ offset) and bucket by NZ date.
+      // Fetch in 2-day chunks using Created At (ISO format) + Project ID filter
       const CHUNK_DAYS = 2;
       for (let startDay = 1; startDay <= maxDay; startDay += CHUNK_DAYS) {
         if (cancelled) break;
         const endDay = Math.min(startDay + CHUNK_DAYS, maxDay + 1);
-        // Extend start 13h earlier and end 13h later to capture NZ timezone overlap
-        const chunkStartDate = new Date(Date.UTC(year, month, startDay) - 13 * 3600000);
-        const chunkEndDate = new Date(Date.UTC(year, month, endDay) - 11 * 3600000);
-        const chunkStart = chunkStartDate.toISOString();
-        const chunkEnd = chunkEndDate.toISOString();
+        const chunkStart = `${year}-${mm}-${String(startDay).padStart(2, "0")}T00:00:00Z`;
+        const chunkEndDay = endDay > daysInMo
+          ? (month === 11 ? `${year + 1}-01-01` : `${year}-${String(month + 2).padStart(2, "0")}-01`)
+          : `${year}-${mm}-${String(endDay).padStart(2, "0")}`;
+        const chunkEnd = `${chunkEndDay}T00:00:00Z`;
         try {
-          const res = await fetch(`${SKOOL_BASE}/rest/v1/${TABLE}?select=${COL}&${COL}=gte.${chunkStart}&${COL}=lt.${chunkEnd}&limit=5000`);
+          const res = await fetch(`${SKOOL_BASE}/rest/v1/${TABLE}?select=${COL}&${PID}=eq.${PROJECT_ID}&${COL}=gte.${chunkStart}&${COL}=lt.${chunkEnd}&limit=2000`);
           if (res.ok) {
-            const rows: { "Date Added": string }[] = await res.json();
+            const rows: { "Created At": string }[] = await res.json();
             for (const row of rows) {
-              // Bucket by NZ date
-              const nzDate = new Date(row["Date Added"]).toLocaleDateString("en-CA", { timeZone: "Pacific/Auckland" });
-              // Only count if within the chunk's NZ day range
-              const nzDay = parseInt(nzDate.split("-")[2]);
-              if (nzDay >= startDay && nzDay < endDay && nzDate.startsWith(`${year}-${mm}`)) {
-                result[nzDate] = (result[nzDate] || 0) + 1;
+              // Bucket by date portion of Created At (substring 0-10)
+              const date = (row["Created At"] ?? "").substring(0, 10);
+              if (date && date.startsWith(`${year}-${mm}`)) {
+                result[date] = (result[date] || 0) + 1;
               }
             }
           }

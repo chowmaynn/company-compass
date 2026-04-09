@@ -3,14 +3,16 @@ import { generateWeekConfigs, getCurrentNZMonth, getCatchUpRange } from "@/data/
 
 const SKOOL_BASE = "/api/skool-supabase";
 const TABLE = "Skool%20Lead%20Logs";
-const COL = "%22Date%20Added%22";
+const COL = "%22Created%20At%22";
+const PID = "%22Project%20ID%22";
+const PROJECT_ID = "recW9TFcHNzEYV7ql";
 
 const ONE_DAY_MS = 86400000;
 const ONE_WEEK_MS = 7 * ONE_DAY_MS;
 
 /** Fetch join count for a single chunk. Use higher limit for wider ranges. */
 async function fetchChunk(start: string, end: string, limit = 2000): Promise<number> {
-  const url = `${SKOOL_BASE}/rest/v1/${TABLE}?select=${COL}&${COL}=gte.${start}&${COL}=lt.${end}&limit=${limit}`;
+  const url = `${SKOOL_BASE}/rest/v1/${TABLE}?select=${COL}&${PID}=eq.${PROJECT_ID}&${COL}=gte.${start}&${COL}=lt.${end}&limit=${limit}`;
   const res = await fetch(url);
   if (!res.ok) {
     console.error("Skool joins fetch error:", res.status, { start, end });
