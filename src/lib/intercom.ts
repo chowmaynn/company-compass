@@ -98,11 +98,16 @@ export const TRACKER_TYPES = [
 
 export interface IntercomTicket {
   id: string;
+  ticket_id: string;
   created_at: number;
   updated_at: number;
+  open: boolean;
   ticket_state: { category: string; internal_label: string };
   ticket_type: { id: number; name: string };
   ticket_attributes: Record<string, unknown>;
+  contacts: { contacts: { id: string; type: string }[] };
+  admin_assignee_id: number | null;
+  linked_objects: { data: { id: string; type: string; category: string }[] };
 }
 
 interface TicketSearchResponse {

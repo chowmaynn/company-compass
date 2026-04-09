@@ -29,7 +29,7 @@ import {
 import { GRID, TICK } from "@/lib/chart-theme";
 import { StatCard } from "@/components/StatCard";
 import { LoadingDots } from "@/components/LoadingDots";
-import { fmtDuration } from "@/lib/dates";
+import { fmtDuration, elapsed } from "@/lib/dates";
 
 // ── Helpers ───────────────────────────────────────────────────
 
@@ -80,6 +80,14 @@ export default function SupportDashboard() {
     });
     return Object.entries(map).map(([key, count]) => ({ key, label: dayLabel(key), count }));
   }, [tickets, range.startDate, range.endDate]);
+
+  // Open tickets sorted by oldest first
+  const openTickets = useMemo(() =>
+    tickets
+      .filter((t) => t.open)
+      .sort((a, b) => a.created_at - b.created_at),
+    [tickets]
+  );
 
   // Tracker donut data
   const donutData = useMemo(() =>
@@ -271,6 +279,97 @@ export default function SupportDashboard() {
             </div>
           ) : (
             <p className="text-sm text-muted-foreground text-center py-8">No tracker tickets in this period</p>
+          )}
+        </CardContent>
+      </Card>
+
+      {/* ── Open Tickets ──────────────────────────────────── */}
+      <Card className="border-border/50">
+        <CardContent className="p-5">
+          <div className="flex items-center justify-between mb-4">
+            <div>
+              <h3 className="text-sm font-semibold text-foreground">Open Tickets</h3>
+              <p className="text-xs text-muted-foreground mt-0.5">
+                {loading ? "" : `${openTickets.length} unresolved · sorted by oldest first`}
+              </p>
+            </div>
+            <a
+              href="https://app.intercom.com"
+              target="_blank"
+              rel="noopener noreferrer"
+              className="flex items-center gap-1.5 text-xs text-primary hover:underline font-medium"
+            >
+              Open Intercom <ExternalLink className="h-3 w-3" />
+            </a>
+          </div>
+
+          {loading ? (
+            <div className="flex items-center justify-center py-16"><LoadingDots /></div>
+          ) : openTickets.length === 0 ? (
+            <div className="text-center py-10 text-muted-foreground">
+              <CheckCircle2 className="h-8 w-8 mx-auto mb-2 opacity-30 text-emerald-500" />
+              <p className="text-sm">All tickets resolved</p>
+            </div>
+          ) : (
+            <div className="divide-y divide-border/50">
+              {/* Header */}
+              <div className="grid grid-cols-[60px_1fr_120px_100px_100px] gap-3 pb-2 text-[10px] font-semibold text-muted-foreground uppercase tracking-wider">
+                <span>Ticket #</span>
+                <span>Trackers</span>
+                <span>Status</span>
+                <span>Open For</span>
+                <span>Updated</span>
+              </div>
+
+              {openTickets.slice(0, 50).map((t) => {
+                const stateLabel = t.ticket_state?.internal_label ?? "Unknown";
+                const stateCategory = t.ticket_state?.category ?? "";
+                const trackerCount = t.linked_objects?.data?.filter((o) => o.category === "Tracker").length ?? 0;
+                const isWaiting = stateCategory === "waiting_on_customer";
+                const isNew = stateCategory === "new";
+
+                return (
+                  <div
+                    key={t.id}
+                    className="grid grid-cols-[60px_1fr_120px_100px_100px] gap-3 items-center py-2.5 hover:bg-muted/20 transition-colors rounded"
+                  >
+                    <span className="text-xs font-mono text-muted-foreground">#{t.ticket_id}</span>
+                    <span className="text-xs text-muted-foreground">
+                      {trackerCount > 0 ? `${trackerCount} tracker${trackerCount > 1 ? "s" : ""}` : "—"}
+                    </span>
+                    <div>
+                      {isWaiting ? (
+                        <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-semibold bg-amber-100 dark:bg-amber-950/50 text-amber-700 dark:text-amber-400">
+                          <span className="h-1.5 w-1.5 rounded-full bg-amber-500 animate-pulse" />
+                          Waiting
+                        </span>
+                      ) : isNew ? (
+                        <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-semibold bg-blue-100 dark:bg-blue-950/50 text-blue-700 dark:text-blue-400">
+                          New
+                        </span>
+                      ) : (
+                        <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-semibold bg-indigo-100 dark:bg-indigo-950/50 text-indigo-700 dark:text-indigo-400">
+                          {stateLabel}
+                        </span>
+                      )}
+                    </div>
+                    <span className="text-xs font-mono text-muted-foreground">{elapsed(t.created_at)}</span>
+                    <span className="text-xs font-mono text-muted-foreground">{elapsed(t.updated_at)}</span>
+                  </div>
+                );
+              })}
+
+              {openTickets.length > 50 && (
+                <div className="pt-3 text-center">
+                  <p className="text-xs text-muted-foreground">
+                    Showing 50 of {openTickets.length} open tickets.{" "}
+                    <a href="https://app.intercom.com" target="_blank" rel="noopener noreferrer" className="text-primary hover:underline">
+                      View all in Intercom →
+                    </a>
+                  </p>
+                </div>
+              )}
+            </div>
           )}
         </CardContent>
       </Card>
