@@ -269,7 +269,7 @@ export default function CoachesDashboard() {
           loading={loading}
         />
         <StatCard
-          label="Avg Circle Response"
+          label="Response Time"
           value={avgResponseTime !== null ? `${avgResponseTime}m` : "—"}
           sub="Avg time to respond to help requests"
           accent={
