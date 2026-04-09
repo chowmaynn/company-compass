@@ -278,7 +278,7 @@ export default function CoachesDashboard() {
               : avgResponseTime < 1440 ? "text-amber-600"
               : "text-red-600"
           }
-          icon={Users}
+          icon={Clock}
           loading={loading}
         />
       </div>
