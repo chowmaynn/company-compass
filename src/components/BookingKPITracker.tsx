@@ -353,7 +353,7 @@ export function BookingKPITracker() {
       .catch(() => setGa4ActiveByDate({}));
   }, [year, month]);
 
-  const METRIC_SOURCE_MAP: Record<string, { type: "source"; sources: string[] } | { type: "event"; events: string[] } | { type: "allSources" } | { type: "cube"; category: string; metric: string } | { type: "skoolJoins" } | { type: "ga4ActiveUsers" }> = useMemo(() => ({
+  const METRIC_SOURCE_MAP: Record<string, { type: "source"; sources: string[] } | { type: "event"; events: string[] } | { type: "allSources" } | { type: "cube"; category: string; metric: string } | { type: "skoolJoins" } | { type: "ga4ActiveUsers" } | { type: "sourceOrEvent"; sources: string[]; events: string[] }> = useMemo(() => ({
     "QF Calls Booked": { type: "allSources" },
     "Skool Joins": { type: "skoolJoins" as const },
     "Skool Bookings DM Setter": { type: "source", sources: ["source_skool setter"] },
@@ -363,8 +363,8 @@ export function BookingKPITracker() {
     "Welcome Sequence Email Bookings": { type: "source", sources: ["source_email welcome"] },
     "Website Visitors (Active Users)": { type: "ga4ActiveUsers" as const },
     "Website Bookings (Total)": { type: "source", sources: ["source_website", "source_website b", "source_website c"] },
-    "Google Bookings": { type: "source", sources: ["source_google"] },
-    "Webinar Bookings": { type: "source", sources: ["source_aios lp"] },
+    "Google Bookings": { type: "sourceOrEvent", sources: ["source_google"], events: ["AAA Accelerator Business Call (Google)"] },
+    "Webinar Bookings": { type: "sourceOrEvent", sources: ["source_aios lp"], events: ["AAA Accelerator Business Call (Masterclass)"] },
   }), []);
 
   function getApiValue(date: string, metric: MetricName): number | null {
@@ -406,6 +406,25 @@ export function BookingKPITracker() {
         return skoolJoinsByDate[date] ?? null;
       case "ga4ActiveUsers":
         return ga4ActiveByDate[date] ?? null;
+      case "sourceOrEvent": {
+        // Try source-level first, fall back to event-level
+        let total = 0;
+        let hasSource = false;
+        for (const src of mapping.sources) {
+          const totalBk = cube[date]?.[src]?.total_bookings;
+          if (totalBk !== undefined) {
+            hasSource = true;
+            const casey = cube[date]?.[src]?.casey_cancelled ?? 0;
+            total += totalBk - casey;
+          }
+        }
+        if (hasSource) return total;
+        // Fall back to event-level qualified
+        for (const ev of mapping.events) {
+          total += cube[date]?.[`event_${ev}`]?.qualified ?? 0;
+        }
+        return total;
+      }
     }
   }
 

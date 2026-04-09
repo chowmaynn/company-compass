@@ -111,6 +111,19 @@ export function useSupabaseMetrics(from: string, to: string) {
     sourceQualified[displayName] = totalBk - caseyCx;
   });
 
+  // Fallback: if source_google or source_aios_lp have no data, use event-level qualified
+  const EVENT_FALLBACKS: { displayName: string; eventName: string }[] = [
+    { displayName: "Google", eventName: "AAA Accelerator Business Call (Google)" },
+    { displayName: "AIOS LP", eventName: "AAA Accelerator Business Call (Masterclass)" },
+  ];
+  for (const { displayName, eventName } of EVENT_FALLBACKS) {
+    if (!sourceQualified[displayName] || sourceQualified[displayName] === 0) {
+      let q = 0;
+      dates.forEach((date) => { q += cube[date]?.[`event_${eventName}`]?.qualified ?? 0; });
+      if (q > 0) sourceQualified[displayName] = q;
+    }
+  }
+
   const totalBookings = Object.values(sourceQualified).reduce((s, v) => s + v, 0);
 
   // ── Overall funnel metrics (null category — all call types) ──────────
