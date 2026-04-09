@@ -267,13 +267,13 @@ async function loadStateFromSupabase(y: number, m: number): Promise<TrackerState
 
     const state: TrackerState = { days: {}, targets: {} };
     for (const row of rows) {
-      if (row.type === "target" && row.metric) {
+      if (row.type === "target" && row.metric && row.metric !== "__none__") {
         state.targets[row.metric as MetricName] = row.value ?? "";
-      } else if (row.type === "note" && row.day_date) {
+      } else if (row.type === "note" && row.day_date && row.day_date !== "1970-01-01") {
         const day = row.day_date;
         if (!state.days[day]) state.days[day] = { note: "", values: {} };
         state.days[day].note = row.value ?? "";
-      } else if (row.type === "social" && row.day_date) {
+      } else if (row.type === "social" && row.day_date && row.day_date !== "1970-01-01") {
         const day = row.day_date;
         if (!state.days[day]) state.days[day] = { note: "", values: {} };
         state.days[day].socialUrls = row.social_urls ?? [];
@@ -286,19 +286,42 @@ async function loadStateFromSupabase(y: number, m: number): Promise<TrackerState
 }
 
 async function upsertTracker(month: string, type: string, metric: string | null, dayDate: string | null, value: string | null, socialUrls: string[] | null) {
+  // Use sentinel values for NULLs so the unique constraint works
+  const metricVal = metric ?? "__none__";
+  const dayVal = dayDate ?? "1970-01-01";
+
+  // Try update first, then insert if no match
+  const filter = `month=eq.${month}&type=eq.${type}&metric=eq.${metricVal}&day_date=eq.${dayVal}`;
   const body: Record<string, unknown> = {
-    month, type, metric, day_date: dayDate, value, social_urls: socialUrls, updated_at: new Date().toISOString(),
+    value, social_urls: socialUrls, updated_at: new Date().toISOString(),
   };
-  await fetch(`${COMPASS_URL}/rest/v1/booking_tracker`, {
-    method: "POST",
+
+  const updateRes = await fetch(`${COMPASS_URL}/rest/v1/booking_tracker?${filter}`, {
+    method: "PATCH",
     headers: {
       apikey: COMPASS_KEY,
       Authorization: `Bearer ${COMPASS_KEY}`,
       "Content-Type": "application/json",
-      Prefer: "resolution=merge-duplicates",
+      Prefer: "return=representation",
     },
     body: JSON.stringify(body),
   });
+
+  const updated = await updateRes.json();
+  if (Array.isArray(updated) && updated.length === 0) {
+    // No existing row — insert
+    await fetch(`${COMPASS_URL}/rest/v1/booking_tracker`, {
+      method: "POST",
+      headers: {
+        apikey: COMPASS_KEY,
+        Authorization: `Bearer ${COMPASS_KEY}`,
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({
+        month, type, metric: metricVal, day_date: dayVal, value, social_urls: socialUrls, updated_at: new Date().toISOString(),
+      }),
+    });
+  }
 }
 function getDaysInMonth(y: number, m: number): Date[] {
   const out: Date[] = []; const d = new Date(y, m, 1);
