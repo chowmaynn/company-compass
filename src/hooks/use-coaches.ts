@@ -23,23 +23,23 @@ function getMonthBounds(): { startDate: string; endDate: string } {
   return { startDate: fmt(start), endDate: fmt(end) };
 }
 
-export function useCoachesMeetings() {
+export function useCoachesMeetings(startDate?: string, endDate?: string) {
   const [todaysMeetings, setTodaysMeetings] = useState<Array<{ id: string; fields: MeetingRecord }>>([]);
   const [monthlyMeetings, setMonthlyMeetings] = useState<Array<{ id: string; fields: MeetingRecord }>>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
-    const { startDate, endDate } = getMonthBounds();
+    const bounds = startDate && endDate ? { startDate, endDate } : getMonthBounds();
     setLoading(true);
-    Promise.all([fetchTodaysMeetings(), fetchWeeklyMeetings(startDate, endDate)])
+    Promise.all([fetchTodaysMeetings(), fetchWeeklyMeetings(bounds.startDate, bounds.endDate)])
       .then(([todays, monthly]) => {
         setTodaysMeetings(todays);
         setMonthlyMeetings(monthly);
       })
       .catch((e) => setError(String(e)))
       .finally(() => setLoading(false));
-  }, []);
+  }, [startDate, endDate]);
 
   return { todaysMeetings, monthlyMeetings, loading, error };
 }

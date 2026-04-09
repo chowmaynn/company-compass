@@ -1,5 +1,6 @@
 import { useMemo, useState } from "react";
 import { Card, CardContent } from "@/components/ui/card";
+import { DateRangePicker, type DateRangeValue } from "@/components/DateRangePicker";
 import { useCoachesMeetings, useCircleSLA } from "@/hooks/use-coaches";
 import type { MeetingRecord, CirclePost } from "@/hooks/use-coaches";
 import {
@@ -138,7 +139,8 @@ function fmtDate(d: Date): string {
 // ── Main component ────────────────────────────────────────────
 
 export default function CoachesDashboard() {
-  const { todaysMeetings, monthlyMeetings, loading: meetingsLoading, error: meetingsError } = useCoachesMeetings();
+  const [range, setRange] = useState<DateRangeValue>({ start: "", end: "", startDate: "", endDate: "" });
+  const { todaysMeetings, monthlyMeetings, loading: meetingsLoading, error: meetingsError } = useCoachesMeetings(range.startDate || undefined, range.endDate || undefined);
   const { posts: circlePosts, loading: circleLoading, error: circleError } = useCircleSLA();
 
   const today = useMemo(() => todayIso(), []);
@@ -228,10 +230,11 @@ export default function CoachesDashboard() {
   // Daily coaching calls over time
   const dailyCalls = useMemo(() => {
     const map: Record<string, { total: number; completed: number }> = {};
-    // Fill all days of the month
-    const daysInMonth = new Date(now.getFullYear(), now.getMonth() + 1, 0).getDate();
-    for (let d = 1; d <= daysInMonth; d++) {
-      const iso = fmtDate(new Date(now.getFullYear(), now.getMonth(), d));
+    // Fill all days in the selected range
+    const start = range.startDate ? new Date(range.startDate) : new Date(now.getFullYear(), now.getMonth(), 1);
+    const end = range.endDate ? new Date(range.endDate) : new Date(now.getFullYear(), now.getMonth() + 1, 0);
+    for (let d = new Date(start); d <= end; d.setDate(d.getDate() + 1)) {
+      const iso = fmtDate(new Date(d));
       map[iso] = { total: 0, completed: 0 };
     }
     monthlyMeetings.forEach((r) => {
@@ -252,7 +255,7 @@ export default function CoachesDashboard() {
         total: counts.total,
         completed: counts.completed,
       }));
-  }, [monthlyMeetings]);
+  }, [monthlyMeetings, range.startDate, range.endDate]);
 
   const loading = meetingsLoading || circleLoading;
   const error = meetingsError ?? circleError;
@@ -263,6 +266,11 @@ export default function CoachesDashboard() {
   return (
     <DashboardShell loading={loading} error={error} loadingMessage="Loading coaches data\u2026">
     <div className="p-6 space-y-6 max-w-[1440px] mx-auto">
+      {/* ── Date range selector ─────────────────────────── */}
+      <div className="flex justify-end">
+        <DateRangePicker defaultPreset="MTD" onChange={setRange} />
+      </div>
+
       {/* ── Stats bar ────────────────────────────────────── */}
       <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
         <StatCard label="Total Calls Today" value={totalToday} icon={CalendarDays} loading={loading} />
