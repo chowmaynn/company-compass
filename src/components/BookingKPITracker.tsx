@@ -316,20 +316,27 @@ export function BookingKPITracker() {
       const isCurrentMo = year === now.getFullYear() && month === now.getMonth();
       const maxDay = isCurrentMo ? now.getDate() : daysInMo;
 
-      for (let d = 1; d <= maxDay; d++) {
+      // Fetch in weekly chunks to minimize requests (max ~5 requests instead of 30)
+      const CHUNK_DAYS = 7;
+      for (let startDay = 1; startDay <= maxDay; startDay += CHUNK_DAYS) {
         if (cancelled) break;
-        const dayStr = `${year}-${mm}-${String(d).padStart(2, "0")}`;
-        const nextD = d < daysInMo
-          ? `${year}-${mm}-${String(d + 1).padStart(2, "0")}`
-          : month === 11 ? `${year + 1}-01-01` : `${year}-${String(month + 2).padStart(2, "0")}-01`;
+        const endDay = Math.min(startDay + CHUNK_DAYS, daysInMo + 1);
+        const chunkStart = `${year}-${mm}-${String(startDay).padStart(2, "0")}T00:00:00Z`;
+        const chunkEndStr = endDay > daysInMo
+          ? (month === 11 ? `${year + 1}-01-01` : `${year}-${String(month + 2).padStart(2, "0")}-01`)
+          : `${year}-${mm}-${String(endDay).padStart(2, "0")}`;
+        const chunkEnd = `${chunkEndStr}T00:00:00Z`;
         try {
-          const res = await fetch(`${SKOOL_BASE}/rest/v1/${TABLE}?select=${COL}&${COL}=gte.${dayStr}T00:00:00Z&${COL}=lt.${nextD}T00:00:00Z&limit=5000`);
+          const res = await fetch(`${SKOOL_BASE}/rest/v1/${TABLE}?select=${COL}&${COL}=gte.${chunkStart}&${COL}=lt.${chunkEnd}&limit=5000`);
           if (res.ok) {
-            const rows: unknown[] = await res.json();
-            result[dayStr] = rows.length;
+            const rows: { "Date Added": string }[] = await res.json();
+            for (const row of rows) {
+              const date = (row["Date Added"] ?? "").substring(0, 10);
+              if (date) result[date] = (result[date] || 0) + 1;
+            }
           }
         } catch {}
-        await new Promise(r => setTimeout(r, 100));
+        await new Promise(r => setTimeout(r, 200));
       }
 
       if (!cancelled) {
