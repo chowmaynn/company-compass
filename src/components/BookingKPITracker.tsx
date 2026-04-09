@@ -631,8 +631,11 @@ export function BookingKPITracker() {
     const cur = getDayData(d);
     setState(p => ({ ...p, days: { ...p.days, [toISO(d)]: { ...cur, values: { ...cur.values, [metric]: value } } } }));
   }
-  function updateTarget(metric: MetricName, value: string) {
+  function updateTargetLocal(metric: MetricName, value: string) {
     setState(p => ({ ...p, targets: { ...p.targets, [metric]: value } }));
+  }
+  function saveTarget(metric: MetricName) {
+    const value = state.targets[metric] ?? "";
     upsertTracker(mm, "target", metric, null, value, null);
   }
 
@@ -889,11 +892,11 @@ export function BookingKPITracker() {
                         <input
                           type="text" inputMode="decimal"
                           value={state.targets[metric] ?? ""}
-                          onChange={e => updateTarget(metric, e.target.value)}
+                          onChange={e => updateTargetLocal(metric, e.target.value)}
                           style={{ width: "100%", background: "transparent", border: "1px solid transparent", borderRadius: 4, textAlign: "center", fontSize: 12, fontFamily: "monospace", color: "hsl(var(--primary))", fontWeight: 600, padding: "4px 4px", outline: "none" }}
                           placeholder="—"
                           onFocus={e => (e.currentTarget.style.borderColor = "hsl(var(--primary))")}
-                          onBlur={e => (e.currentTarget.style.borderColor = "transparent")}
+                          onBlur={e => { e.currentTarget.style.borderColor = "transparent"; saveTarget(metric); }}
                         />
                       </td>
 
