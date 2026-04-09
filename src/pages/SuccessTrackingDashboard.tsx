@@ -226,14 +226,14 @@ export default function SuccessTrackingDashboard() {
           <CardContent className="p-5">
             <h3 className="text-sm font-semibold text-foreground mb-0.5">Solution Type</h3>
             <p className="text-xs text-muted-foreground mb-3">Distribution of win types</p>
-            <ResponsiveContainer width="100%" height={220}>
+            <ResponsiveContainer width="100%" height={150}>
               <PieChart>
                 <Pie
                   data={solutionData}
-                  cx="30%"
+                  cx="50%"
                   cy="50%"
-                  innerRadius={35}
-                  outerRadius={55}
+                  innerRadius={30}
+                  outerRadius={50}
                   paddingAngle={2}
                   dataKey="value"
                 >
@@ -246,19 +246,16 @@ export default function SuccessTrackingDashboard() {
                   contentStyle={{ fontSize: 11, borderRadius: 8, border: "1px solid hsl(var(--border))", backgroundColor: "hsl(var(--card))", color: "hsl(var(--foreground))" }}
                   formatter={(val, name) => [`${val} wins`, name]}
                 />
-                <Legend
-                  layout="vertical"
-                  align="right"
-                  verticalAlign="middle"
-                  iconType="circle"
-                  iconSize={7}
-                  wrapperStyle={{ fontSize: 11, lineHeight: "20px", paddingLeft: 8 }}
-                  formatter={(value, entry: { payload?: { value: number } }) => (
-                    <span className="text-muted-foreground">{value} ({entry.payload?.value})</span>
-                  )}
-                />
               </PieChart>
             </ResponsiveContainer>
+            <div className="flex flex-wrap gap-x-4 gap-y-1 justify-center mt-2">
+              {solutionData.map((d, i) => (
+                <div key={d.name} className="flex items-center gap-1.5 text-[11px]">
+                  <span className="w-2 h-2 rounded-full shrink-0" style={{ background: COLORS[i % COLORS.length] }} />
+                  <span className="text-muted-foreground">{d.name} ({d.value})</span>
+                </div>
+              ))}
+            </div>
           </CardContent>
         </Card>
       </div>
