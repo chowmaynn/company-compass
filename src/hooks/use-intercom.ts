@@ -6,6 +6,8 @@ import {
   fetchYourInboxConversations,
   fetchSupportTickets,
   fetchTrackerTickets,
+  fetchContactName,
+  fetchTicketFirstMessage,
   TRACKER_TYPES,
   type IntercomConversation,
   type IntercomTicket,
@@ -51,8 +53,14 @@ export interface TrackerBreakdown {
   states: Record<string, number>; // e.g. { "in_progress": 5, "resolved": 20 }
 }
 
+export interface EnrichedTicket extends IntercomTicket {
+  contactName: string;
+  firstMessage: string;
+}
+
 export interface IntercomTicketData {
   tickets: IntercomTicket[];
+  openTickets: EnrichedTicket[];
   totalTickets: number;
   resolvedCount: number;
   openCount: number;
@@ -77,7 +85,20 @@ async function fetchTicketData(startISO: string, endISO: string) {
     return { id: t.id, label: t.label, color: t.color, total: total_count, states };
   });
 
-  return { tickets: support.tickets, totalTickets: support.total_count, trackerBreakdown };
+  // Enrich open tickets with contact names and first messages
+  const openRaw = support.tickets.filter((t) => t.open);
+  const enriched: EnrichedTicket[] = await Promise.all(
+    openRaw.slice(0, 30).map(async (t) => {
+      const contactId = t.contacts?.contacts?.[0]?.id;
+      const [contactName, firstMessage] = await Promise.all([
+        contactId ? fetchContactName(contactId) : Promise.resolve("Unknown"),
+        fetchTicketFirstMessage(t.id),
+      ]);
+      return { ...t, contactName, firstMessage };
+    })
+  );
+
+  return { tickets: support.tickets, totalTickets: support.total_count, trackerBreakdown, openTickets: enriched };
 }
 
 export function useIntercomTickets(startISO: string, endISO: string): IntercomTicketData {
@@ -100,6 +121,7 @@ export function useIntercomTickets(startISO: string, endISO: string): IntercomTi
 
   return {
     tickets,
+    openTickets: query.data?.openTickets ?? [],
     totalTickets: query.data?.totalTickets ?? 0,
     resolvedCount,
     openCount,

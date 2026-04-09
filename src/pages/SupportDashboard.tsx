@@ -55,7 +55,7 @@ function dayLabel(key: string): string {
 
 export default function SupportDashboard() {
   const [range, setRange] = useState<DateRangeValue>({ start: "", end: "", startDate: "", endDate: "" });
-  const { tickets, totalTickets, resolvedCount, openCount, trackerBreakdown, loading, error } = useIntercomTickets(range.start, range.end);
+  const { tickets, openTickets, totalTickets, resolvedCount, openCount, trackerBreakdown, loading, error } = useIntercomTickets(range.start, range.end);
 
   // ── Derived stats ─────────────────────────────────────────
 
@@ -81,12 +81,10 @@ export default function SupportDashboard() {
     return Object.entries(map).map(([key, count]) => ({ key, label: dayLabel(key), count }));
   }, [tickets, range.startDate, range.endDate]);
 
-  // Open tickets sorted by oldest first
-  const openTickets = useMemo(() =>
-    tickets
-      .filter((t) => t.open)
-      .sort((a, b) => a.created_at - b.created_at),
-    [tickets]
+  // Open tickets already enriched and sorted by oldest first from hook
+  const sortedOpenTickets = useMemo(() =>
+    [...openTickets].sort((a, b) => a.created_at - b.created_at),
+    [openTickets]
   );
 
   // Tracker donut data
@@ -290,7 +288,7 @@ export default function SupportDashboard() {
             <div>
               <h3 className="text-sm font-semibold text-foreground">Open Tickets</h3>
               <p className="text-xs text-muted-foreground mt-0.5">
-                {loading ? "" : `${openTickets.length} unresolved · sorted by oldest first`}
+                {loading ? "" : `${sortedOpenTickets.length} unresolved · sorted by oldest first`}
               </p>
             </div>
             <a
@@ -305,7 +303,7 @@ export default function SupportDashboard() {
 
           {loading ? (
             <div className="flex items-center justify-center py-16"><LoadingDots /></div>
-          ) : openTickets.length === 0 ? (
+          ) : sortedOpenTickets.length === 0 ? (
             <div className="text-center py-10 text-muted-foreground">
               <CheckCircle2 className="h-8 w-8 mx-auto mb-2 opacity-30 text-emerald-500" />
               <p className="text-sm">All tickets resolved</p>
@@ -313,30 +311,31 @@ export default function SupportDashboard() {
           ) : (
             <div className="divide-y divide-border/50">
               {/* Header */}
-              <div className="grid grid-cols-[60px_1fr_120px_100px_100px] gap-3 pb-2 text-[10px] font-semibold text-muted-foreground uppercase tracking-wider">
-                <span>Ticket #</span>
-                <span>Trackers</span>
+              <div className="grid grid-cols-[1fr_120px_90px_90px] gap-3 pb-2 text-[10px] font-semibold text-muted-foreground uppercase tracking-wider">
+                <span>Contact & Issue</span>
                 <span>Status</span>
                 <span>Open For</span>
                 <span>Updated</span>
               </div>
 
-              {openTickets.slice(0, 50).map((t) => {
+              {sortedOpenTickets.map((t) => {
                 const stateLabel = t.ticket_state?.internal_label ?? "Unknown";
                 const stateCategory = t.ticket_state?.category ?? "";
-                const trackerCount = t.linked_objects?.data?.filter((o) => o.category === "Tracker").length ?? 0;
                 const isWaiting = stateCategory === "waiting_on_customer";
                 const isNew = stateCategory === "new";
 
                 return (
                   <div
                     key={t.id}
-                    className="grid grid-cols-[60px_1fr_120px_100px_100px] gap-3 items-center py-2.5 hover:bg-muted/20 transition-colors rounded"
+                    className="grid grid-cols-[1fr_120px_90px_90px] gap-3 items-center py-3 hover:bg-muted/20 transition-colors rounded"
                   >
-                    <span className="text-xs font-mono text-muted-foreground">#{t.ticket_id}</span>
-                    <span className="text-xs text-muted-foreground">
-                      {trackerCount > 0 ? `${trackerCount} tracker${trackerCount > 1 ? "s" : ""}` : "—"}
-                    </span>
+                    <div className="min-w-0">
+                      <div className="flex items-center gap-2">
+                        <p className="text-sm font-medium text-foreground truncate">{t.contactName}</p>
+                        <span className="text-[10px] font-mono text-muted-foreground/50">#{t.ticket_id}</span>
+                      </div>
+                      <p className="text-[11px] text-muted-foreground truncate mt-0.5">{t.firstMessage}</p>
+                    </div>
                     <div>
                       {isWaiting ? (
                         <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-semibold bg-amber-100 dark:bg-amber-950/50 text-amber-700 dark:text-amber-400">
@@ -359,10 +358,10 @@ export default function SupportDashboard() {
                 );
               })}
 
-              {openTickets.length > 50 && (
+              {sortedOpenTickets.length > 30 && (
                 <div className="pt-3 text-center">
                   <p className="text-xs text-muted-foreground">
-                    Showing 50 of {openTickets.length} open tickets.{" "}
+                    Showing 30 of {openCount} open tickets.{" "}
                     <a href="https://app.intercom.com" target="_blank" rel="noopener noreferrer" className="text-primary hover:underline">
                       View all in Intercom →
                     </a>

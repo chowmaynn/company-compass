@@ -158,6 +158,31 @@ export async function fetchTrackerTickets(
   }, 150);
 }
 
+/** Fetch contact name by ID */
+export async function fetchContactName(contactId: string): Promise<string> {
+  try {
+    const data = await intercomGet<{ name?: string; email?: string }>(`/contacts/${contactId}`);
+    return data.name || data.email || "Unknown";
+  } catch {
+    return "Unknown";
+  }
+}
+
+/** Fetch a single ticket's first customer message */
+export async function fetchTicketFirstMessage(ticketId: string): Promise<string> {
+  try {
+    const data = await intercomGet<{ ticket_parts: { ticket_parts: { author: { type: string }; body: string }[] } }>(`/tickets/${ticketId}`);
+    const parts = data.ticket_parts?.ticket_parts ?? [];
+    const userPart = parts.find((p) => p.author?.type === "user" || p.author?.type === "contact");
+    if (userPart?.body) {
+      return userPart.body.replace(/<[^>]*>/g, "").trim().slice(0, 120) || "—";
+    }
+    return "—";
+  } catch {
+    return "—";
+  }
+}
+
 /** Open conversations assigned to a specific admin — "Your inbox" */
 export async function fetchYourInboxConversations(adminId: string): Promise<{ conversations: IntercomConversation[]; total_count: number }> {
   return searchPage(
