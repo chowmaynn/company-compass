@@ -595,7 +595,15 @@ export function BookingKPITracker() {
   function updateNote(d: Date, note: string) {
     const iso = toISO(d);
     setState(p => ({ ...p, days: { ...p.days, [iso]: { ...getDayData(d), note } } }));
-    upsertTracker(mm, "note", null, iso, note, null);
+    if (note.trim()) {
+      upsertTracker(mm, "note", null, iso, note, null);
+    } else {
+      // Delete the row when clearing
+      fetch(`${COMPASS_URL}/rest/v1/booking_tracker?month=eq.${mm}&type=eq.note&metric=eq.__none__&day_date=eq.${iso}`, {
+        method: "DELETE",
+        headers: { apikey: COMPASS_KEY, Authorization: `Bearer ${COMPASS_KEY}` },
+      });
+    }
   }
   function addSocialUrl(d: Date, url: string) {
     const iso = toISO(d);
