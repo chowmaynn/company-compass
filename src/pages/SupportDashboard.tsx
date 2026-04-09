@@ -235,45 +235,19 @@ export default function SupportDashboard() {
           {loading ? (
             <div className="flex items-center justify-center py-16"><LoadingDots /></div>
           ) : trackerBreakdown.length > 0 ? (
-            <div className="overflow-x-auto">
-              <table className="w-full text-sm">
-                <thead>
-                  <tr className="border-b border-border">
-                    <th className="text-left py-2.5 px-3 text-[10px] font-semibold text-muted-foreground uppercase tracking-wider">Category</th>
-                    <th className="text-right py-2.5 px-3 text-[10px] font-semibold text-muted-foreground uppercase tracking-wider">Total</th>
-                    <th className="text-right py-2.5 px-3 text-[10px] font-semibold text-muted-foreground uppercase tracking-wider">New</th>
-                    <th className="text-right py-2.5 px-3 text-[10px] font-semibold text-muted-foreground uppercase tracking-wider">In Progress</th>
-                    <th className="text-right py-2.5 px-3 text-[10px] font-semibold text-muted-foreground uppercase tracking-wider">Waiting</th>
-                    <th className="text-right py-2.5 px-3 text-[10px] font-semibold text-muted-foreground uppercase tracking-wider">Resolved</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {trackerBreakdown.map((t) => (
-                    <tr key={t.id} className="border-b border-border/50 hover:bg-muted/20 transition-colors">
-                      <td className="py-3 px-3">
-                        <div className="flex items-center gap-2">
-                          <span className="w-2.5 h-2.5 rounded-full shrink-0" style={{ background: t.color }} />
-                          <span className="font-medium text-foreground">{t.label}</span>
-                        </div>
-                      </td>
-                      <td className="text-right py-3 px-3 font-mono font-semibold text-foreground">{t.total}</td>
-                      <td className="text-right py-3 px-3 font-mono text-muted-foreground">{t.states["new"] ?? 0}</td>
-                      <td className="text-right py-3 px-3 font-mono text-muted-foreground">{t.states["in_progress"] ?? 0}</td>
-                      <td className="text-right py-3 px-3 font-mono text-amber-500">{t.states["waiting_on_customer"] ?? 0}</td>
-                      <td className="text-right py-3 px-3 font-mono text-emerald-500">{t.states["resolved"] ?? 0}</td>
-                    </tr>
-                  ))}
-                  {/* Totals row */}
-                  <tr className="bg-muted/30">
-                    <td className="py-3 px-3 font-semibold text-foreground">Total</td>
-                    <td className="text-right py-3 px-3 font-mono font-bold text-foreground">{totalTrackerTickets}</td>
-                    <td className="text-right py-3 px-3 font-mono text-muted-foreground">{trackerBreakdown.reduce((s, t) => s + (t.states["new"] ?? 0), 0)}</td>
-                    <td className="text-right py-3 px-3 font-mono text-muted-foreground">{trackerBreakdown.reduce((s, t) => s + (t.states["in_progress"] ?? 0), 0)}</td>
-                    <td className="text-right py-3 px-3 font-mono text-amber-500">{trackerBreakdown.reduce((s, t) => s + (t.states["waiting_on_customer"] ?? 0), 0)}</td>
-                    <td className="text-right py-3 px-3 font-mono text-emerald-500">{trackerBreakdown.reduce((s, t) => s + (t.states["resolved"] ?? 0), 0)}</td>
-                  </tr>
-                </tbody>
-              </table>
+            <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
+              {trackerBreakdown.map((t) => (
+                <div key={t.id} className="rounded-xl border border-border/50 p-4 hover:bg-muted/20 transition-colors">
+                  <div className="flex items-center gap-2 mb-2">
+                    <span className="w-2.5 h-2.5 rounded-full shrink-0" style={{ background: t.color }} />
+                    <span className="text-xs font-medium text-muted-foreground">{t.label}</span>
+                  </div>
+                  <p className="text-3xl font-bold text-foreground">{t.total}</p>
+                  <p className="text-[11px] text-muted-foreground mt-1">
+                    {t.total === 1 ? "ticket" : "tickets"} in period
+                  </p>
+                </div>
+              ))}
             </div>
           ) : (
             <p className="text-sm text-muted-foreground text-center py-8">No tracker tickets in this period</p>
