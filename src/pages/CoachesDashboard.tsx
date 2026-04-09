@@ -3,14 +3,18 @@ import { Card, CardContent } from "@/components/ui/card";
 import { useCoachesMeetings, useCircleSLA } from "@/hooks/use-coaches";
 import type { MeetingRecord, CirclePost } from "@/hooks/use-coaches";
 import {
+  AreaChart,
+  Area,
   BarChart,
   Bar,
+  CartesianGrid,
   XAxis,
   YAxis,
   Tooltip,
   ResponsiveContainer,
   Cell,
 } from "recharts";
+import { GRID, TICK, TOOLTIP_STYLE as CHART_TOOLTIP } from "@/lib/chart-theme";
 import {
   Clock,
   CheckCircle2,
@@ -221,6 +225,35 @@ export default function CoachesDashboard() {
     return map;
   }, [monthlyMeetings]);
 
+  // Daily coaching calls over time
+  const dailyCalls = useMemo(() => {
+    const map: Record<string, { total: number; completed: number }> = {};
+    // Fill all days of the month
+    const daysInMonth = new Date(now.getFullYear(), now.getMonth() + 1, 0).getDate();
+    for (let d = 1; d <= daysInMonth; d++) {
+      const iso = fmtDate(new Date(now.getFullYear(), now.getMonth(), d));
+      map[iso] = { total: 0, completed: 0 };
+    }
+    monthlyMeetings.forEach((r) => {
+      const date = r.fields["Event Start Date Only (NZT)"] ?? "";
+      if (date && map[date]) {
+        map[date].total++;
+        const status = r.fields["Meeting Status"];
+        if (Array.isArray(status) && status.includes("Completed")) {
+          map[date].completed++;
+        }
+      }
+    });
+    return Object.entries(map)
+      .sort(([a], [b]) => a.localeCompare(b))
+      .map(([date, counts]) => ({
+        date,
+        label: `${date.split("-")[2]}/${date.split("-")[1]}`,
+        total: counts.total,
+        completed: counts.completed,
+      }));
+  }, [monthlyMeetings]);
+
   const loading = meetingsLoading || circleLoading;
   const error = meetingsError ?? circleError;
 
@@ -249,6 +282,42 @@ export default function CoachesDashboard() {
           loading={loading}
         />
       </div>
+
+      {/* ── Coaching Calls Over Time ─────────────────────── */}
+      <Card className="border-border/50">
+        <CardContent className="p-5">
+          <div className="flex items-start justify-between mb-4">
+            <div>
+              <h3 className="text-sm font-semibold text-foreground">Coaching Calls Over Time</h3>
+              <p className="text-xs text-muted-foreground mt-0.5">{monthLabel} · {monthlyMeetings.length} total calls</p>
+            </div>
+          </div>
+          <ResponsiveContainer width="100%" height={200}>
+            <AreaChart data={dailyCalls} margin={{ top: 5, right: 10, left: -10, bottom: 0 }}>
+              <defs>
+                <linearGradient id="callsGrad" x1="0" y1="0" x2="0" y2="1">
+                  <stop offset="5%" stopColor="#6366f1" stopOpacity={0.2} />
+                  <stop offset="95%" stopColor="#6366f1" stopOpacity={0} />
+                </linearGradient>
+                <linearGradient id="completedGrad" x1="0" y1="0" x2="0" y2="1">
+                  <stop offset="5%" stopColor="#10b981" stopOpacity={0.2} />
+                  <stop offset="95%" stopColor="#10b981" stopOpacity={0} />
+                </linearGradient>
+              </defs>
+              <CartesianGrid strokeDasharray="3 3" stroke={GRID} vertical={false} />
+              <XAxis dataKey="label" tick={{ fontSize: 10, fill: TICK }} axisLine={{ stroke: GRID }} tickLine={false} interval="preserveStartEnd" />
+              <YAxis tick={{ fontSize: 10, fill: TICK }} axisLine={false} tickLine={false} allowDecimals={false} />
+              <Tooltip cursor={false} contentStyle={CHART_TOOLTIP} />
+              <Area type="monotone" dataKey="total" name="Total Calls" stroke="#6366f1" strokeWidth={2} fill="url(#callsGrad)" dot={false} activeDot={{ r: 4, fill: "#6366f1" }} />
+              <Area type="monotone" dataKey="completed" name="Completed" stroke="#10b981" strokeWidth={2} fill="url(#completedGrad)" dot={false} activeDot={{ r: 4, fill: "#10b981" }} />
+            </AreaChart>
+          </ResponsiveContainer>
+          <div className="flex items-center gap-4 justify-center mt-2 text-[11px]">
+            <div className="flex items-center gap-1.5"><span className="w-3 h-0.5 rounded bg-indigo-500" /> Total Calls</div>
+            <div className="flex items-center gap-1.5"><span className="w-3 h-0.5 rounded bg-emerald-500" /> Completed</div>
+          </div>
+        </CardContent>
+      </Card>
 
       {/* ── Circle SLA Monitor ───────────────────────────── */}
       <Card className="border-border/50">
