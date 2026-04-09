@@ -155,10 +155,13 @@ export default function CoachesDashboard() {
   );
 
   const avgResponseTime = useMemo(() => {
+    const startMs = range.startDate ? new Date(range.startDate).getTime() : 0;
+    const endMs = range.endDate ? new Date(range.endDate + "T23:59:59").getTime() : Infinity;
     const relevant = circlePosts.filter((p) => {
       if (p.fields["Status"] !== "Complete") return false;
       if (!p.fields["Time Difference"]) return false;
-      return true;
+      const created = p.fields["Created"] ? new Date(p.fields["Created"]).getTime() : 0;
+      return created >= startMs && created <= endMs;
     });
     if (!relevant.length) return null;
     return Math.round(relevant.reduce((acc, p) => acc + (p.fields["Time Difference"] ?? 0), 0) / relevant.length);
