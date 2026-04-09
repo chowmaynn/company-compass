@@ -480,14 +480,14 @@ export default function MarketingDashboard() {
             <div className="grid grid-cols-2 lg:grid-cols-4 divide-x divide-border border-b border-border">
               <div className="px-5 py-4">
                 <p className="text-[10px] text-muted-foreground uppercase tracking-wider font-semibold mb-1">Cold Subscribers</p>
-                <p className="text-2xl font-bold text-status-yellow">{kit.loading ? <LoadingDots /> : fmt(kit.coldSubscribers)}</p>
+                <p className="text-2xl font-bold text-blue-500">{kit.loading ? <LoadingDots /> : fmt(kit.coldSubscribers)}</p>
                 <p className="text-xs text-muted-foreground mt-1">~1–2% est. accuracy</p>
               </div>
               <div className="px-5 py-4">
                 <p className="text-[10px] text-muted-foreground uppercase tracking-wider font-semibold mb-1">Total List</p>
                 <p className="text-2xl font-bold text-foreground">{kit.loading ? <LoadingDots /> : fmt(kit.activeSubscribers)}</p>
                 <p className="text-xs text-muted-foreground mt-1">
-                  {kit.newSubscribers != null ? `+${fmt(kit.newSubscribers)} new this period` : "Active subscribers"}
+                  {kit.newSubscribers != null ? `+${fmt(kit.newSubscribers)} new this period` : "All subscribers"}
                 </p>
               </div>
               <div className="px-5 py-4">
