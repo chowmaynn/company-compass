@@ -336,7 +336,8 @@ export function BookingKPITracker() {
   const now = new Date();
   const [year, setYear]   = useState(now.getFullYear());
   const [month, setMonth] = useState(now.getMonth());
-  const [bg, setBg]       = useState("hsl(var(--card))");
+  const isDark = document.documentElement.classList.contains("dark");
+  const [bg, setBg]       = useState(isDark ? "#212121" : "#ffffff");
   const [state, setState] = useState<TrackerState>({ days: {}, targets: {} });
 
   const days  = useMemo(() => getDaysInMonth(year, month), [year, month]);
@@ -578,15 +579,16 @@ export function BookingKPITracker() {
     return map;
   }, [broadcasts]);
 
-  // Resolve the actual card background color so sticky cells are truly opaque
+  // Observe theme changes and update frozen sidebar bg
   useEffect(() => {
-    const el = document.createElement("div");
-    el.className = "bg-card";
-    el.style.cssText = "position:absolute;visibility:hidden";
-    document.body.appendChild(el);
-    const c = getComputedStyle(el).backgroundColor;
-    document.body.removeChild(el);
-    if (c && c !== "rgba(0, 0, 0, 0)") setBg(c);
+    function updateBg() {
+      const dark = document.documentElement.classList.contains("dark");
+      setBg(dark ? "#212121" : "#ffffff");
+    }
+    updateBg();
+    const observer = new MutationObserver(updateBg);
+    observer.observe(document.documentElement, { attributes: true, attributeFilter: ["class"] });
+    return () => observer.disconnect();
   }, []);
 
   // Load from Supabase when month changes
