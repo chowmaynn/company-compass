@@ -252,12 +252,54 @@ const NOTE_CHANNELS = [
 interface DayData { note: string; socialUrls?: string[]; values: Partial<Record<MetricName, string>>; }
 interface TrackerState { days: Record<string, DayData>; targets: Partial<Record<MetricName, string>>; }
 
-function storageKey(y: number, m: number) { return `booking-kpi-${y}-${String(m + 1).padStart(2, "0")}`; }
-function loadState(y: number, m: number): TrackerState {
-  try { const r = localStorage.getItem(storageKey(y, m)); if (r) return JSON.parse(r); } catch {}
-  return { days: {}, targets: {} };
+const COMPASS_URL = import.meta.env.VITE_COMPASS_SUPABASE_URL;
+const COMPASS_KEY = import.meta.env.VITE_COMPASS_SUPABASE_ANON_KEY;
+
+async function loadStateFromSupabase(y: number, m: number): Promise<TrackerState> {
+  const mm = `${y}-${String(m + 1).padStart(2, "0")}`;
+  try {
+    const res = await fetch(
+      `${COMPASS_URL}/rest/v1/booking_tracker?month=eq.${mm}&select=*`,
+      { headers: { apikey: COMPASS_KEY, Authorization: `Bearer ${COMPASS_KEY}` } }
+    );
+    if (!res.ok) return { days: {}, targets: {} };
+    const rows: { type: string; day_date: string | null; metric: string | null; value: string | null; social_urls: string[] | null }[] = await res.json();
+
+    const state: TrackerState = { days: {}, targets: {} };
+    for (const row of rows) {
+      if (row.type === "target" && row.metric) {
+        state.targets[row.metric as MetricName] = row.value ?? "";
+      } else if (row.type === "note" && row.day_date) {
+        const day = row.day_date;
+        if (!state.days[day]) state.days[day] = { note: "", values: {} };
+        state.days[day].note = row.value ?? "";
+      } else if (row.type === "social" && row.day_date) {
+        const day = row.day_date;
+        if (!state.days[day]) state.days[day] = { note: "", values: {} };
+        state.days[day].socialUrls = row.social_urls ?? [];
+      }
+    }
+    return state;
+  } catch {
+    return { days: {}, targets: {} };
+  }
 }
-function saveState(y: number, m: number, s: TrackerState) { localStorage.setItem(storageKey(y, m), JSON.stringify(s)); }
+
+async function upsertTracker(month: string, type: string, metric: string | null, dayDate: string | null, value: string | null, socialUrls: string[] | null) {
+  const body: Record<string, unknown> = {
+    month, type, metric, day_date: dayDate, value, social_urls: socialUrls, updated_at: new Date().toISOString(),
+  };
+  await fetch(`${COMPASS_URL}/rest/v1/booking_tracker`, {
+    method: "POST",
+    headers: {
+      apikey: COMPASS_KEY,
+      Authorization: `Bearer ${COMPASS_KEY}`,
+      "Content-Type": "application/json",
+      Prefer: "resolution=merge-duplicates",
+    },
+    body: JSON.stringify(body),
+  });
+}
 function getDaysInMonth(y: number, m: number): Date[] {
   const out: Date[] = []; const d = new Date(y, m, 1);
   while (d.getMonth() === m) { out.push(new Date(d)); d.setDate(d.getDate() + 1); }
@@ -272,7 +314,7 @@ export function BookingKPITracker() {
   const [year, setYear]   = useState(now.getFullYear());
   const [month, setMonth] = useState(now.getMonth());
   const [bg, setBg]       = useState("#1B1B1B");
-  const [state, setState] = useState<TrackerState>(() => loadState(now.getFullYear(), now.getMonth()));
+  const [state, setState] = useState<TrackerState>({ days: {}, targets: {} });
 
   const days  = useMemo(() => getDaysInMonth(year, month), [year, month]);
   const today = toISO(now);
@@ -518,23 +560,33 @@ export function BookingKPITracker() {
     setBg("#1B1B1B");
   }, []);
 
-  useEffect(() => { setState(loadState(year, month)); }, [year, month]);
-  useEffect(() => { saveState(year, month, state); }, [state, year, month]);
+  // Load from Supabase when month changes
+  useEffect(() => {
+    loadStateFromSupabase(year, month).then(setState);
+  }, [year, month]);
+
+  const mm = `${year}-${String(month + 1).padStart(2, "0")}`;
 
   function getDayData(d: Date): DayData { return state.days[toISO(d)] ?? { note: "", values: {} }; }
 
   function updateNote(d: Date, note: string) {
-    setState(p => ({ ...p, days: { ...p.days, [toISO(d)]: { ...getDayData(d), note } } }));
+    const iso = toISO(d);
+    setState(p => ({ ...p, days: { ...p.days, [iso]: { ...getDayData(d), note } } }));
+    upsertTracker(mm, "note", null, iso, note, null);
   }
   function addSocialUrl(d: Date, url: string) {
+    const iso = toISO(d);
     const cur = getDayData(d);
     const urls = [...(cur.socialUrls || []), url];
-    setState(p => ({ ...p, days: { ...p.days, [toISO(d)]: { ...cur, socialUrls: urls } } }));
+    setState(p => ({ ...p, days: { ...p.days, [iso]: { ...cur, socialUrls: urls } } }));
+    upsertTracker(mm, "social", null, iso, null, urls);
   }
   function removeSocialUrl(d: Date, index: number) {
+    const iso = toISO(d);
     const cur = getDayData(d);
     const urls = (cur.socialUrls || []).filter((_, i) => i !== index);
-    setState(p => ({ ...p, days: { ...p.days, [toISO(d)]: { ...cur, socialUrls: urls } } }));
+    setState(p => ({ ...p, days: { ...p.days, [iso]: { ...cur, socialUrls: urls } } }));
+    upsertTracker(mm, "social", null, iso, null, urls);
   }
   function updateValue(d: Date, metric: MetricName, value: string) {
     const cur = getDayData(d);
@@ -542,6 +594,7 @@ export function BookingKPITracker() {
   }
   function updateTarget(metric: MetricName, value: string) {
     setState(p => ({ ...p, targets: { ...p.targets, [metric]: value } }));
+    upsertTracker(mm, "target", metric, null, value, null);
   }
 
   // Helper to get the effective value for a metric on a day (API or localStorage)
