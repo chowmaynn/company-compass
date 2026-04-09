@@ -4,6 +4,7 @@ import { type VideoItem } from "@/lib/youtube";
 import { fetchBroadcastsInRange, type BroadcastItem } from "@/lib/kit";
 import { fetchDailyActiveUsers } from "@/lib/google-analytics";
 import { useSupabaseMetrics } from "@/hooks/use-supabase-metrics";
+import { LoadingDots } from "@/components/LoadingDots";
 
 // ─── Note Popover ─────────────────────────────────────────────────────────────
 
@@ -287,6 +288,7 @@ export function BookingKPITracker() {
   // Fetch Skool joins per day — cached in React state (useRef) across month switches
   const skoolCache = useRef<Record<string, Record<string, number>>>({});
   const [skoolJoinsByDate, setSkoolJoinsByDate] = useState<Record<string, number>>({});
+  const [skoolLoading, setSkoolLoading] = useState(true);
   useEffect(() => {
     let cancelled = false;
     const mm = String(month + 1).padStart(2, "0");
@@ -295,11 +297,13 @@ export function BookingKPITracker() {
     // Use in-memory cache if available
     if (skoolCache.current[cacheKey] && Object.keys(skoolCache.current[cacheKey]).length > 0) {
       setSkoolJoinsByDate(skoolCache.current[cacheKey]);
+      setSkoolLoading(false);
       // Past months: don't refetch
       const currentMonth = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, "0")}`;
       if (cacheKey !== currentMonth) return;
     } else {
       setSkoolJoinsByDate({});
+      setSkoolLoading(true);
     }
 
     const SKOOL_BASE = "/api/skool-supabase";
@@ -328,9 +332,12 @@ export function BookingKPITracker() {
         await new Promise(r => setTimeout(r, 100));
       }
 
-      if (!cancelled && Object.keys(result).length > 0) {
-        skoolCache.current[cacheKey] = result;
-        setSkoolJoinsByDate(result);
+      if (!cancelled) {
+        if (Object.keys(result).length > 0) {
+          skoolCache.current[cacheKey] = result;
+          setSkoolJoinsByDate(result);
+        }
+        setSkoolLoading(false);
       }
     }
 
@@ -796,6 +803,18 @@ export function BookingKPITracker() {
                         const computed = getComputed(d, metric);
                         const cs       = cellStyle(computed, metric);
                         const todayBg  = "rgba(99,102,241,0.1)";
+                        // Show loading dots for Skool Joins while fetching
+                        const isSkoolMetric = metric === "Skool Joins";
+                        if (isSkoolMetric && skoolLoading && d <= now) {
+                          return (
+                            <td key={iso} style={{ width: W_DAY, minWidth: W_DAY, borderRight: B_ROW, borderBottom: rowBorderBottom, padding: 2, backgroundColor: isToday ? todayBg : section.rowTint }}>
+                              <span style={{ display: "flex", justifyContent: "center", alignItems: "center", height: 24 }}>
+                                <LoadingDots className="scale-50" />
+                              </span>
+                            </td>
+                          );
+                        }
+
                         const apiVal   = METRIC_SOURCE_MAP[metric] ? getApiValue(iso, metric) : null;
                         const hasApi   = apiVal !== null && apiVal > 0;
 
