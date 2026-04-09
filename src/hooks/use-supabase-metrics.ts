@@ -15,6 +15,7 @@ const OVERALL = "__overall__";
 
 function buildCube(rows: RawMetricRow[]): DataCube {
   const cube: DataCube = {};
+  if (!Array.isArray(rows)) return cube;
   rows.forEach((row) => {
     const date = row.metric_date.substring(0, 10);
     const cat = row.category ?? OVERALL;
@@ -34,7 +35,8 @@ async function fetchDynamicMetrics(from: string, to: string): Promise<RawMetricR
     body: JSON.stringify({ sql_query: `SELECT * FROM get_dynamic_metrics('${from}', '${to}')` }),
   });
   if (!res.ok) throw new Error(`Supabase ${res.status}`);
-  return res.json();
+  const data = await res.json();
+  return Array.isArray(data) ? data : [];
 }
 
 export interface DailyBooking {
