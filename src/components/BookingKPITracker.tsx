@@ -718,7 +718,7 @@ export function BookingKPITracker() {
       return { position: "sticky", left: L_AVG, zIndex: 10, backgroundColor: bg,
         width: W_AVG, minWidth: W_AVG,
         borderRight: B_PANEL, borderBottom: B_ROW,
-        boxShadow: "4px 0 10px rgba(0,0,0,0.35)", ...rest };
+        boxShadow: bg === "#212121" ? "4px 0 10px rgba(0,0,0,0.35)" : "4px 0 8px rgba(0,0,0,0.08)", ...rest };
     },
   };
 
