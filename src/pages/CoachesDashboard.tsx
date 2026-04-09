@@ -147,31 +147,18 @@ export default function CoachesDashboard() {
   const now = new Date();
   const [expandedDay, setExpandedDay] = useState<string | null>(today);
 
-  // ── Stat calculations ──────────────────────────────────────
+  // ── Stat calculations (based on selected date range) ────────
 
-  const totalToday = todaysMeetings.length;
-
-  const completedToday = useMemo(
-    () => todaysMeetings.filter((r) => Array.isArray(r.fields["Meeting Status"]) && r.fields["Meeting Status"].includes("Completed")).length,
-    [todaysMeetings]
-  );
-
-  const upcomingToday = useMemo(
-    () => todaysMeetings.filter((r) => {
-      const s = r.fields["Meeting Status"];
-      if (!Array.isArray(s)) return true;
-      return !s.includes("Completed") && !s.includes("Cancelled");
-    }).length,
-    [todaysMeetings]
+  const completedInRange = useMemo(
+    () => monthlyMeetings.filter((r) => Array.isArray(r.fields["Meeting Status"]) && r.fields["Meeting Status"].includes("Completed")).length,
+    [monthlyMeetings]
   );
 
   const avgResponseTime = useMemo(() => {
-    const thirtyDaysAgo = Date.now() - 30 * 24 * 60 * 60 * 1000;
     const relevant = circlePosts.filter((p) => {
       if (p.fields["Status"] !== "Complete") return false;
       if (!p.fields["Time Difference"]) return false;
-      const created = p.fields["Created"] ? new Date(p.fields["Created"]).getTime() : 0;
-      return created > thirtyDaysAgo;
+      return true;
     });
     if (!relevant.length) return null;
     return Math.round(relevant.reduce((acc, p) => acc + (p.fields["Time Difference"] ?? 0), 0) / relevant.length);
@@ -272,14 +259,19 @@ export default function CoachesDashboard() {
       </div>
 
       {/* ── Stats bar ────────────────────────────────────── */}
-      <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-        <StatCard label="Total Calls Today" value={totalToday} icon={CalendarDays} loading={loading} />
-        <StatCard label="Completed Today" value={completedToday} accent="text-emerald-600" icon={CheckCircle2} loading={loading} />
-        <StatCard label="Upcoming Today" value={upcomingToday} accent="text-blue-600" icon={Clock} loading={loading} />
+      <div className="grid grid-cols-2 gap-4">
+        <StatCard
+          label="Calls Completed"
+          value={completedInRange}
+          sub={`${monthlyMeetings.length} total in period`}
+          accent="text-emerald-600"
+          icon={CheckCircle2}
+          loading={loading}
+        />
         <StatCard
           label="Avg Circle Response"
           value={avgResponseTime !== null ? `${avgResponseTime}m` : "—"}
-          sub="Last 30 days · Complete posts"
+          sub="Complete posts in period"
           accent={
             avgResponseTime === null ? "text-foreground"
               : avgResponseTime < 720 ? "text-emerald-600"
