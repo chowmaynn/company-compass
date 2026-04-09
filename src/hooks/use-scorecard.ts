@@ -374,8 +374,26 @@ export function useScorecard(month: string = DEFAULT_MONTH) {
       let updated = m;
       const source = API_METRIC_MAP[m.name];
 
+      // NPS: fill current and past weeks + catch-up with the all-time NPS score
+      if (m.name === "NPS Score - 2 months" || m.name === "NPS Score - 6 Months") {
+        const field = m.name.includes("2") ? "2 months" : "6 months";
+        const match = tallyNps.results.find((r) =>
+          r.formName.toLowerCase().includes(field.toLowerCase())
+        );
+        if (match && !match.loading) {
+          const score = match.score;
+          const newWeeks = [...m.weeks];
+          // Fill weeks up to and including current week (or all weeks for past months)
+          const maxWeek = isCurrentMonth ? Math.min(cwi, 3) : 3;
+          for (let w = 0; w <= maxWeek; w++) {
+            newWeeks[w] = { ...newWeeks[w], actual: score };
+          }
+          updated = { ...m, weeks: newWeeks, catchUp: { ...m.catchUp, actual: score } };
+        }
+      }
+
       // Sales tracking: overlay ALL weeks + catch-up (data comes from Supabase sales_tracking table)
-      if (source?.hook === "salesTracking") {
+      else if (source?.hook === "salesTracking") {
         const field = source.field as keyof import("@/hooks/use-sales-tracking").WeekMetrics;
         let changed = false;
         const newWeeks = [...m.weeks];
