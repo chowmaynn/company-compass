@@ -1,35 +1,45 @@
 import { useMemo, useState } from "react";
-import { useIntercom } from "@/hooks/use-intercom";
+import { useIntercomTickets, type TrackerBreakdown } from "@/hooks/use-intercom";
+import { TRACKER_TYPES } from "@/lib/intercom";
 import { Card, CardContent } from "@/components/ui/card";
-import { elapsed, fmtDuration } from "@/lib/dates";
+import { DateRangePicker, type DateRangeValue } from "@/components/DateRangePicker";
 import {
   AreaChart,
   Area,
   BarChart,
   Bar,
+  PieChart,
+  Pie,
+  Cell,
   XAxis,
   YAxis,
   CartesianGrid,
   Tooltip,
   ResponsiveContainer,
-  Cell,
+  Legend,
 } from "recharts";
 import {
   MessageSquare,
   Clock,
-  AlertCircle,
   CheckCircle2,
   Loader2,
-  Inbox,
   ExternalLink,
 } from "lucide-react";
 
+import { GRID, TICK } from "@/lib/chart-theme";
+import { StatCard } from "@/components/StatCard";
+import { DashboardShell } from "@/components/DashboardShell";
+import { fmtDuration } from "@/lib/dates";
+
 // ── Helpers ───────────────────────────────────────────────────
 
-function stripHtml(html?: string): string {
-  if (!html) return "—";
-  return html.replace(/<[^>]*>/g, "").trim() || "—";
-}
+const TOOLTIP_STYLE: React.CSSProperties = {
+  backgroundColor: "hsl(var(--card))",
+  border: "1px solid hsl(var(--border))",
+  borderRadius: "8px",
+  fontSize: "12px",
+  color: "hsl(var(--foreground))",
+};
 
 function dayKey(ts: number): string {
   const d = new Date(ts * 1000);
@@ -41,169 +51,124 @@ function dayLabel(key: string): string {
   return `${d}/${m}`;
 }
 
-import { GRID, TICK } from "@/lib/chart-theme";
-
-const TOOLTIP_STYLE: React.CSSProperties = {
-  backgroundColor: "hsl(var(--card))",
-  border: "1px solid hsl(var(--border))",
-  borderRadius: "8px",
-  fontSize: "12px",
-  color: "hsl(var(--foreground))",
-};
-
-const DAY_PRESETS = [
-  { label: "7d", days: 7 },
-  { label: "14d", days: 14 },
-  { label: "30d", days: 30 },
-  { label: "60d", days: 60 },
-  { label: "90d", days: 90 },
-];
-
-import { StatCard } from "@/components/StatCard";
-import { DashboardShell } from "@/components/DashboardShell";
-
 // ── Main ──────────────────────────────────────────────────────
 
 export default function SupportDashboard() {
-  const [days, setDays] = useState(30);
-  const { recent, inbox, inboxTotal, loading, error } = useIntercom(days);
+  const [range, setRange] = useState<DateRangeValue>({ start: "", end: "", startDate: "", endDate: "" });
+  const { tickets, totalTickets, resolvedCount, openCount, trackerBreakdown, loading, error } = useIntercomTickets(range.start, range.end);
 
   // ── Derived stats ─────────────────────────────────────────
 
-  const closedRecent = useMemo(() => recent.filter((c) => c.state === "closed").length, [recent]);
-  const openRecent = useMemo(() => recent.filter((c) => c.state === "open").length, [recent]);
-
-  const awaitingReply = useMemo(
-    () => inbox.filter((c) => c.waiting_since !== null).length,
-    [inbox]
-  );
-
-  const avgResponseTime = useMemo(() => {
-    const times = recent
-      .map((c) => c.statistics?.time_to_admin_reply)
-      .filter((t): t is number => typeof t === "number" && t > 0);
-    if (!times.length) return null;
-    return Math.round(times.reduce((a, b) => a + b, 0) / times.length);
-  }, [recent]);
-
   const resolutionRate = useMemo(() => {
-    if (!recent.length) return null;
-    return Math.round((closedRecent / recent.length) * 100);
-  }, [recent, closedRecent]);
+    if (!totalTickets) return null;
+    return Math.round((resolvedCount / totalTickets) * 100);
+  }, [resolvedCount, totalTickets]);
 
-  // Daily volume — fill all days in range
+  // Daily ticket volume — fill all days in range
   const dailyVolume = useMemo(() => {
+    if (!range.startDate || !range.endDate) return [];
     const map: Record<string, number> = {};
-    for (let i = days - 1; i >= 0; i--) {
-      const d = new Date();
-      d.setDate(d.getDate() - i);
+    const start = new Date(range.startDate);
+    const end = new Date(range.endDate);
+    for (let d = new Date(start); d <= end; d.setDate(d.getDate() + 1)) {
       const key = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
       map[key] = 0;
     }
-    recent.forEach((c) => {
-      const key = dayKey(c.created_at);
+    tickets.forEach((t) => {
+      const key = dayKey(t.created_at);
       if (key in map) map[key]++;
     });
     return Object.entries(map).map(([key, count]) => ({ key, label: dayLabel(key), count }));
-  }, [recent, days]);
+  }, [tickets, range.startDate, range.endDate]);
 
-  // Response time distribution
-  const responseDistribution = useMemo(() => {
-    const buckets = [
-      { label: "< 1h", max: 3600, colour: "#10b981" },
-      { label: "1–4h", max: 14400, colour: "#6366f1" },
-      { label: "4–12h", max: 43200, colour: "#f59e0b" },
-      { label: "12–24h", max: 86400, colour: "#f97316" },
-      { label: "> 24h", max: Infinity, colour: "#f43f5e" },
-    ];
+  // Tracker donut data
+  const donutData = useMemo(() =>
+    trackerBreakdown.filter((t) => t.total > 0).map((t) => ({
+      name: t.label,
+      value: t.total,
+      color: t.color,
+    })),
+    [trackerBreakdown]
+  );
 
-    const times = recent
-      .map((c) => c.statistics?.time_to_admin_reply)
-      .filter((t): t is number => typeof t === "number" && t > 0);
-
-    let prev = 0;
-    return buckets.map((b) => {
-      const count = times.filter((t) => t > prev && t <= b.max).length;
-      prev = b.max;
-      return { ...b, count };
-    });
-  }, [recent]);
-
-  // Inbox — sorted longest wait first
-  const sortedInbox = useMemo(() =>
-    [...inbox]
-      .sort((a, b) => {
-        const aWaiting = a.waiting_since ?? 0;
-        const bWaiting = b.waiting_since ?? 0;
-        if (aWaiting && !bWaiting) return -1;
-        if (!aWaiting && bWaiting) return 1;
-        return aWaiting - bWaiting;
-      })
-      .slice(0, 50),
-    [inbox]
+  const totalTrackerTickets = useMemo(() =>
+    trackerBreakdown.reduce((s, t) => s + t.total, 0),
+    [trackerBreakdown]
   );
 
   return (
-    <DashboardShell loading={loading} error={error} loadingMessage="Loading Intercom data\u2026">
+    <DashboardShell loading={loading} error={error} loadingMessage="Loading support tickets…">
     <div className="space-y-5">
 
       {/* ── Date range selector ─────────────────────────────── */}
-      <div className="flex items-center gap-1 bg-muted rounded-lg p-1 w-fit">
-        {DAY_PRESETS.map((p) => (
-          <button
-            key={p.days}
-            onClick={() => setDays(p.days)}
-            className={`px-3 py-1.5 rounded-md text-sm font-medium transition-all ${
-              days === p.days
-                ? "bg-card text-foreground shadow-sm"
-                : "text-muted-foreground hover:text-foreground"
-            }`}
-          >
-            {p.label}
-          </button>
-        ))}
+      <div className="flex justify-end">
+        <DateRangePicker defaultPreset="MTD" onChange={setRange} />
       </div>
 
       {/* ── Stats row ──────────────────────────────────────── */}
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
         <StatCard
-          label={`Total (${days}d)`}
-          value={recent.length}
-          sub={`${closedRecent} resolved · ${openRecent} open`}
+          label="Support Tickets"
+          value={totalTickets}
+          sub={`${resolvedCount} resolved · ${openCount} open`}
           icon={MessageSquare}
           accent="text-indigo-600"
           bg="bg-indigo-50 dark:bg-indigo-950/40"
         />
         <StatCard
-          label="Your Inbox"
-          value={inboxTotal}
-          sub="Open & assigned to you"
-          icon={Inbox}
+          label="Resolution Rate"
+          value={resolutionRate !== null ? `${resolutionRate}%` : "—"}
+          sub="Resolved ÷ Total"
+          icon={CheckCircle2}
+          accent={
+            resolutionRate === null ? "text-foreground"
+            : resolutionRate >= 70 ? "text-emerald-600"
+            : resolutionRate >= 50 ? "text-amber-600"
+            : "text-red-600"
+          }
+          bg={
+            resolutionRate === null ? "bg-muted"
+            : resolutionRate >= 70 ? "bg-emerald-50 dark:bg-emerald-950/40"
+            : resolutionRate >= 50 ? "bg-amber-50 dark:bg-amber-950/40"
+            : "bg-red-50 dark:bg-red-950/40"
+          }
+        />
+        <StatCard
+          label="Tracker Tickets"
+          value={totalTrackerTickets}
+          sub="Billing · Cancel · General · Refund"
+          icon={Clock}
           accent="text-blue-600"
           bg="bg-blue-50 dark:bg-blue-950/40"
         />
-        <StatCard
-          label="Awaiting Reply"
-          value={awaitingReply}
-          sub="Customer replied last"
-          icon={AlertCircle}
-          accent={awaitingReply > 20 ? "text-red-600" : awaitingReply > 10 ? "text-amber-600" : "text-emerald-600"}
-          bg={awaitingReply > 20 ? "bg-red-50 dark:bg-red-950/40" : awaitingReply > 10 ? "bg-amber-50 dark:bg-amber-950/40" : "bg-emerald-50 dark:bg-emerald-950/40"}
-        />
-        <StatCard
-          label="Avg First Response"
-          value={avgResponseTime !== null ? fmtDuration(avgResponseTime) : "—"}
-          sub={resolutionRate !== null ? `${resolutionRate}% resolved (${days}d)` : `${days}d window`}
-          icon={Clock}
-          accent={
-            avgResponseTime === null ? "text-foreground"
-            : avgResponseTime < 3600 ? "text-emerald-600"
-            : avgResponseTime < 14400 ? "text-indigo-600"
-            : avgResponseTime < 43200 ? "text-amber-600"
-            : "text-red-600"
-          }
-          bg="bg-muted"
-        />
+
+        {/* Tracker donut */}
+        <Card className="border-border/50">
+          <CardContent className="p-4 flex items-center gap-3">
+            {donutData.length > 0 ? (
+              <>
+                <ResponsiveContainer width={80} height={80}>
+                  <PieChart>
+                    <Pie data={donutData} cx="50%" cy="50%" innerRadius={22} outerRadius={36} paddingAngle={2} dataKey="value">
+                      {donutData.map((d, i) => <Cell key={i} fill={d.color} />)}
+                    </Pie>
+                  </PieChart>
+                </ResponsiveContainer>
+                <div className="space-y-1">
+                  {donutData.map((d) => (
+                    <div key={d.name} className="flex items-center gap-2 text-[11px]">
+                      <span className="w-2 h-2 rounded-full shrink-0" style={{ background: d.color }} />
+                      <span className="text-muted-foreground">{d.name}</span>
+                      <span className="font-mono font-semibold text-foreground">{d.value}</span>
+                    </div>
+                  ))}
+                </div>
+              </>
+            ) : (
+              <p className="text-xs text-muted-foreground text-center w-full py-4">No tracker data</p>
+            )}
+          </CardContent>
+        </Card>
       </div>
 
       {/* ── Volume trend ───────────────────────────────────── */}
@@ -211,130 +176,42 @@ export default function SupportDashboard() {
         <CardContent className="p-5">
           <div className="flex items-start justify-between mb-4">
             <div>
-              <h3 className="text-sm font-semibold text-foreground">Conversation Volume</h3>
-              <p className="text-xs text-muted-foreground mt-0.5">New conversations per day — last {days} days</p>
+              <h3 className="text-sm font-semibold text-foreground">Support Ticket Volume</h3>
+              <p className="text-xs text-muted-foreground mt-0.5">Real support tickets per day</p>
             </div>
             <span className="text-xs font-mono text-indigo-600 font-semibold bg-indigo-50 dark:bg-indigo-950/40 px-2 py-1 rounded-lg">
-              {recent.length} total
+              {totalTickets} total
             </span>
           </div>
-          <ResponsiveContainer width="100%" height={200}>
-            <AreaChart data={dailyVolume} margin={{ top: 5, right: 10, left: -10, bottom: 0 }}>
-              <defs>
-                <linearGradient id="volGrad" x1="0" y1="0" x2="0" y2="1">
-                  <stop offset="5%" stopColor="#6366f1" stopOpacity={0.2} />
-                  <stop offset="95%" stopColor="#6366f1" stopOpacity={0} />
-                </linearGradient>
-              </defs>
-              <CartesianGrid strokeDasharray="3 3" stroke={GRID} vertical={false} />
-              <XAxis dataKey="label" tick={{ fontSize: 10, fill: TICK }} axisLine={{ stroke: GRID }} tickLine={false} interval={Math.max(1, Math.floor(days / 10))} />
-              <YAxis tick={{ fontSize: 10, fill: TICK }} axisLine={false} tickLine={false} allowDecimals={false} />
-              <Tooltip cursor={false} contentStyle={TOOLTIP_STYLE} formatter={(v: number) => [v, "Conversations"]} />
-              <Area type="monotone" dataKey="count" stroke="#6366f1" strokeWidth={2} fill="url(#volGrad)" dot={false} activeDot={{ r: 4, fill: "#6366f1" }} />
-            </AreaChart>
-          </ResponsiveContainer>
+          {dailyVolume.length > 0 ? (
+            <ResponsiveContainer width="100%" height={200}>
+              <AreaChart data={dailyVolume} margin={{ top: 5, right: 10, left: -10, bottom: 0 }}>
+                <defs>
+                  <linearGradient id="volGrad" x1="0" y1="0" x2="0" y2="1">
+                    <stop offset="5%" stopColor="#6366f1" stopOpacity={0.2} />
+                    <stop offset="95%" stopColor="#6366f1" stopOpacity={0} />
+                  </linearGradient>
+                </defs>
+                <CartesianGrid strokeDasharray="3 3" stroke={GRID} vertical={false} />
+                <XAxis dataKey="label" tick={{ fontSize: 10, fill: TICK }} axisLine={{ stroke: GRID }} tickLine={false} interval="preserveStartEnd" />
+                <YAxis tick={{ fontSize: 10, fill: TICK }} axisLine={false} tickLine={false} allowDecimals={false} />
+                <Tooltip cursor={false} contentStyle={TOOLTIP_STYLE} formatter={(v: number) => [v, "Tickets"]} />
+                <Area type="monotone" dataKey="count" stroke="#6366f1" strokeWidth={2} fill="url(#volGrad)" dot={false} activeDot={{ r: 4, fill: "#6366f1" }} />
+              </AreaChart>
+            </ResponsiveContainer>
+          ) : (
+            <p className="text-sm text-muted-foreground text-center py-8">No data for this period</p>
+          )}
         </CardContent>
       </Card>
 
-      {/* ── Response distribution + Resolution ─────────────── */}
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
-
-        {/* Response time distribution */}
-        <Card className="border-border/50">
-          <CardContent className="p-5">
-            <h3 className="text-sm font-semibold text-foreground mb-0.5">Response Time Distribution</h3>
-            <p className="text-xs text-muted-foreground mb-4">First response time across resolved conversations</p>
-            <ResponsiveContainer width="100%" height={180}>
-              <BarChart data={responseDistribution} barSize={36} margin={{ top: 0, right: 0, left: -15, bottom: 0 }}>
-                <CartesianGrid strokeDasharray="3 3" stroke={GRID} vertical={false} />
-                <XAxis dataKey="label" tick={{ fontSize: 11, fill: TICK }} axisLine={false} tickLine={false} />
-                <YAxis tick={{ fontSize: 11, fill: TICK }} axisLine={false} tickLine={false} allowDecimals={false} />
-                <Tooltip cursor={false} contentStyle={TOOLTIP_STYLE} formatter={(v: number) => [v, "Conversations"]} />
-                <Bar dataKey="count" radius={[4, 4, 0, 0]}>
-                  {responseDistribution.map((entry, i) => (
-                    <Cell key={i} fill={entry.colour} />
-                  ))}
-                </Bar>
-              </BarChart>
-            </ResponsiveContainer>
-          </CardContent>
-        </Card>
-
-        {/* Resolution rate + open/closed breakdown */}
-        <Card className="border-border/50">
-          <CardContent className="p-5">
-            <h3 className="text-sm font-semibold text-foreground mb-0.5">Resolution Overview</h3>
-            <p className="text-xs text-muted-foreground mb-5">Last {days} days · {recent.length} total conversations</p>
-
-            <div className="space-y-5">
-              {/* Resolution rate */}
-              <div>
-                <div className="flex items-center justify-between mb-2">
-                  <span className="text-xs font-medium text-foreground flex items-center gap-1.5">
-                    <CheckCircle2 className="h-3.5 w-3.5 text-emerald-500" />
-                    Resolution Rate
-                  </span>
-                  <span className={`text-sm font-bold ${
-                    (resolutionRate ?? 0) >= 70 ? "text-emerald-600"
-                    : (resolutionRate ?? 0) >= 50 ? "text-amber-600"
-                    : "text-red-600"
-                  }`}>
-                    {resolutionRate ?? "—"}%
-                  </span>
-                </div>
-                <div className="h-2.5 rounded-full bg-muted overflow-hidden">
-                  <div
-                    className={`h-full rounded-full transition-all ${
-                      (resolutionRate ?? 0) >= 70 ? "bg-emerald-500"
-                      : (resolutionRate ?? 0) >= 50 ? "bg-amber-500"
-                      : "bg-red-500"
-                    }`}
-                    style={{ width: `${Math.min(resolutionRate ?? 0, 100)}%` }}
-                  />
-                </div>
-              </div>
-
-              {/* Open vs closed */}
-              <div className="grid grid-cols-2 gap-3">
-                <div className="rounded-xl bg-emerald-50 dark:bg-emerald-950/40 p-3 text-center">
-                  <p className="text-2xl font-bold text-emerald-600">{closedRecent}</p>
-                  <p className="text-[11px] text-muted-foreground mt-0.5">Resolved</p>
-                </div>
-                <div className="rounded-xl bg-red-50 dark:bg-red-950/40 p-3 text-center">
-                  <p className="text-2xl font-bold text-red-500">{inboxTotal}</p>
-                  <p className="text-[11px] text-muted-foreground mt-0.5">Still Open</p>
-                </div>
-              </div>
-
-              {/* Awaiting reply breakdown */}
-              <div className="pt-3 border-t border-border">
-                <div className="flex items-center justify-between">
-                  <span className="text-xs text-muted-foreground">Awaiting your reply (of inbox)</span>
-                  <span className={`text-xs font-bold ${awaitingReply > 20 ? "text-red-600" : "text-amber-600"}`}>
-                    {awaitingReply} conversations
-                  </span>
-                </div>
-                <div className="h-1.5 rounded-full bg-muted overflow-hidden mt-1.5">
-                  <div
-                    className="h-full rounded-full bg-amber-400"
-                    style={{ width: `${inboxTotal > 0 ? Math.min((awaitingReply / inboxTotal) * 100, 100) : 0}%` }}
-                  />
-                </div>
-              </div>
-            </div>
-          </CardContent>
-        </Card>
-      </div>
-
-      {/* ── Your Inbox ─────────────────────────────────────── */}
+      {/* ── Tracker Breakdown Table ────────────────────────── */}
       <Card className="border-border/50">
         <CardContent className="p-5">
           <div className="flex items-center justify-between mb-4">
             <div>
-              <h3 className="text-sm font-semibold text-foreground">Your Inbox</h3>
-              <p className="text-xs text-muted-foreground mt-0.5">
-                {inboxTotal} open conversations assigned to you · sorted by longest wait first
-              </p>
+              <h3 className="text-sm font-semibold text-foreground">Tracker Breakdown</h3>
+              <p className="text-xs text-muted-foreground mt-0.5">Issue categorization via tracker tickets</p>
             </div>
             <a
               href="https://app.intercom.com"
@@ -346,66 +223,49 @@ export default function SupportDashboard() {
             </a>
           </div>
 
-          {sortedInbox.length === 0 ? (
-            <div className="text-center py-10 text-muted-foreground">
-              <CheckCircle2 className="h-8 w-8 mx-auto mb-2 opacity-30 text-emerald-500" />
-              <p className="text-sm">Inbox clear — no open conversations assigned to you</p>
+          {trackerBreakdown.length > 0 ? (
+            <div className="overflow-x-auto">
+              <table className="w-full text-sm">
+                <thead>
+                  <tr className="border-b border-border">
+                    <th className="text-left py-2.5 px-3 text-[10px] font-semibold text-muted-foreground uppercase tracking-wider">Category</th>
+                    <th className="text-right py-2.5 px-3 text-[10px] font-semibold text-muted-foreground uppercase tracking-wider">Total</th>
+                    <th className="text-right py-2.5 px-3 text-[10px] font-semibold text-muted-foreground uppercase tracking-wider">New</th>
+                    <th className="text-right py-2.5 px-3 text-[10px] font-semibold text-muted-foreground uppercase tracking-wider">In Progress</th>
+                    <th className="text-right py-2.5 px-3 text-[10px] font-semibold text-muted-foreground uppercase tracking-wider">Waiting</th>
+                    <th className="text-right py-2.5 px-3 text-[10px] font-semibold text-muted-foreground uppercase tracking-wider">Resolved</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {trackerBreakdown.map((t) => (
+                    <tr key={t.id} className="border-b border-border/50 hover:bg-muted/20 transition-colors">
+                      <td className="py-3 px-3">
+                        <div className="flex items-center gap-2">
+                          <span className="w-2.5 h-2.5 rounded-full shrink-0" style={{ background: t.color }} />
+                          <span className="font-medium text-foreground">{t.label}</span>
+                        </div>
+                      </td>
+                      <td className="text-right py-3 px-3 font-mono font-semibold text-foreground">{t.total}</td>
+                      <td className="text-right py-3 px-3 font-mono text-muted-foreground">{t.states["new"] ?? 0}</td>
+                      <td className="text-right py-3 px-3 font-mono text-muted-foreground">{t.states["in_progress"] ?? 0}</td>
+                      <td className="text-right py-3 px-3 font-mono text-amber-500">{t.states["waiting_on_customer"] ?? 0}</td>
+                      <td className="text-right py-3 px-3 font-mono text-emerald-500">{t.states["resolved"] ?? 0}</td>
+                    </tr>
+                  ))}
+                  {/* Totals row */}
+                  <tr className="bg-muted/30">
+                    <td className="py-3 px-3 font-semibold text-foreground">Total</td>
+                    <td className="text-right py-3 px-3 font-mono font-bold text-foreground">{totalTrackerTickets}</td>
+                    <td className="text-right py-3 px-3 font-mono text-muted-foreground">{trackerBreakdown.reduce((s, t) => s + (t.states["new"] ?? 0), 0)}</td>
+                    <td className="text-right py-3 px-3 font-mono text-muted-foreground">{trackerBreakdown.reduce((s, t) => s + (t.states["in_progress"] ?? 0), 0)}</td>
+                    <td className="text-right py-3 px-3 font-mono text-amber-500">{trackerBreakdown.reduce((s, t) => s + (t.states["waiting_on_customer"] ?? 0), 0)}</td>
+                    <td className="text-right py-3 px-3 font-mono text-emerald-500">{trackerBreakdown.reduce((s, t) => s + (t.states["resolved"] ?? 0), 0)}</td>
+                  </tr>
+                </tbody>
+              </table>
             </div>
           ) : (
-            <div className="divide-y divide-border/50">
-              {/* Header */}
-              <div className="grid grid-cols-[1fr_140px_100px_90px] gap-3 pb-2 text-[10px] font-semibold text-muted-foreground uppercase tracking-wider">
-                <span>Contact & Subject</span>
-                <span>Source</span>
-                <span>Open For</span>
-                <span>Status</span>
-              </div>
-
-              {sortedInbox.map((c) => {
-                const name = c.source?.author?.name ?? "Unknown";
-                const subject = stripHtml(c.source?.subject);
-                const isWaiting = c.waiting_since !== null;
-                const openDuration = elapsed(c.created_at);
-                const waitDuration = c.waiting_since ? elapsed(c.waiting_since) : null;
-
-                return (
-                  <div
-                    key={c.id}
-                    className="grid grid-cols-[1fr_140px_100px_90px] gap-3 items-center py-2.5 hover:bg-muted/20 transition-colors rounded"
-                  >
-                    <div className="min-w-0">
-                      <p className="text-sm font-medium text-foreground truncate">{name}</p>
-                      <p className="text-[11px] text-muted-foreground truncate">{subject}</p>
-                    </div>
-                    <span className="text-xs text-muted-foreground capitalize">{c.source?.type ?? "—"}</span>
-                    <span className="text-xs font-mono text-muted-foreground">{openDuration}</span>
-                    <div>
-                      {isWaiting ? (
-                        <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-semibold bg-amber-100 dark:bg-amber-950/50 text-amber-700 dark:text-amber-400">
-                          <span className="h-1.5 w-1.5 rounded-full bg-amber-500 animate-pulse" />
-                          {waitDuration} wait
-                        </span>
-                      ) : (
-                        <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-semibold bg-blue-100 dark:bg-blue-950/50 text-blue-700 dark:text-blue-400">
-                          Replied
-                        </span>
-                      )}
-                    </div>
-                  </div>
-                );
-              })}
-
-              {inboxTotal > 50 && (
-                <div className="pt-3 text-center">
-                  <p className="text-xs text-muted-foreground">
-                    Showing 50 of {inboxTotal} conversations.{" "}
-                    <a href="https://app.intercom.com" target="_blank" rel="noopener noreferrer" className="text-primary hover:underline">
-                      View all in Intercom →
-                    </a>
-                  </p>
-                </div>
-              )}
-            </div>
+            <p className="text-sm text-muted-foreground text-center py-8">No tracker tickets in this period</p>
           )}
         </CardContent>
       </Card>

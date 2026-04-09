@@ -79,6 +79,80 @@ export async function fetchOpenConversations(): Promise<{ conversations: Interco
   return searchPage({ field: "state", operator: "=", value: "open" }, 50);
 }
 
+// ── Ticket Types ─────────────────────────────────────────────
+
+export const TICKET_TYPE_IDS = {
+  SUPPORT: 3007702,         // Real support tickets (the "clock")
+  BILLING: 3007694,         // Tracker: Billing / Payment Issue
+  CANCELLATION: 3007695,    // Tracker: Cancellation
+  GENERAL: 3007697,         // Tracker: General Support
+  REFUND: 3007698,          // Tracker: Refund (6-Month Plan)
+} as const;
+
+export const TRACKER_TYPES = [
+  { id: TICKET_TYPE_IDS.BILLING, label: "Billing", color: "#f59e0b" },
+  { id: TICKET_TYPE_IDS.CANCELLATION, label: "Cancellation", color: "#ef4444" },
+  { id: TICKET_TYPE_IDS.GENERAL, label: "General Support", color: "#6366f1" },
+  { id: TICKET_TYPE_IDS.REFUND, label: "Refund", color: "#10b981" },
+] as const;
+
+export interface IntercomTicket {
+  id: string;
+  created_at: number;
+  updated_at: number;
+  ticket_state: { category: string; internal_label: string };
+  ticket_type: { id: number; name: string };
+  ticket_attributes: Record<string, unknown>;
+}
+
+interface TicketSearchResponse {
+  tickets: IntercomTicket[];
+  total_count: number;
+  pages: { next?: { starting_after: string } };
+}
+
+async function searchTickets(query: unknown, perPage: number): Promise<{ tickets: IntercomTicket[]; total_count: number }> {
+  const data = await intercomPost<TicketSearchResponse>("/tickets/search", {
+    query,
+    pagination: { per_page: perPage },
+  });
+  return { tickets: data.tickets ?? [], total_count: data.total_count ?? 0 };
+}
+
+/** Fetch real support tickets (type 3007702) within a date range */
+export async function fetchSupportTickets(startISO: string, endISO: string): Promise<{ tickets: IntercomTicket[]; total_count: number }> {
+  if (!startISO || !endISO) return { tickets: [], total_count: 0 };
+  const since = Math.floor(new Date(startISO).getTime() / 1000);
+  const until = Math.floor(new Date(endISO).getTime() / 1000);
+  return searchTickets({
+    operator: "AND",
+    value: [
+      { field: "created_at", operator: ">", value: since },
+      { field: "created_at", operator: "<", value: until },
+      { field: "ticket_type_id", operator: "=", value: TICKET_TYPE_IDS.SUPPORT },
+    ],
+  }, 150);
+}
+
+/** Fetch tracker ticket count and state breakdown for a given type within a date range */
+export async function fetchTrackerTickets(
+  startISO: string,
+  endISO: string,
+  ticketTypeId: number
+): Promise<{ tickets: IntercomTicket[]; total_count: number }> {
+  if (!startISO || !endISO) return { tickets: [], total_count: 0 };
+  const since = Math.floor(new Date(startISO).getTime() / 1000);
+  const until = Math.floor(new Date(endISO).getTime() / 1000);
+  return searchTickets({
+    operator: "AND",
+    value: [
+      { field: "created_at", operator: ">", value: since },
+      { field: "created_at", operator: "<", value: until },
+      { field: "ticket_type_id", operator: "=", value: ticketTypeId },
+    ],
+  }, 150);
+}
+
 /** Open conversations assigned to a specific admin — "Your inbox" */
 export async function fetchYourInboxConversations(adminId: string): Promise<{ conversations: IntercomConversation[]; total_count: number }> {
   return searchPage(
