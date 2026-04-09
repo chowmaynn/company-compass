@@ -178,7 +178,7 @@ export default function SupportDashboard() {
         </Card>
       </div>
 
-      {/* ── Volume trend ───────────────────────────────────── */}
+      {/* ── Volume + Open Tickets ─────────────────────────── */}
       <Card className="border-border/50">
         <CardContent className="p-5">
           <div className="flex items-start justify-between mb-4">
@@ -212,12 +212,9 @@ export default function SupportDashboard() {
             <p className="text-sm text-muted-foreground text-center py-8">No data for this period</p>
           )}
         </CardContent>
-      </Card>
 
-
-      {/* ── Open Tickets ──────────────────────────────────── */}
-      <Card className="border-border/50">
-        <CardContent className="p-5">
+        {/* ── Open Tickets — attached below chart ──────────── */}
+        <div className="border-t border-border px-5 py-5">
           <div className="flex items-center justify-between mb-4">
             <div>
               <h3 className="text-sm font-semibold text-foreground">Open Tickets</h3>
@@ -304,7 +301,7 @@ export default function SupportDashboard() {
               )}
             </div>
           )}
-        </CardContent>
+        </div>
       </Card>
 
     </div>
