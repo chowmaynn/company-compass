@@ -388,7 +388,14 @@ function fmtMonth(m: string): string {
 
 function FinancialOverview({ convert, symbol }: { convert: (v: number) => number; symbol: string }) {
   const { data, loading } = useFinanceOverview();
-  const latest = data[0];
+  const [selectedMonth, setSelectedMonth] = useState<string>("");
+
+  // Available months from data
+  const months = useMemo(() => data.map((d) => d.month), [data]);
+
+  // Default to latest month
+  const activeMonth = selectedMonth || months[0] || "";
+  const selected = useMemo(() => data.find((d) => d.month === activeMonth) ?? data[0], [data, activeMonth]);
 
   // Chart data — sorted oldest first
   const chartData = useMemo(() =>
@@ -403,36 +410,52 @@ function FinancialOverview({ convert, symbol }: { convert: (v: number) => number
 
   return (
     <div className="space-y-6 mb-6">
+      {/* ── Month Selector ──────────────────────────────────── */}
+      <div className="flex items-center justify-between mb-4">
+        <h2 className="text-lg font-semibold text-foreground">Financial Overview</h2>
+        {months.length > 0 && (
+          <select
+            value={activeMonth}
+            onChange={(e) => setSelectedMonth(e.target.value)}
+            className="appearance-none bg-transparent text-sm text-muted-foreground font-medium pr-6 cursor-pointer hover:text-foreground transition-colors focus:outline-none"
+          >
+            {months.map((m) => (
+              <option key={m} value={m}>{fmtMonth(m)}</option>
+            ))}
+          </select>
+        )}
+      </div>
+
       {/* ── KPI Cards ─────────────────────────────────────────── */}
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
         <StatCard
           label="Revenue"
-          value={loading ? <LoadingDots /> : latest?.revenue != null ? `${symbol}${compact(convert(latest.revenue))}` : "—"}
-          sub={latest ? fmtMonth(latest.month) : ""}
+          value={loading ? <LoadingDots /> : selected?.revenue != null ? `${symbol}${compact(convert(latest.revenue))}` : "—"}
+          sub={selected ? fmtMonth(selected.month) : ""}
           icon={DollarSign}
           accent="text-emerald-600"
           bg="bg-emerald-50 dark:bg-emerald-950/40"
         />
         <StatCard
           label="Cost of Goods"
-          value={loading ? <LoadingDots /> : latest?.cogs != null ? `${symbol}${compact(convert(latest.cogs))}` : "—"}
-          sub={latest?.cogs != null && latest?.revenue ? `${((latest.cogs / latest.revenue) * 100).toFixed(1)}% of revenue` : ""}
+          value={loading ? <LoadingDots /> : selected?.cogs != null ? `${symbol}${compact(convert(latest.cogs))}` : "—"}
+          sub={selected?.cogs != null && selected?.revenue ? `${((latest.cogs / latest.revenue) * 100).toFixed(1)}% of revenue` : ""}
           icon={BarChart3}
           accent="text-amber-600"
           bg="bg-amber-50 dark:bg-amber-950/40"
         />
         <StatCard
           label="Gross Margin"
-          value={loading ? <LoadingDots /> : latest?.gross_margin_pct != null ? `${latest.gross_margin_pct.toFixed(1)}%` : "—"}
-          sub={latest?.gross_margin_pct != null && latest.gross_margin_pct >= 85 ? "Healthy" : latest?.gross_margin_pct != null && latest.gross_margin_pct >= 70 ? "Moderate" : "Low"}
+          value={loading ? <LoadingDots /> : selected?.gross_margin_pct != null ? `${latest.gross_margin_pct.toFixed(1)}%` : "—"}
+          sub={selected?.gross_margin_pct != null && latest.gross_margin_pct >= 85 ? "Healthy" : selected?.gross_margin_pct != null && latest.gross_margin_pct >= 70 ? "Moderate" : "Low"}
           icon={TrendingUp}
-          accent={latest?.gross_margin_pct != null && latest.gross_margin_pct >= 85 ? "text-emerald-600" : latest?.gross_margin_pct != null && latest.gross_margin_pct >= 70 ? "text-amber-600" : "text-red-600"}
-          bg={latest?.gross_margin_pct != null && latest.gross_margin_pct >= 85 ? "bg-emerald-50 dark:bg-emerald-950/40" : latest?.gross_margin_pct != null && latest.gross_margin_pct >= 70 ? "bg-amber-50 dark:bg-amber-950/40" : "bg-red-50 dark:bg-red-950/40"}
+          accent={selected?.gross_margin_pct != null && latest.gross_margin_pct >= 85 ? "text-emerald-600" : selected?.gross_margin_pct != null && latest.gross_margin_pct >= 70 ? "text-amber-600" : "text-red-600"}
+          bg={selected?.gross_margin_pct != null && latest.gross_margin_pct >= 85 ? "bg-emerald-50 dark:bg-emerald-950/40" : selected?.gross_margin_pct != null && latest.gross_margin_pct >= 70 ? "bg-amber-50 dark:bg-amber-950/40" : "bg-red-50 dark:bg-red-950/40"}
         />
         <StatCard
           label="Revenue / Employee"
-          value={loading ? <LoadingDots /> : latest?.revenue_per_employee != null ? `${symbol}${compact(convert(latest.revenue_per_employee))}` : "—"}
-          sub={latest?.headcount != null ? `${latest.headcount} employees` : ""}
+          value={loading ? <LoadingDots /> : selected?.revenue_per_employee != null ? `${symbol}${compact(convert(latest.revenue_per_employee))}` : "—"}
+          sub={selected?.headcount != null ? `${latest.headcount} employees` : ""}
           icon={Users}
           accent="text-blue-600"
           bg="bg-blue-50 dark:bg-blue-950/40"
