@@ -119,12 +119,11 @@ export function FocusBoardSection() {
           </div>
           {isAdmin && (
             <Button
-              variant="ghost"
+              variant={showGoalForm ? "ghost" : "outline"}
               size="sm"
               onClick={() => setShowGoalForm(!showGoalForm)}
-              className="text-xs text-muted-foreground"
             >
-              {showGoalForm ? "Cancel" : "+ Add Goal"}
+              {showGoalForm ? "Cancel" : "+ Add Quarterly Goal"}
             </Button>
           )}
         </div>
