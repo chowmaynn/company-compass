@@ -38,7 +38,7 @@ function progressColor(completed: number, total: number): string {
 
 export function FocusBoardSection() {
   const { user, isAdmin } = useAuth();
-  const { foci, goals, weekLabel, addFocus, toggleComplete, removeFocus, addGoal, editGoal, removeGoal, loading } = useFocusBoard();
+  const { foci, goals, weekLabel, quarter, addFocus, toggleComplete, removeFocus, addGoal, editGoal, removeGoal, loading } = useFocusBoard();
   const userId = user?.id ?? "";
 
   const [newTitle, setNewTitle] = useState("");
@@ -223,6 +223,7 @@ export function FocusBoardSection() {
         {goals.length > 0 && (
           <div className="mb-4 space-y-2">
             <div className="flex flex-wrap items-center gap-2">
+              <span className="text-[10px] font-bold text-muted-foreground uppercase tracking-wider mr-1">{quarter.replace("-", " ")}</span>
               <button
                 onClick={() => setFilterGoalId(null)}
                 className={`px-3 py-1.5 rounded-full text-xs font-medium transition-colors ${
