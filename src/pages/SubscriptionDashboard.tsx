@@ -430,7 +430,7 @@ function FinancialOverview({ convert, symbol }: { convert: (v: number) => number
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
         <StatCard
           label="Revenue"
-          value={loading ? <LoadingDots /> : selected?.revenue != null ? `${symbol}${compact(convert(latest.revenue))}` : "—"}
+          value={loading ? <LoadingDots /> : selected?.revenue != null ? `${symbol}${compact(convert(selected.revenue))}` : "—"}
           sub={selected ? fmtMonth(selected.month) : ""}
           icon={DollarSign}
           accent="text-emerald-600"
@@ -438,24 +438,24 @@ function FinancialOverview({ convert, symbol }: { convert: (v: number) => number
         />
         <StatCard
           label="Cost of Goods"
-          value={loading ? <LoadingDots /> : selected?.cogs != null ? `${symbol}${compact(convert(latest.cogs))}` : "—"}
-          sub={selected?.cogs != null && selected?.revenue ? `${((latest.cogs / latest.revenue) * 100).toFixed(1)}% of revenue` : ""}
+          value={loading ? <LoadingDots /> : selected?.cogs != null ? `${symbol}${compact(convert(selected.cogs))}` : "—"}
+          sub={selected?.cogs != null && selected?.revenue ? `${((selected.cogs / selected.revenue) * 100).toFixed(1)}% of revenue` : ""}
           icon={BarChart3}
           accent="text-amber-600"
           bg="bg-amber-50 dark:bg-amber-950/40"
         />
         <StatCard
           label="Gross Margin"
-          value={loading ? <LoadingDots /> : selected?.gross_margin_pct != null ? `${latest.gross_margin_pct.toFixed(1)}%` : "—"}
-          sub={selected?.gross_margin_pct != null && latest.gross_margin_pct >= 85 ? "Healthy" : selected?.gross_margin_pct != null && latest.gross_margin_pct >= 70 ? "Moderate" : "Low"}
+          value={loading ? <LoadingDots /> : selected?.gross_margin_pct != null ? `${selected.gross_margin_pct.toFixed(1)}%` : "—"}
+          sub={selected?.gross_margin_pct != null && selected.gross_margin_pct >= 85 ? "Healthy" : selected?.gross_margin_pct != null && selected.gross_margin_pct >= 70 ? "Moderate" : "Low"}
           icon={TrendingUp}
-          accent={selected?.gross_margin_pct != null && latest.gross_margin_pct >= 85 ? "text-emerald-600" : selected?.gross_margin_pct != null && latest.gross_margin_pct >= 70 ? "text-amber-600" : "text-red-600"}
-          bg={selected?.gross_margin_pct != null && latest.gross_margin_pct >= 85 ? "bg-emerald-50 dark:bg-emerald-950/40" : selected?.gross_margin_pct != null && latest.gross_margin_pct >= 70 ? "bg-amber-50 dark:bg-amber-950/40" : "bg-red-50 dark:bg-red-950/40"}
+          accent={selected?.gross_margin_pct != null && selected.gross_margin_pct >= 85 ? "text-emerald-600" : selected?.gross_margin_pct != null && selected.gross_margin_pct >= 70 ? "text-amber-600" : "text-red-600"}
+          bg={selected?.gross_margin_pct != null && selected.gross_margin_pct >= 85 ? "bg-emerald-50 dark:bg-emerald-950/40" : selected?.gross_margin_pct != null && selected.gross_margin_pct >= 70 ? "bg-amber-50 dark:bg-amber-950/40" : "bg-red-50 dark:bg-red-950/40"}
         />
         <StatCard
           label="Revenue / Employee"
-          value={loading ? <LoadingDots /> : selected?.revenue_per_employee != null ? `${symbol}${compact(convert(latest.revenue_per_employee))}` : "—"}
-          sub={selected?.headcount != null ? `${latest.headcount} employees` : ""}
+          value={loading ? <LoadingDots /> : selected?.revenue_per_employee != null ? `${symbol}${compact(convert(selected.revenue_per_employee))}` : "—"}
+          sub={selected?.headcount != null ? `${selected.headcount} employees` : ""}
           icon={Users}
           accent="text-blue-600"
           bg="bg-blue-50 dark:bg-blue-950/40"
