@@ -91,6 +91,17 @@ export default function Dashboard() {
 
   const { metrics: scorecardData, loading } = useScorecard(activeMonth);
 
+  // BambooHR headcount
+  const [headcount, setHeadcount] = useState<number | null>(null);
+  useEffect(() => {
+    fetch("/api/bamboohr/employees/directory")
+      .then((r) => r.ok ? r.json() : null)
+      .then((data) => {
+        if (data?.employees) setHeadcount(data.employees.length);
+      })
+      .catch(() => {});
+  }, []);
+
   // Multi-month financial summary (Revenue + Cash Collected summed across range)
   const [financialSummary, setFinancialSummary] = useState<ScorecardRow[]>([]);
   useEffect(() => {
@@ -185,6 +196,13 @@ export default function Dashboard() {
                   </div>
                 </div>
               )}
+            </div>
+            <div className="border-t border-white/[0.06] p-5 pt-3">
+              <span className="text-sm font-medium text-muted-foreground mb-2 block">Team Size</span>
+              <p className="text-3xl font-bold tracking-tight text-foreground">
+                {headcount !== null ? headcount : "—"}
+              </p>
+              <p className="text-xs text-muted-foreground mt-1">Active employees · BambooHR</p>
             </div>
           </div>
 

@@ -19,6 +19,7 @@
     { "source": "/api/supabase/:path(.*)", "destination": "/api/supabase?__proxy_path=/:path" },
     { "source": "/api/skool-supabase/:path(.*)", "destination": "/api/skool-supabase?__proxy_path=/:path" },
     { "source": "/api/ga4/:path(.*)", "destination": "/api/ga4?__proxy_path=/:path" },
+    { "source": "/api/bamboohr/:path(.*)", "destination": "/api/bamboohr?__proxy_path=/:path" },
     { "source": "/((?!api/).*)", "destination": "/index.html" }
   ]
 }
