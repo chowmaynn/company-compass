@@ -7,7 +7,7 @@ import { useFinance } from "@/hooks/use-finance";
 import { useFinanceOverview, type FinanceMonthly } from "@/hooks/use-finance-overview";
 import {
   Loader2, AlertTriangle, XCircle, CreditCard, RefreshCw,
-  TrendingUp, DollarSign, Users, BarChart3,
+  TrendingUp, DollarSign, Users, BarChart3, ChevronDown,
 } from "lucide-react";
 import { Card, CardContent } from "@/components/ui/card";
 import { StatCard } from "@/components/StatCard";
@@ -411,20 +411,22 @@ function FinancialOverview({ convert, symbol }: { convert: (v: number) => number
   return (
     <div className="space-y-6 mb-6">
       {/* ── Month Selector ──────────────────────────────────── */}
-      <div className="flex items-center justify-between mb-4">
-        <h2 className="text-lg font-semibold text-foreground">Financial Overview</h2>
-        {months.length > 0 && (
-          <select
-            value={activeMonth}
-            onChange={(e) => setSelectedMonth(e.target.value)}
-            className="appearance-none bg-transparent text-sm text-muted-foreground font-medium pr-6 cursor-pointer hover:text-foreground transition-colors focus:outline-none"
-          >
-            {months.map((m) => (
-              <option key={m} value={m}>{fmtMonth(m)}</option>
-            ))}
-          </select>
-        )}
-      </div>
+      {months.length > 0 && (
+        <div className="flex items-center justify-end mb-4">
+          <div className="relative inline-flex items-center gap-2 bg-muted rounded-lg px-4 py-2 cursor-pointer hover:bg-muted/80 transition-colors">
+            <select
+              value={activeMonth}
+              onChange={(e) => setSelectedMonth(e.target.value)}
+              className="appearance-none bg-transparent text-sm font-semibold text-foreground cursor-pointer focus:outline-none pr-5"
+            >
+              {months.map((m) => (
+                <option key={m} value={m}>{fmtMonth(m)}</option>
+              ))}
+            </select>
+            <ChevronDown className="absolute right-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground pointer-events-none" />
+          </div>
+        </div>
+      )}
 
       {/* ── KPI Cards ─────────────────────────────────────────── */}
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
