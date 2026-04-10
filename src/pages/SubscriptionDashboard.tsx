@@ -414,7 +414,7 @@ function FinancialOverview({ convert, symbol }: { convert: (v: number) => number
           bg="bg-emerald-50 dark:bg-emerald-950/40"
         />
         <StatCard
-          label="COGs"
+          label="Cost of Goods"
           value={loading ? <LoadingDots /> : latest?.cogs != null ? `${symbol}${compact(convert(latest.cogs))}` : "—"}
           sub={latest?.cogs != null && latest?.revenue ? `${((latest.cogs / latest.revenue) * 100).toFixed(1)}% of revenue` : ""}
           icon={BarChart3}
@@ -439,10 +439,10 @@ function FinancialOverview({ convert, symbol }: { convert: (v: number) => number
         />
       </div>
 
-      {/* ── Revenue & COGs Trend Chart ────────────────────────── */}
+      {/* ── Revenue & Cost of Goods Trend Chart ────────────────────────── */}
       <Card className="border-border/50">
         <CardContent className="p-5">
-          <h3 className="text-sm font-semibold text-foreground mb-1">Revenue & COGs Trend</h3>
+          <h3 className="text-sm font-semibold text-foreground mb-1">Revenue & Cost of Goods Trend</h3>
           <p className="text-xs text-muted-foreground mb-4">Monthly · Gross Margin % on right axis</p>
           {loading ? (
             <div className="flex items-center justify-center py-16"><LoadingDots /></div>
@@ -459,10 +459,10 @@ function FinancialOverview({ convert, symbol }: { convert: (v: number) => number
                 <XAxis dataKey="month" tick={{ fontSize: 10, fill: TICK }} axisLine={{ stroke: GRID }} tickLine={false} />
                 <YAxis yAxisId="left" tick={{ fontSize: 10, fill: TICK }} axisLine={false} tickLine={false} tickFormatter={(v: number) => `$${compact(v)}`} />
                 <YAxis yAxisId="right" orientation="right" tick={{ fontSize: 10, fill: TICK }} axisLine={false} tickLine={false} tickFormatter={(v: number) => `${v}%`} domain={[50, 100]} />
-                <Tooltip contentStyle={CHART_TOOLTIP} formatter={(v: number, name: string) => [name === "grossMargin" ? `${v.toFixed(1)}%` : `$${compact(v)}`, name === "revenue" ? "Revenue" : name === "cogs" ? "COGs" : "Gross Margin"]} />
+                <Tooltip contentStyle={CHART_TOOLTIP} formatter={(v: number, name: string) => [name === "grossMargin" ? `${v.toFixed(1)}%` : `$${compact(v)}`, name === "revenue" ? "Revenue" : name === "cogs" ? "Cost of Goods" : "Gross Margin"]} />
                 <Legend wrapperStyle={{ fontSize: 11 }} />
                 <Area yAxisId="left" type="monotone" dataKey="revenue" name="Revenue" stroke="#10b981" strokeWidth={2} fill="url(#revGrad)" dot={false} activeDot={{ r: 4, fill: "#10b981" }} />
-                <Bar yAxisId="left" dataKey="cogs" name="COGs" fill="#f59e0b" radius={[3, 3, 0, 0]} barSize={20} opacity={0.7} />
+                <Bar yAxisId="left" dataKey="cogs" name="Cost of Goods" fill="#f59e0b" radius={[3, 3, 0, 0]} barSize={20} opacity={0.7} />
                 <Line yAxisId="right" type="monotone" dataKey="grossMargin" name="Gross Margin" stroke="#6366f1" strokeWidth={2} strokeDasharray="5 5" dot={{ r: 3, fill: "#6366f1" }} />
               </ComposedChart>
             </ResponsiveContainer>
@@ -483,7 +483,7 @@ function FinancialOverview({ convert, symbol }: { convert: (v: number) => number
                   <tr className="border-b border-border">
                     <th className="text-left py-2 px-3 text-[10px] font-semibold text-muted-foreground uppercase tracking-wider">Month</th>
                     <th className="text-right py-2 px-3 text-[10px] font-semibold text-muted-foreground uppercase tracking-wider">Revenue</th>
-                    <th className="text-right py-2 px-3 text-[10px] font-semibold text-muted-foreground uppercase tracking-wider">COGs</th>
+                    <th className="text-right py-2 px-3 text-[10px] font-semibold text-muted-foreground uppercase tracking-wider">CoGs</th>
                     <th className="text-right py-2 px-3 text-[10px] font-semibold text-muted-foreground uppercase tracking-wider">Coaching</th>
                     <th className="text-right py-2 px-3 text-[10px] font-semibold text-muted-foreground uppercase tracking-wider">Subs</th>
                     <th className="text-right py-2 px-3 text-[10px] font-semibold text-muted-foreground uppercase tracking-wider">Margin</th>
