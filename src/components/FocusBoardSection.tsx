@@ -164,8 +164,8 @@ export function FocusBoardSection() {
   }
 
   async function handleAddGoal() {
-    if (!newGoalTitle.trim()) return;
-    await addGoal(newGoalTitle, newGoalDept || null);
+    if (!newGoalTitle.trim() || !newGoalDept) return;
+    await addGoal(newGoalTitle, newGoalDept === "company" ? null : newGoalDept);
     setNewGoalTitle("");
     setNewGoalDept("");
     setShowGoalForm(false);
@@ -207,12 +207,13 @@ export function FocusBoardSection() {
               onChange={(e) => setNewGoalDept(e.target.value)}
               className="text-xs bg-transparent border border-border rounded-md px-2 py-2 text-muted-foreground min-w-[120px]"
             >
-              <option value="">Company-wide</option>
+              <option value="" disabled>Select department...</option>
+              <option value="company">Company</option>
               {DEPARTMENTS.map((d) => (
                 <option key={d} value={d}>{d}</option>
               ))}
             </select>
-            <Button size="sm" onClick={handleAddGoal} disabled={!newGoalTitle.trim()}>
+            <Button size="sm" onClick={handleAddGoal} disabled={!newGoalTitle.trim() || !newGoalDept}>
               Add Goal
             </Button>
           </div>
