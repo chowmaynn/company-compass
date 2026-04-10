@@ -38,7 +38,7 @@ function progressColor(completed: number, total: number): string {
 
 export function FocusBoardSection() {
   const { user, isAdmin } = useAuth();
-  const { foci, goals, weekLabel, quarter, addFocus, toggleComplete, removeFocus, addGoal, editGoal, removeGoal, loading } = useFocusBoard();
+  const { foci, goals, weekLabel, quarter, addFocus, editFocus, toggleComplete, removeFocus, addGoal, editGoal, removeGoal, loading } = useFocusBoard();
   const userId = user?.id ?? "";
 
   const [newTitle, setNewTitle] = useState("");
@@ -49,6 +49,8 @@ export function FocusBoardSection() {
   const [filterGoalId, setFilterGoalId] = useState<string | null>(null);
   const [editingGoalId, setEditingGoalId] = useState<string | null>(null);
   const [editingGoalTitle, setEditingGoalTitle] = useState("");
+  const [editingFocusId, setEditingFocusId] = useState<string | null>(null);
+  const [editingFocusTitle, setEditingFocusTitle] = useState("");
 
   // Goals lookup + progress
   const goalMap = useMemo(() => {
@@ -326,10 +328,12 @@ export function FocusBoardSection() {
                   <div className="space-y-1.5">
                     {group.items.map((item) => {
                       const goal = item.quarterly_goal_id ? goalMap.get(item.quarterly_goal_id) : null;
+                      const isEditingThis = editingFocusId === item.id;
+
                       return (
                         <div
                           key={item.id}
-                          className={`flex items-center gap-3 py-1.5 px-2 rounded-md transition-colors ${
+                          className={`flex items-center gap-3 py-1.5 px-2 rounded-md transition-colors group/item ${
                             item.completed ? "opacity-60" : "hover:bg-muted/30"
                           }`}
                         >
@@ -343,22 +347,44 @@ export function FocusBoardSection() {
                             {item.carried_over_from && (
                               <RotateCcw className="h-3 w-3 text-amber-500 shrink-0" title="Carried over from last week" />
                             )}
-                            <span className={`text-sm ${item.completed ? "line-through text-muted-foreground" : "text-foreground"}`}>
-                              {item.title}
-                            </span>
-                            {goal && (
+                            {isEditingThis ? (
+                              <input
+                                autoFocus
+                                value={editingFocusTitle}
+                                onChange={(e) => setEditingFocusTitle(e.target.value)}
+                                onKeyDown={(e) => {
+                                  if (e.key === "Enter") { editFocus(item.id, editingFocusTitle); setEditingFocusId(null); }
+                                  if (e.key === "Escape") setEditingFocusId(null);
+                                }}
+                                onBlur={() => { editFocus(item.id, editingFocusTitle); setEditingFocusId(null); }}
+                                className="text-sm bg-transparent outline-none border-b border-primary flex-1"
+                              />
+                            ) : (
+                              <span className={`text-sm ${item.completed ? "line-through text-muted-foreground" : "text-foreground"}`}>
+                                {item.title}
+                              </span>
+                            )}
+                            {goal && !isEditingThis && (
                               <span className="inline-flex items-center px-1.5 py-0.5 rounded text-[9px] font-medium bg-primary/10 text-primary shrink-0">
                                 {goal.title}
                               </span>
                             )}
                           </div>
-                          {isMe && !item.completed && (
-                            <button
-                              onClick={() => removeFocus(item.id)}
-                              className="shrink-0 text-muted-foreground hover:text-red-500 transition-colors"
-                            >
-                              <Trash2 className="h-3.5 w-3.5" />
-                            </button>
+                          {isMe && !item.completed && !isEditingThis && (
+                            <div className="flex items-center gap-1 opacity-0 group-hover/item:opacity-100 transition-opacity">
+                              <button
+                                onClick={() => { setEditingFocusId(item.id); setEditingFocusTitle(item.title); }}
+                                className="shrink-0 text-muted-foreground hover:text-foreground transition-colors"
+                              >
+                                <Pencil className="h-3.5 w-3.5" />
+                              </button>
+                              <button
+                                onClick={() => removeFocus(item.id)}
+                                className="shrink-0 text-muted-foreground hover:text-red-500 transition-colors"
+                              >
+                                <Trash2 className="h-3.5 w-3.5" />
+                              </button>
+                            </div>
                           )}
                         </div>
                       );

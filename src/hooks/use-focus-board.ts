@@ -121,6 +121,16 @@ export function useFocusBoard() {
     [userId, userEmail, weekStart, queryClient]
   );
 
+  const editFocus = useCallback(
+    async (id: string, title: string) => {
+      queryClient.setQueryData<FocusItem[]>(["focus-board", weekStart], (old) =>
+        old?.map((f) => f.id === id ? { ...f, title } : f)
+      );
+      await updateFocusItem(id, { title });
+    },
+    [weekStart, queryClient]
+  );
+
   const toggleComplete = useCallback(
     async (id: string, currentlyCompleted: boolean) => {
       const newCompleted = !currentlyCompleted;
@@ -196,6 +206,7 @@ export function useFocusBoard() {
     weekLabel,
     quarter,
     addFocus,
+    editFocus,
     toggleComplete,
     removeFocus,
     addGoal,
