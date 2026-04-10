@@ -165,28 +165,7 @@ export default function Dashboard() {
         <div className="flex flex-col lg:flex-row">
           {/* Left: Summary stats */}
           <div className="lg:w-[280px] shrink-0 lg:border-r border-white/[0.06]">
-            <div className="p-5 pb-3">
-              <span className="text-sm font-medium text-muted-foreground mb-2 block">Revenue</span>
-              <p className="text-3xl font-bold tracking-tight text-foreground">
-                {revActual !== null ? `${symbol}${compactNumber(convert(revActual))}` : "—"}
-              </p>
-              <p className="text-xs text-muted-foreground mt-1">Target: {revTarget !== null ? `${symbol}${compactNumber(convert(revTarget))}` : "—"}</p>
-              {revPct !== null && (
-                <div className="mt-3">
-                  <div className="flex justify-between text-xs mb-1.5">
-                    <span className="text-muted-foreground">Progress</span>
-                    <span className={`font-mono font-semibold ${revPct >= 80 ? "text-status-green" : revPct >= 50 ? "text-status-yellow" : "text-status-red"}`}>{revPct}%</span>
-                  </div>
-                  <div className="h-2 rounded-full bg-muted overflow-hidden">
-                    <div
-                      className={`h-full rounded-full transition-all ${revPct >= 80 ? "bg-status-green" : revPct >= 50 ? "bg-status-yellow" : "bg-status-red"}`}
-                      style={{ width: `${Math.min(revPct, 100)}%` }}
-                    />
-                  </div>
-                </div>
-              )}
-            </div>
-            <div className="border-t border-white/[0.06] p-5 pt-3">
+            <div className="p-5">
               <span className="text-sm font-medium text-muted-foreground mb-2 block">Cash Collected</span>
               <p className="text-3xl font-bold tracking-tight text-foreground">
                 {cashActual !== null ? `${symbol}${compactNumber(convert(cashActual))}` : "—"}
