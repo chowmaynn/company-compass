@@ -403,6 +403,7 @@ function FinancialOverview({ convert, symbol }: { convert: (v: number) => number
       month: fmtMonth(d.month),
       revenue: d.revenue ?? 0,
       cogs: d.cogs ?? 0,
+      revPerEmployee: d.revenue_per_employee ?? 0,
       grossMargin: d.gross_margin_pct ?? 0,
     })),
     [data]
@@ -464,11 +465,11 @@ function FinancialOverview({ convert, symbol }: { convert: (v: number) => number
         />
       </div>
 
-      {/* ── Revenue & Cost of Goods Trend Chart ────────────────────────── */}
+      {/* ── Revenue, CoGs & Rev/Employee Chart ─────────────────────── */}
       <Card className="border-border/50">
         <CardContent className="p-5">
-          <h3 className="text-sm font-semibold text-foreground mb-1">Revenue & Cost of Goods Trend</h3>
-          <p className="text-xs text-muted-foreground mb-4">Monthly · Gross Margin % on right axis</p>
+          <h3 className="text-sm font-semibold text-foreground mb-1">Revenue, Cost of Goods & Revenue per Employee</h3>
+          <p className="text-xs text-muted-foreground mb-4">Monthly · Rev/Employee on right axis</p>
           {loading ? (
             <div className="flex items-center justify-center py-16"><LoadingDots /></div>
           ) : (
@@ -483,13 +484,40 @@ function FinancialOverview({ convert, symbol }: { convert: (v: number) => number
                 <CartesianGrid strokeDasharray="3 3" stroke={GRID} vertical={false} />
                 <XAxis dataKey="month" tick={{ fontSize: 10, fill: TICK }} axisLine={{ stroke: GRID }} tickLine={false} />
                 <YAxis yAxisId="left" tick={{ fontSize: 10, fill: TICK }} axisLine={false} tickLine={false} tickFormatter={(v: number) => `$${compact(v)}`} />
-                <YAxis yAxisId="right" orientation="right" tick={{ fontSize: 10, fill: TICK }} axisLine={false} tickLine={false} tickFormatter={(v: number) => `${v}%`} domain={[50, 100]} />
-                <Tooltip contentStyle={CHART_TOOLTIP} formatter={(v: number, name: string) => [name === "Gross Margin" ? `${v.toFixed(1)}%` : `$${compact(v)}`, name]} />
+                <YAxis yAxisId="right" orientation="right" tick={{ fontSize: 10, fill: TICK }} axisLine={false} tickLine={false} tickFormatter={(v: number) => `$${compact(v)}`} />
+                <Tooltip contentStyle={CHART_TOOLTIP} formatter={(v: number, name: string) => [`$${compact(v)}`, name]} />
                 <Legend wrapperStyle={{ fontSize: 11 }} />
                 <Area yAxisId="left" type="monotone" dataKey="revenue" name="Revenue" stroke="#10b981" strokeWidth={2} fill="url(#revGrad)" dot={false} activeDot={{ r: 4, fill: "#10b981" }} />
                 <Bar yAxisId="left" dataKey="cogs" name="Cost of Goods" fill="#f59e0b" radius={[3, 3, 0, 0]} barSize={20} opacity={0.7} />
-                <Line yAxisId="right" type="monotone" dataKey="grossMargin" name="Gross Margin" stroke="#6366f1" strokeWidth={2} strokeDasharray="5 5" dot={{ r: 3, fill: "#6366f1" }} />
+                <Line yAxisId="right" type="monotone" dataKey="revPerEmployee" name="Rev/Employee" stroke="#3b82f6" strokeWidth={2} dot={{ r: 3, fill: "#3b82f6" }} />
               </ComposedChart>
+            </ResponsiveContainer>
+          )}
+        </CardContent>
+      </Card>
+
+      {/* ── Gross Margin Trend ────────────────────────────────── */}
+      <Card className="border-border/50">
+        <CardContent className="p-5">
+          <h3 className="text-sm font-semibold text-foreground mb-1">Gross Margin %</h3>
+          <p className="text-xs text-muted-foreground mb-4">Monthly trend</p>
+          {loading ? (
+            <div className="flex items-center justify-center py-12"><LoadingDots /></div>
+          ) : (
+            <ResponsiveContainer width="100%" height={160}>
+              <AreaChart data={chartData} margin={{ top: 5, right: 10, left: -10, bottom: 0 }}>
+                <defs>
+                  <linearGradient id="marginGrad" x1="0" y1="0" x2="0" y2="1">
+                    <stop offset="5%" stopColor="#6366f1" stopOpacity={0.2} />
+                    <stop offset="95%" stopColor="#6366f1" stopOpacity={0} />
+                  </linearGradient>
+                </defs>
+                <CartesianGrid strokeDasharray="3 3" stroke={GRID} vertical={false} />
+                <XAxis dataKey="month" tick={{ fontSize: 10, fill: TICK }} axisLine={{ stroke: GRID }} tickLine={false} />
+                <YAxis tick={{ fontSize: 10, fill: TICK }} axisLine={false} tickLine={false} tickFormatter={(v: number) => `${v}%`} domain={[60, 100]} />
+                <Tooltip contentStyle={CHART_TOOLTIP} formatter={(v: number) => [`${v.toFixed(1)}%`, "Gross Margin"]} />
+                <Area type="monotone" dataKey="grossMargin" stroke="#6366f1" strokeWidth={2} fill="url(#marginGrad)" dot={{ r: 3, fill: "#6366f1" }} activeDot={{ r: 5, fill: "#6366f1" }} />
+              </AreaChart>
             </ResponsiveContainer>
           )}
         </CardContent>
