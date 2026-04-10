@@ -213,7 +213,18 @@ export default function Dashboard() {
                     : "—"}
                 </p>
                 <p className="text-xs text-muted-foreground mt-1">
-                  {rangeMonths.length > 1 ? `${rangeMonths.length} months` : activeMonth === selectedMonth ? "This month" : "Selected month"}
+                  {(() => {
+                    const now = new Date();
+                    const currentMonth = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, "0")}`;
+                    const prevMonth = now.getMonth() === 0
+                      ? `${now.getFullYear() - 1}-12`
+                      : `${now.getFullYear()}-${String(now.getMonth()).padStart(2, "0")}`;
+                    if (activeMonth === currentMonth) return "This month";
+                    if (activeMonth === prevMonth) return "Last month";
+                    const [y, m] = activeMonth.split("-");
+                    const names = ["", "Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
+                    return `${names[parseInt(m)]} ${y}`;
+                  })()}
                 </p>
               </div>
             </div>
