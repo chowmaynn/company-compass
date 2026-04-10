@@ -483,13 +483,12 @@ function FinancialOverview({ convert, symbol }: { convert: (v: number) => number
                 </defs>
                 <CartesianGrid strokeDasharray="3 3" stroke={GRID} vertical={false} />
                 <XAxis dataKey="month" tick={{ fontSize: 10, fill: TICK }} axisLine={{ stroke: GRID }} tickLine={false} />
-                <YAxis yAxisId="left" tick={{ fontSize: 10, fill: TICK }} axisLine={false} tickLine={false} tickFormatter={(v: number) => `$${compact(v)}`} />
-                <YAxis yAxisId="right" orientation="right" tick={{ fontSize: 10, fill: TICK }} axisLine={false} tickLine={false} tickFormatter={(v: number) => `$${compact(v)}`} />
+                <YAxis tick={{ fontSize: 10, fill: TICK }} axisLine={false} tickLine={false} tickFormatter={(v: number) => `$${compact(v)}`} />
                 <Tooltip contentStyle={CHART_TOOLTIP} formatter={(v: number, name: string) => [`$${compact(v)}`, name]} />
                 <Legend wrapperStyle={{ fontSize: 11 }} />
-                <Area yAxisId="left" type="monotone" dataKey="revenue" name="Revenue" stroke="#10b981" strokeWidth={2} fill="url(#revGrad)" dot={false} activeDot={{ r: 4, fill: "#10b981" }} />
-                <Bar yAxisId="left" dataKey="cogs" name="Cost of Goods" fill="#f59e0b" radius={[3, 3, 0, 0]} barSize={20} opacity={0.7} />
-                <Line yAxisId="right" type="monotone" dataKey="revPerEmployee" name="Rev/Employee" stroke="#3b82f6" strokeWidth={2} dot={{ r: 3, fill: "#3b82f6" }} />
+                <Area type="monotone" dataKey="revenue" name="Revenue" stroke="#10b981" strokeWidth={2} fill="url(#revGrad)" dot={false} activeDot={{ r: 4, fill: "#10b981" }} />
+                <Bar dataKey="cogs" name="Cost of Goods" fill="#f59e0b" radius={[3, 3, 0, 0]} barSize={20} opacity={0.7} />
+                <Line type="monotone" dataKey="revPerEmployee" name="Rev/Employee" stroke="#3b82f6" strokeWidth={2} dot={{ r: 3, fill: "#3b82f6" }} />
               </ComposedChart>
             </ResponsiveContainer>
           )}

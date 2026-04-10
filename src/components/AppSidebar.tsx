@@ -13,7 +13,6 @@ import type { StatusFilter } from "@/components/SummaryCards";
 
 const slugToDept: Record<string, string> = {
   finance: "Finance",
-  subscriptions: "Finance",
   content: "Content",
   marketing: "Marketing",
   sales: "Sales",

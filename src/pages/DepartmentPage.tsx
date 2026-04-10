@@ -17,7 +17,6 @@ import { SalesTrackingPage } from "@/components/SalesTrackingPage";
 import { LayoutDashboard, BarChart3, Shield, Trophy, HeadphonesIcon, DollarSign, Swords, Megaphone } from "lucide-react";
 
 const slugToDepartment: Record<string, Department> = {
-  "subscriptions": "Finance",
   "finance": "Finance",
   "evergreen-metrics": "Product",
   "content": "Content",
@@ -65,13 +64,13 @@ function DepartmentPageInner() {
   const department = slug ? slugToDepartment[slug] : undefined;
 
   const [activeTab, setActiveTab] = useState<Tab>(
-    slug === "subscriptions" || slug === "finance" ? "finance" : slug === "marketing" ? "marketing" : slug === "sales" ? "tracking" : "dashboard"
+    slug === "finance" ? "finance" : slug === "marketing" ? "marketing" : slug === "sales" ? "tracking" : "dashboard"
   );
   const [metrics, setMetrics] = useState<Metric[]>(initialData);
 
   // Reset tab when navigating between departments
   useEffect(() => {
-    setActiveTab(slug === "subscriptions" || slug === "finance" ? "finance" : slug === "marketing" ? "marketing" : slug === "sales" ? "tracking" : "dashboard");
+    setActiveTab(slug === "finance" ? "finance" : slug === "marketing" ? "marketing" : slug === "sales" ? "tracking" : "dashboard");
   }, [slug]);
 
   if (!department) return <Navigate to="/" replace />;

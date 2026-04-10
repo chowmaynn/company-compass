@@ -72,7 +72,7 @@ export function useStatusModal() {
 
 // Nav items for the horizontal navbar
 const navItems = [
-  { title: "Subscriptions", url: "/departments/subscriptions", icon: DollarSign },
+  { title: "Finance", url: "/departments/finance", icon: DollarSign },
   { title: "Content", url: "/departments/content", icon: Video },
   { title: "Marketing", url: "/departments/marketing", icon: Megaphone },
   { title: "Sales", url: "/departments/sales", icon: Phone },
