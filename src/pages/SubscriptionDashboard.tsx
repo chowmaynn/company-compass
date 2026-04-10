@@ -31,7 +31,6 @@ function getYearMonth(dateStr: string): string {
 // ── Components ────────────────────────────────────────────────────────────────
 
 import { ChartTooltip } from "@/components/ChartTooltip";
-import { LoadingDots } from "@/components/LoadingDots";
 
 // ── Main Dashboard ────────────────────────────────────────────────────────────
 
