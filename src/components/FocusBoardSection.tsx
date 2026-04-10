@@ -222,8 +222,8 @@ export function FocusBoardSection() {
         {/* Quarterly Goal Pills — grouped by department */}
         {goals.length > 0 && (
           <div className="mb-4 space-y-2">
+            <p className="text-[10px] font-bold text-muted-foreground uppercase tracking-widest">Q{quarter.split("Q")[1]} Goals</p>
             <div className="flex flex-wrap items-center gap-2">
-              <span className="text-[10px] font-bold text-muted-foreground uppercase tracking-wider mr-1">{quarter.replace("-", " ")}</span>
               <button
                 onClick={() => setFilterGoalId(null)}
                 className={`px-3 py-1.5 rounded-full text-xs font-medium transition-colors ${
