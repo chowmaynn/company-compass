@@ -35,11 +35,12 @@ export function FocusBoardSection() {
   const [newGoalId, setNewGoalId] = useState<string>("");
   const [showGoalForm, setShowGoalForm] = useState(false);
   const [newGoalTitle, setNewGoalTitle] = useState("");
+  const [filterGoalId, setFilterGoalId] = useState<string | null>(null);
 
   // Group foci by user, current user first
   const grouped = useMemo(() => {
     const map = new Map<string, { email: string; userId: string; items: FocusItem[] }>();
-    for (const f of foci) {
+    for (const f of filteredFoci) {
       if (!map.has(f.user_id)) {
         map.set(f.user_id, { email: f.user_email, userId: f.user_id, items: [] });
       }
@@ -53,14 +54,33 @@ export function FocusBoardSection() {
       return a.email.localeCompare(b.email);
     });
     return groups;
-  }, [foci, userId]);
+  }, [filteredFoci, userId]);
 
-  // Goals lookup
+  // Goals lookup + progress
   const goalMap = useMemo(() => {
     const m = new Map<string, QuarterlyGoal>();
     for (const g of goals) m.set(g.id, g);
     return m;
   }, [goals]);
+
+  const goalProgress = useMemo(() => {
+    const map = new Map<string, { total: number; completed: number }>();
+    for (const g of goals) map.set(g.id, { total: 0, completed: 0 });
+    for (const f of foci) {
+      if (f.quarterly_goal_id && map.has(f.quarterly_goal_id)) {
+        const p = map.get(f.quarterly_goal_id)!;
+        p.total++;
+        if (f.completed) p.completed++;
+      }
+    }
+    return map;
+  }, [goals, foci]);
+
+  // Filter foci by selected goal
+  const filteredFoci = useMemo(() => {
+    if (!filterGoalId) return foci;
+    return foci.filter((f) => f.quarterly_goal_id === filterGoalId);
+  }, [foci, filterGoalId]);
 
   async function handleAddFocus() {
     if (!newTitle.trim()) return;
@@ -111,6 +131,45 @@ export function FocusBoardSection() {
             <Button size="sm" onClick={handleAddGoal} disabled={!newGoalTitle.trim()}>
               Add Goal
             </Button>
+          </div>
+        )}
+
+        {/* Quarterly Goal Pills */}
+        {goals.length > 0 && (
+          <div className="flex flex-wrap items-center gap-2 mb-4">
+            <button
+              onClick={() => setFilterGoalId(null)}
+              className={`px-3 py-1.5 rounded-full text-xs font-medium transition-colors ${
+                filterGoalId === null
+                  ? "bg-foreground text-background"
+                  : "bg-muted text-muted-foreground hover:text-foreground"
+              }`}
+            >
+              All
+            </button>
+            {goals.map((g) => {
+              const p = goalProgress.get(g.id);
+              const isActive = filterGoalId === g.id;
+              return (
+                <button
+                  key={g.id}
+                  onClick={() => setFilterGoalId(isActive ? null : g.id)}
+                  className={`inline-flex items-center gap-2 px-3 py-1.5 rounded-full text-xs font-medium transition-colors ${
+                    isActive
+                      ? "bg-primary text-primary-foreground"
+                      : "bg-muted text-muted-foreground hover:text-foreground"
+                  }`}
+                >
+                  <Target className="h-3 w-3" />
+                  {g.title}
+                  {p && p.total > 0 && (
+                    <span className={`text-[10px] ${isActive ? "text-primary-foreground/70" : "text-muted-foreground/60"}`}>
+                      {p.completed}/{p.total}
+                    </span>
+                  )}
+                </button>
+              );
+            })}
           </div>
         )}
 
