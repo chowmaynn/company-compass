@@ -371,7 +371,7 @@ export function FocusBoardSection() {
                             )}
                           </div>
                           {isMe && !item.completed && !isEditingThis && (
-                            <div className="flex items-center gap-1 opacity-0 group-hover/item:opacity-100 transition-opacity">
+                            <div className="flex items-center gap-3 opacity-0 group-hover/item:opacity-100 transition-opacity">
                               <button
                                 onClick={() => { setEditingFocusId(item.id); setEditingFocusTitle(item.title); }}
                                 className="shrink-0 text-muted-foreground hover:text-foreground transition-colors"
