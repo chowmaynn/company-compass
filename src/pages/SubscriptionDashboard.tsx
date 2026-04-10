@@ -1,18 +1,23 @@
 import { useMemo, useState } from "react";
 import {
-  AreaChart, Area, BarChart, Bar, XAxis, YAxis, Tooltip,
-  ResponsiveContainer, CartesianGrid, LabelList,
+  AreaChart, Area, BarChart, Bar, XAxis, YAxis, Tooltip, Legend,
+  ResponsiveContainer, CartesianGrid, LabelList, ComposedChart, Line,
 } from "recharts";
 import { useFinance } from "@/hooks/use-finance";
+import { useFinanceOverview, type FinanceMonthly } from "@/hooks/use-finance-overview";
 import {
   Loader2, AlertTriangle, XCircle, CreditCard, RefreshCw,
+  TrendingUp, DollarSign, Users, BarChart3,
 } from "lucide-react";
-import { Card } from "@/components/ui/card";
+import { Card, CardContent } from "@/components/ui/card";
+import { StatCard } from "@/components/StatCard";
+import { LoadingDots } from "@/components/LoadingDots";
 import { DashboardShell } from "@/components/DashboardShell";
 import { DateRangePicker, presetToRange, rangeToStrings, type DateRangeValue } from "@/components/DateRangePicker";
 import { useCurrency } from "@/components/AppLayout";
 import { formatYearMonth } from "@/lib/dates";
 import { fmtCurrency } from "@/lib/formatNumber";
+import { GRID, TICK, TOOLTIP_STYLE as CHART_TOOLTIP } from "@/lib/chart-theme";
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
 
@@ -105,6 +110,8 @@ export default function SubscriptionDashboard() {
       <DateRangePicker onChange={setDateRange} />
       {stripeLoading && <RefreshCw className="h-3.5 w-3.5 text-muted-foreground animate-spin" />}
     </div>
+
+    <FinancialOverview convert={convert} symbol={symbol} />
 
     <DashboardShell loading={loading} error={error} loadingMessage="Loading finance data\u2026">
     <div className="space-y-6">
@@ -337,5 +344,149 @@ export default function SubscriptionDashboard() {
     </div>
     </DashboardShell>
     </>
+  );
+}
+
+// ── Financial Overview Component ─────────────────────────────────────────────
+
+function compact(n: number): string {
+  if (n >= 1_000_000) return `${(n / 1_000_000).toFixed(1)}M`;
+  if (n >= 1_000) return `${(n / 1_000).toFixed(1)}K`;
+  return String(Math.round(n));
+}
+
+function fmtMonth(m: string): string {
+  const [y, mo] = m.split("-");
+  const names = ["", "Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
+  return `${names[parseInt(mo)]} ${y.slice(2)}`;
+}
+
+function FinancialOverview({ convert, symbol }: { convert: (v: number) => number; symbol: string }) {
+  const { data, loading } = useFinanceOverview();
+  const latest = data[0];
+
+  // Chart data — sorted oldest first
+  const chartData = useMemo(() =>
+    [...data].reverse().map((d) => ({
+      month: fmtMonth(d.month),
+      revenue: d.revenue ?? 0,
+      cogs: d.cogs ?? 0,
+      grossMargin: d.gross_margin_pct ?? 0,
+    })),
+    [data]
+  );
+
+  return (
+    <div className="space-y-6 mb-6">
+      {/* ── KPI Cards ─────────────────────────────────────────── */}
+      <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
+        <StatCard
+          label="Revenue"
+          value={loading ? <LoadingDots /> : latest?.revenue != null ? `${symbol}${compact(convert(latest.revenue))}` : "—"}
+          sub={latest ? fmtMonth(latest.month) : ""}
+          icon={DollarSign}
+          accent="text-emerald-600"
+          bg="bg-emerald-50 dark:bg-emerald-950/40"
+        />
+        <StatCard
+          label="COGs"
+          value={loading ? <LoadingDots /> : latest?.cogs != null ? `${symbol}${compact(convert(latest.cogs))}` : "—"}
+          sub={latest?.cogs != null && latest?.revenue ? `${((latest.cogs / latest.revenue) * 100).toFixed(1)}% of revenue` : ""}
+          icon={BarChart3}
+          accent="text-amber-600"
+          bg="bg-amber-50 dark:bg-amber-950/40"
+        />
+        <StatCard
+          label="Gross Margin"
+          value={loading ? <LoadingDots /> : latest?.gross_margin_pct != null ? `${latest.gross_margin_pct.toFixed(1)}%` : "—"}
+          sub={latest?.gross_margin_pct != null && latest.gross_margin_pct >= 85 ? "Healthy" : latest?.gross_margin_pct != null && latest.gross_margin_pct >= 70 ? "Moderate" : "Low"}
+          icon={TrendingUp}
+          accent={latest?.gross_margin_pct != null && latest.gross_margin_pct >= 85 ? "text-emerald-600" : latest?.gross_margin_pct != null && latest.gross_margin_pct >= 70 ? "text-amber-600" : "text-red-600"}
+          bg={latest?.gross_margin_pct != null && latest.gross_margin_pct >= 85 ? "bg-emerald-50 dark:bg-emerald-950/40" : latest?.gross_margin_pct != null && latest.gross_margin_pct >= 70 ? "bg-amber-50 dark:bg-amber-950/40" : "bg-red-50 dark:bg-red-950/40"}
+        />
+        <StatCard
+          label="Revenue / Employee"
+          value={loading ? <LoadingDots /> : latest?.revenue_per_employee != null ? `${symbol}${compact(convert(latest.revenue_per_employee))}` : "—"}
+          sub={latest?.headcount != null ? `${latest.headcount} employees` : ""}
+          icon={Users}
+          accent="text-blue-600"
+          bg="bg-blue-50 dark:bg-blue-950/40"
+        />
+      </div>
+
+      {/* ── Revenue & COGs Trend Chart ────────────────────────── */}
+      <Card className="border-border/50">
+        <CardContent className="p-5">
+          <h3 className="text-sm font-semibold text-foreground mb-1">Revenue & COGs Trend</h3>
+          <p className="text-xs text-muted-foreground mb-4">Monthly · Gross Margin % on right axis</p>
+          {loading ? (
+            <div className="flex items-center justify-center py-16"><LoadingDots /></div>
+          ) : (
+            <ResponsiveContainer width="100%" height={240}>
+              <ComposedChart data={chartData} margin={{ top: 5, right: 10, left: -10, bottom: 0 }}>
+                <defs>
+                  <linearGradient id="revGrad" x1="0" y1="0" x2="0" y2="1">
+                    <stop offset="5%" stopColor="#10b981" stopOpacity={0.2} />
+                    <stop offset="95%" stopColor="#10b981" stopOpacity={0} />
+                  </linearGradient>
+                </defs>
+                <CartesianGrid strokeDasharray="3 3" stroke={GRID} vertical={false} />
+                <XAxis dataKey="month" tick={{ fontSize: 10, fill: TICK }} axisLine={{ stroke: GRID }} tickLine={false} />
+                <YAxis yAxisId="left" tick={{ fontSize: 10, fill: TICK }} axisLine={false} tickLine={false} tickFormatter={(v: number) => `$${compact(v)}`} />
+                <YAxis yAxisId="right" orientation="right" tick={{ fontSize: 10, fill: TICK }} axisLine={false} tickLine={false} tickFormatter={(v: number) => `${v}%`} domain={[50, 100]} />
+                <Tooltip contentStyle={CHART_TOOLTIP} formatter={(v: number, name: string) => [name === "grossMargin" ? `${v.toFixed(1)}%` : `$${compact(v)}`, name === "revenue" ? "Revenue" : name === "cogs" ? "COGs" : "Gross Margin"]} />
+                <Legend wrapperStyle={{ fontSize: 11 }} />
+                <Area yAxisId="left" type="monotone" dataKey="revenue" name="Revenue" stroke="#10b981" strokeWidth={2} fill="url(#revGrad)" dot={false} activeDot={{ r: 4, fill: "#10b981" }} />
+                <Bar yAxisId="left" dataKey="cogs" name="COGs" fill="#f59e0b" radius={[3, 3, 0, 0]} barSize={20} opacity={0.7} />
+                <Line yAxisId="right" type="monotone" dataKey="grossMargin" name="Gross Margin" stroke="#6366f1" strokeWidth={2} strokeDasharray="5 5" dot={{ r: 3, fill: "#6366f1" }} />
+              </ComposedChart>
+            </ResponsiveContainer>
+          )}
+        </CardContent>
+      </Card>
+
+      {/* ── Monthly Detail Table ──────────────────────────────── */}
+      <Card className="border-border/50">
+        <CardContent className="p-5">
+          <h3 className="text-sm font-semibold text-foreground mb-4">Monthly Breakdown</h3>
+          {loading ? (
+            <div className="flex items-center justify-center py-12"><LoadingDots /></div>
+          ) : (
+            <div className="overflow-x-auto">
+              <table className="w-full text-sm">
+                <thead>
+                  <tr className="border-b border-border">
+                    <th className="text-left py-2 px-3 text-[10px] font-semibold text-muted-foreground uppercase tracking-wider">Month</th>
+                    <th className="text-right py-2 px-3 text-[10px] font-semibold text-muted-foreground uppercase tracking-wider">Revenue</th>
+                    <th className="text-right py-2 px-3 text-[10px] font-semibold text-muted-foreground uppercase tracking-wider">COGs</th>
+                    <th className="text-right py-2 px-3 text-[10px] font-semibold text-muted-foreground uppercase tracking-wider">Coaching</th>
+                    <th className="text-right py-2 px-3 text-[10px] font-semibold text-muted-foreground uppercase tracking-wider">Subs</th>
+                    <th className="text-right py-2 px-3 text-[10px] font-semibold text-muted-foreground uppercase tracking-wider">Margin</th>
+                    <th className="text-right py-2 px-3 text-[10px] font-semibold text-muted-foreground uppercase tracking-wider">Cost Ratio</th>
+                    <th className="text-right py-2 px-3 text-[10px] font-semibold text-muted-foreground uppercase tracking-wider">HC</th>
+                    <th className="text-right py-2 px-3 text-[10px] font-semibold text-muted-foreground uppercase tracking-wider">Rev/Emp</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {data.map((d) => (
+                    <tr key={d.month} className="border-b border-border/50 hover:bg-muted/20 transition-colors">
+                      <td className="py-2.5 px-3 font-medium text-foreground">{fmtMonth(d.month)}</td>
+                      <td className="py-2.5 px-3 text-right font-mono text-foreground">{d.revenue != null ? `${symbol}${compact(convert(d.revenue))}` : "—"}</td>
+                      <td className="py-2.5 px-3 text-right font-mono text-amber-500">{d.cogs != null ? `${symbol}${compact(convert(d.cogs))}` : "—"}</td>
+                      <td className="py-2.5 px-3 text-right font-mono text-muted-foreground">{d.coaching_contractors != null ? `${symbol}${compact(convert(d.coaching_contractors))}` : "—"}</td>
+                      <td className="py-2.5 px-3 text-right font-mono text-muted-foreground">{d.subscriptions != null ? `${symbol}${compact(convert(d.subscriptions))}` : "—"}</td>
+                      <td className={`py-2.5 px-3 text-right font-mono font-semibold ${(d.gross_margin_pct ?? 0) >= 85 ? "text-emerald-500" : (d.gross_margin_pct ?? 0) >= 70 ? "text-amber-500" : "text-red-500"}`}>{d.gross_margin_pct != null ? `${d.gross_margin_pct.toFixed(1)}%` : "—"}</td>
+                      <td className="py-2.5 px-3 text-right font-mono text-muted-foreground">{d.product_cost_ratio_pct != null ? `${d.product_cost_ratio_pct.toFixed(1)}%` : "—"}</td>
+                      <td className="py-2.5 px-3 text-right font-mono text-foreground">{d.headcount ?? "—"}</td>
+                      <td className="py-2.5 px-3 text-right font-mono text-blue-500">{d.revenue_per_employee != null ? `${symbol}${compact(convert(d.revenue_per_employee))}` : "—"}</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          )}
+        </CardContent>
+      </Card>
+    </div>
   );
 }
