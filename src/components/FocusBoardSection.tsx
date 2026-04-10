@@ -9,6 +9,16 @@ import { Target, RotateCcw, Plus, Trash2, ChevronDown } from "lucide-react";
 import { LoadingDots } from "@/components/LoadingDots";
 import type { FocusItem, QuarterlyGoal } from "@/lib/supabase-focus";
 
+const DEPARTMENTS = ["Finance", "Content", "Marketing", "Sales", "Product"];
+
+const DEPT_COLORS: Record<string, string> = {
+  Finance: "text-emerald-600",
+  Content: "text-blue-600",
+  Marketing: "text-pink-600",
+  Sales: "text-amber-600",
+  Product: "text-purple-600",
+};
+
 // ── Helpers ──────────────────────────────────────────────────
 
 function displayName(email: string): string {
@@ -35,6 +45,7 @@ export function FocusBoardSection() {
   const [newGoalId, setNewGoalId] = useState<string>("");
   const [showGoalForm, setShowGoalForm] = useState(false);
   const [newGoalTitle, setNewGoalTitle] = useState("");
+  const [newGoalDept, setNewGoalDept] = useState<string>("");
   const [filterGoalId, setFilterGoalId] = useState<string | null>(null);
 
   // Goals lookup + progress
@@ -90,8 +101,9 @@ export function FocusBoardSection() {
 
   async function handleAddGoal() {
     if (!newGoalTitle.trim()) return;
-    await addGoal(newGoalTitle);
+    await addGoal(newGoalTitle, newGoalDept || null);
     setNewGoalTitle("");
+    setNewGoalDept("");
     setShowGoalForm(false);
   }
 
@@ -127,46 +139,89 @@ export function FocusBoardSection() {
               className="text-sm"
               onKeyDown={(e) => e.key === "Enter" && handleAddGoal()}
             />
+            <select
+              value={newGoalDept}
+              onChange={(e) => setNewGoalDept(e.target.value)}
+              className="text-xs bg-transparent border border-border rounded-md px-2 py-2 text-muted-foreground min-w-[120px]"
+            >
+              <option value="">Company-wide</option>
+              {DEPARTMENTS.map((d) => (
+                <option key={d} value={d}>{d}</option>
+              ))}
+            </select>
             <Button size="sm" onClick={handleAddGoal} disabled={!newGoalTitle.trim()}>
               Add Goal
             </Button>
           </div>
         )}
 
-        {/* Quarterly Goal Pills */}
+        {/* Quarterly Goal Pills — grouped by department */}
         {goals.length > 0 && (
-          <div className="flex flex-wrap items-center gap-2 mb-4">
-            <button
-              onClick={() => setFilterGoalId(null)}
-              className={`px-3 py-1.5 rounded-full text-xs font-medium transition-colors ${
-                filterGoalId === null
-                  ? "bg-foreground text-background"
-                  : "bg-muted text-muted-foreground hover:text-foreground"
-              }`}
-            >
-              All
-            </button>
-            {goals.map((g) => {
-              const p = goalProgress.get(g.id);
-              const isActive = filterGoalId === g.id;
+          <div className="mb-4 space-y-2">
+            <div className="flex flex-wrap items-center gap-2">
+              <button
+                onClick={() => setFilterGoalId(null)}
+                className={`px-3 py-1.5 rounded-full text-xs font-medium transition-colors ${
+                  filterGoalId === null
+                    ? "bg-foreground text-background"
+                    : "bg-muted text-muted-foreground hover:text-foreground"
+                }`}
+              >
+                All
+              </button>
+            </div>
+            {/* Company-wide goals */}
+            {goals.filter((g) => !g.department).length > 0 && (
+              <div className="flex flex-wrap items-center gap-2">
+                <span className="text-[10px] font-semibold text-muted-foreground uppercase tracking-wider w-20 shrink-0">Company</span>
+                {goals.filter((g) => !g.department).map((g) => {
+                  const p = goalProgress.get(g.id);
+                  const isActive = filterGoalId === g.id;
+                  return (
+                    <button
+                      key={g.id}
+                      onClick={() => setFilterGoalId(isActive ? null : g.id)}
+                      className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-medium transition-colors ${
+                        isActive ? "bg-primary text-primary-foreground" : "bg-muted text-muted-foreground hover:text-foreground"
+                      }`}
+                    >
+                      <Target className="h-3 w-3" />
+                      {g.title}
+                      {p && p.total > 0 && (
+                        <span className={`text-[10px] ${isActive ? "text-primary-foreground/70" : "text-muted-foreground/60"}`}>{p.completed}/{p.total}</span>
+                      )}
+                    </button>
+                  );
+                })}
+              </div>
+            )}
+            {/* Department goals */}
+            {DEPARTMENTS.map((dept) => {
+              const deptGoals = goals.filter((g) => g.department === dept);
+              if (deptGoals.length === 0) return null;
               return (
-                <button
-                  key={g.id}
-                  onClick={() => setFilterGoalId(isActive ? null : g.id)}
-                  className={`inline-flex items-center gap-2 px-3 py-1.5 rounded-full text-xs font-medium transition-colors ${
-                    isActive
-                      ? "bg-primary text-primary-foreground"
-                      : "bg-muted text-muted-foreground hover:text-foreground"
-                  }`}
-                >
-                  <Target className="h-3 w-3" />
-                  {g.title}
-                  {p && p.total > 0 && (
-                    <span className={`text-[10px] ${isActive ? "text-primary-foreground/70" : "text-muted-foreground/60"}`}>
-                      {p.completed}/{p.total}
-                    </span>
-                  )}
-                </button>
+                <div key={dept} className="flex flex-wrap items-center gap-2">
+                  <span className={`text-[10px] font-semibold uppercase tracking-wider w-20 shrink-0 ${DEPT_COLORS[dept] || "text-muted-foreground"}`}>{dept}</span>
+                  {deptGoals.map((g) => {
+                    const p = goalProgress.get(g.id);
+                    const isActive = filterGoalId === g.id;
+                    return (
+                      <button
+                        key={g.id}
+                        onClick={() => setFilterGoalId(isActive ? null : g.id)}
+                        className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-medium transition-colors ${
+                          isActive ? "bg-primary text-primary-foreground" : "bg-muted text-muted-foreground hover:text-foreground"
+                        }`}
+                      >
+                        <Target className="h-3 w-3" />
+                        {g.title}
+                        {p && p.total > 0 && (
+                          <span className={`text-[10px] ${isActive ? "text-primary-foreground/70" : "text-muted-foreground/60"}`}>{p.completed}/{p.total}</span>
+                        )}
+                      </button>
+                    );
+                  })}
+                </div>
               );
             })}
           </div>
