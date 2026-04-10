@@ -109,6 +109,28 @@ export async function fetchQuarterlyGoals(quarter: string): Promise<QuarterlyGoa
   return res.json();
 }
 
+export async function updateQuarterlyGoal(
+  id: string,
+  updates: Partial<Pick<QuarterlyGoal, "title" | "department">>
+): Promise<boolean> {
+  const headers = await getSupabaseHeaders();
+  const res = await fetch(`${SUPABASE_URL}/rest/v1/quarterly_goals?id=eq.${id}`, {
+    method: "PATCH",
+    headers: { ...headers, Prefer: "return=minimal" },
+    body: JSON.stringify({ ...updates, updated_at: new Date().toISOString() }),
+  });
+  return res.ok;
+}
+
+export async function deleteQuarterlyGoal(id: string): Promise<boolean> {
+  const headers = await getSupabaseHeaders();
+  const res = await fetch(`${SUPABASE_URL}/rest/v1/quarterly_goals?id=eq.${id}`, {
+    method: "DELETE",
+    headers,
+  });
+  return res.ok;
+}
+
 export async function createQuarterlyGoal(goal: {
   title: string;
   quarter: string;

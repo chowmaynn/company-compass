@@ -5,7 +5,7 @@ import { Card, CardContent } from "@/components/ui/card";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
-import { Target, RotateCcw, Plus, Trash2, ChevronDown } from "lucide-react";
+import { Target, RotateCcw, Plus, Trash2, Pencil, X } from "lucide-react";
 import { LoadingDots } from "@/components/LoadingDots";
 import type { FocusItem, QuarterlyGoal } from "@/lib/supabase-focus";
 
@@ -38,7 +38,7 @@ function progressColor(completed: number, total: number): string {
 
 export function FocusBoardSection() {
   const { user, isAdmin } = useAuth();
-  const { foci, goals, weekLabel, addFocus, toggleComplete, removeFocus, addGoal, loading } = useFocusBoard();
+  const { foci, goals, weekLabel, addFocus, toggleComplete, removeFocus, addGoal, editGoal, removeGoal, loading } = useFocusBoard();
   const userId = user?.id ?? "";
 
   const [newTitle, setNewTitle] = useState("");
@@ -47,6 +47,8 @@ export function FocusBoardSection() {
   const [newGoalTitle, setNewGoalTitle] = useState("");
   const [newGoalDept, setNewGoalDept] = useState<string>("");
   const [filterGoalId, setFilterGoalId] = useState<string | null>(null);
+  const [editingGoalId, setEditingGoalId] = useState<string | null>(null);
+  const [editingGoalTitle, setEditingGoalTitle] = useState("");
 
   // Goals lookup + progress
   const goalMap = useMemo(() => {
@@ -97,6 +99,68 @@ export function FocusBoardSection() {
     await addFocus(newTitle, newGoalId || null);
     setNewTitle("");
     setNewGoalId("");
+  }
+
+  function renderGoalPill(g: QuarterlyGoal) {
+    const p = goalProgress.get(g.id);
+    const isActive = filterGoalId === g.id;
+    const isOwner = g.created_by === userId;
+    const isEditing = editingGoalId === g.id;
+
+    if (isEditing) {
+      return (
+        <div key={g.id} className="inline-flex items-center gap-1 px-2 py-1 rounded-full bg-muted border border-primary/50">
+          <input
+            autoFocus
+            value={editingGoalTitle}
+            onChange={(e) => setEditingGoalTitle(e.target.value)}
+            onKeyDown={(e) => {
+              if (e.key === "Enter") {
+                editGoal(g.id, editingGoalTitle, g.department);
+                setEditingGoalId(null);
+              }
+              if (e.key === "Escape") setEditingGoalId(null);
+            }}
+            className="text-xs bg-transparent outline-none w-32"
+          />
+          <button onClick={() => { editGoal(g.id, editingGoalTitle, g.department); setEditingGoalId(null); }} className="text-primary"><Plus className="h-3 w-3" /></button>
+          <button onClick={() => setEditingGoalId(null)} className="text-muted-foreground"><X className="h-3 w-3" /></button>
+        </div>
+      );
+    }
+
+    return (
+      <div key={g.id} className="inline-flex items-center gap-0.5 group">
+        <button
+          onClick={() => setFilterGoalId(isActive ? null : g.id)}
+          className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-medium transition-colors ${
+            isActive ? "bg-primary text-primary-foreground" : "bg-muted text-muted-foreground hover:text-foreground"
+          } ${isOwner ? "rounded-r-none" : ""}`}
+        >
+          <Target className="h-3 w-3" />
+          {g.title}
+          {p && p.total > 0 && (
+            <span className={`text-[10px] ${isActive ? "text-primary-foreground/70" : "text-muted-foreground/60"}`}>{p.completed}/{p.total}</span>
+          )}
+        </button>
+        {isOwner && (
+          <div className="inline-flex opacity-0 group-hover:opacity-100 transition-opacity">
+            <button
+              onClick={() => { setEditingGoalId(g.id); setEditingGoalTitle(g.title); }}
+              className="px-1.5 py-1.5 rounded-none bg-muted text-muted-foreground hover:text-foreground transition-colors"
+            >
+              <Pencil className="h-3 w-3" />
+            </button>
+            <button
+              onClick={() => { if (confirm(`Delete "${g.title}"?`)) removeGoal(g.id); }}
+              className="px-1.5 py-1.5 rounded-r-full bg-muted text-muted-foreground hover:text-red-500 transition-colors"
+            >
+              <Trash2 className="h-3 w-3" />
+            </button>
+          </div>
+        )}
+      </div>
+    );
   }
 
   async function handleAddGoal() {
@@ -173,25 +237,7 @@ export function FocusBoardSection() {
             {goals.filter((g) => !g.department).length > 0 && (
               <div className="flex flex-wrap items-center gap-2">
                 <span className="text-[10px] font-semibold text-muted-foreground uppercase tracking-wider w-20 shrink-0">Company</span>
-                {goals.filter((g) => !g.department).map((g) => {
-                  const p = goalProgress.get(g.id);
-                  const isActive = filterGoalId === g.id;
-                  return (
-                    <button
-                      key={g.id}
-                      onClick={() => setFilterGoalId(isActive ? null : g.id)}
-                      className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-medium transition-colors ${
-                        isActive ? "bg-primary text-primary-foreground" : "bg-muted text-muted-foreground hover:text-foreground"
-                      }`}
-                    >
-                      <Target className="h-3 w-3" />
-                      {g.title}
-                      {p && p.total > 0 && (
-                        <span className={`text-[10px] ${isActive ? "text-primary-foreground/70" : "text-muted-foreground/60"}`}>{p.completed}/{p.total}</span>
-                      )}
-                    </button>
-                  );
-                })}
+                {goals.filter((g) => !g.department).map(renderGoalPill)}
               </div>
             )}
             {/* Department goals */}
@@ -201,25 +247,7 @@ export function FocusBoardSection() {
               return (
                 <div key={dept} className="flex flex-wrap items-center gap-2">
                   <span className={`text-[10px] font-semibold uppercase tracking-wider w-20 shrink-0 ${DEPT_COLORS[dept] || "text-muted-foreground"}`}>{dept}</span>
-                  {deptGoals.map((g) => {
-                    const p = goalProgress.get(g.id);
-                    const isActive = filterGoalId === g.id;
-                    return (
-                      <button
-                        key={g.id}
-                        onClick={() => setFilterGoalId(isActive ? null : g.id)}
-                        className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-medium transition-colors ${
-                          isActive ? "bg-primary text-primary-foreground" : "bg-muted text-muted-foreground hover:text-foreground"
-                        }`}
-                      >
-                        <Target className="h-3 w-3" />
-                        {g.title}
-                        {p && p.total > 0 && (
-                          <span className={`text-[10px] ${isActive ? "text-primary-foreground/70" : "text-muted-foreground/60"}`}>{p.completed}/{p.total}</span>
-                        )}
-                      </button>
-                    );
-                  })}
+                  {deptGoals.map(renderGoalPill)}
                 </div>
               );
             })}

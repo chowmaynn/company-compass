@@ -9,6 +9,8 @@ import {
   deleteFocusItem,
   fetchQuarterlyGoals,
   createQuarterlyGoal,
+  updateQuarterlyGoal,
+  deleteQuarterlyGoal,
   type FocusItem,
   type QuarterlyGoal,
 } from "@/lib/supabase-focus";
@@ -167,6 +169,26 @@ export function useFocusBoard() {
     [userId, quarter, queryClient]
   );
 
+  const editGoal = useCallback(
+    async (id: string, title: string, department?: string | null) => {
+      queryClient.setQueryData<QuarterlyGoal[]>(["quarterly-goals", quarter], (old) =>
+        old?.map((g) => g.id === id ? { ...g, title, department: department ?? g.department } : g)
+      );
+      await updateQuarterlyGoal(id, { title, department: department ?? undefined });
+    },
+    [quarter, queryClient]
+  );
+
+  const removeGoal = useCallback(
+    async (id: string) => {
+      queryClient.setQueryData<QuarterlyGoal[]>(["quarterly-goals", quarter], (old) =>
+        old?.filter((g) => g.id !== id)
+      );
+      await deleteQuarterlyGoal(id);
+    },
+    [quarter, queryClient]
+  );
+
   return {
     foci: fociQuery.data ?? [],
     goals: goalsQuery.data ?? [],
@@ -177,6 +199,8 @@ export function useFocusBoard() {
     toggleComplete,
     removeFocus,
     addGoal,
+    editGoal,
+    removeGoal,
     loading: fociQuery.isLoading,
   };
 }
