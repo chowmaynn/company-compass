@@ -35,6 +35,7 @@ import { ChartTooltip } from "@/components/ChartTooltip";
 // ── Main Dashboard ────────────────────────────────────────────────────────────
 
 export default function SubscriptionDashboard() {
+  const [activeTab, setActiveTab] = useState<"overview" | "subscriptions">("overview");
   const { convert, symbol, label: currencyLabel } = useCurrency();
   const cfmt = (n: number) => fmtCurrency(convert(n), symbol);
 
@@ -102,13 +103,39 @@ export default function SubscriptionDashboard() {
 
   return (
     <>
-    {/* ── Date range filter (outside DashboardShell so it persists during loading) */}
+    {/* ── Tabs ──────────────────────────────────────────────── */}
+    <div className="flex gap-1 border-b border-border mb-6">
+      {[
+        { key: "overview", label: "Overview" },
+        { key: "subscriptions", label: "Subscriptions" },
+      ].map(({ key, label }) => (
+        <button
+          key={key}
+          onClick={() => setActiveTab(key as typeof activeTab)}
+          className={`px-4 py-2 text-sm font-medium transition-colors border-b-2 -mb-px ${
+            activeTab === key
+              ? "border-primary text-primary"
+              : "border-transparent text-muted-foreground hover:text-foreground"
+          }`}
+        >
+          {label}
+        </button>
+      ))}
+    </div>
+
+    {/* ── Overview Tab ──────────────────────────────────────── */}
+    {activeTab === "overview" && (
+      <FinancialOverview convert={convert} symbol={symbol} />
+    )}
+
+    {/* ── Subscriptions Tab ─────────────────────────────────── */}
+    {activeTab === "subscriptions" && <>
+
+    {/* ── Date range filter */}
     <div className="flex items-center justify-end gap-2 mb-6">
       <DateRangePicker onChange={setDateRange} />
       {stripeLoading && <RefreshCw className="h-3.5 w-3.5 text-muted-foreground animate-spin" />}
     </div>
-
-    <FinancialOverview convert={convert} symbol={symbol} />
 
     <DashboardShell loading={loading} error={error} loadingMessage="Loading finance data\u2026">
     <div className="space-y-6">
@@ -340,6 +367,7 @@ export default function SubscriptionDashboard() {
 
     </div>
     </DashboardShell>
+    </>}
     </>
   );
 }
