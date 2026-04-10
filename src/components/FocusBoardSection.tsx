@@ -198,7 +198,7 @@ export function FocusBoardSection() {
             <Input
               value={newGoalTitle}
               onChange={(e) => setNewGoalTitle(e.target.value)}
-              placeholder="Quarterly goal title..."
+              placeholder="Enter quarterly goal..."
               className="text-sm"
               onKeyDown={(e) => e.key === "Enter" && handleAddGoal()}
             />
@@ -207,7 +207,7 @@ export function FocusBoardSection() {
               onChange={(e) => setNewGoalDept(e.target.value)}
               className="text-xs bg-transparent border border-border rounded-md px-2 py-2 text-muted-foreground min-w-[120px]"
             >
-              <option value="" disabled>Select department...</option>
+              <option value="" disabled>Department</option>
               <option value="company">Company</option>
               {DEPARTMENTS.map((d) => (
                 <option key={d} value={d}>{d}</option>
