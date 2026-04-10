@@ -484,7 +484,7 @@ function FinancialOverview({ convert, symbol }: { convert: (v: number) => number
                 <XAxis dataKey="month" tick={{ fontSize: 10, fill: TICK }} axisLine={{ stroke: GRID }} tickLine={false} />
                 <YAxis yAxisId="left" tick={{ fontSize: 10, fill: TICK }} axisLine={false} tickLine={false} tickFormatter={(v: number) => `$${compact(v)}`} />
                 <YAxis yAxisId="right" orientation="right" tick={{ fontSize: 10, fill: TICK }} axisLine={false} tickLine={false} tickFormatter={(v: number) => `${v}%`} domain={[50, 100]} />
-                <Tooltip contentStyle={CHART_TOOLTIP} formatter={(v: number, name: string) => [name === "grossMargin" ? `${v.toFixed(1)}%` : `$${compact(v)}`, name === "revenue" ? "Revenue" : name === "cogs" ? "Cost of Goods" : "Gross Margin"]} />
+                <Tooltip contentStyle={CHART_TOOLTIP} formatter={(v: number, name: string) => [name === "Gross Margin" ? `${v.toFixed(1)}%` : `$${compact(v)}`, name]} />
                 <Legend wrapperStyle={{ fontSize: 11 }} />
                 <Area yAxisId="left" type="monotone" dataKey="revenue" name="Revenue" stroke="#10b981" strokeWidth={2} fill="url(#revGrad)" dot={false} activeDot={{ r: 4, fill: "#10b981" }} />
                 <Bar yAxisId="left" dataKey="cogs" name="Cost of Goods" fill="#f59e0b" radius={[3, 3, 0, 0]} barSize={20} opacity={0.7} />
