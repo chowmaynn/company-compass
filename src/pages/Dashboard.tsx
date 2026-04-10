@@ -197,12 +197,25 @@ export default function Dashboard() {
                 </div>
               )}
             </div>
-            <div className="border-t border-white/[0.06] p-5 pt-3">
-              <span className="text-sm font-medium text-muted-foreground mb-2 block">Team Size</span>
-              <p className="text-3xl font-bold tracking-tight text-foreground">
-                {headcount !== null ? headcount : "—"}
-              </p>
-              <p className="text-xs text-muted-foreground mt-1">Active employees · BambooHR</p>
+            <div className="border-t border-white/[0.06] grid grid-cols-2 divide-x divide-white/[0.06]">
+              <div className="p-5 pt-3">
+                <span className="text-sm font-medium text-muted-foreground mb-2 block">Team Size</span>
+                <p className="text-3xl font-bold tracking-tight text-foreground">
+                  {headcount !== null ? headcount : "—"}
+                </p>
+                <p className="text-xs text-muted-foreground mt-1">Active employees</p>
+              </div>
+              <div className="p-5 pt-3">
+                <span className="text-sm font-medium text-muted-foreground mb-2 block">Revenue / Employee</span>
+                <p className="text-3xl font-bold tracking-tight text-foreground">
+                  {revActual !== null && headcount
+                    ? `${symbol}${compactNumber(convert(Math.round(revActual / headcount)))}`
+                    : "—"}
+                </p>
+                <p className="text-xs text-muted-foreground mt-1">
+                  {rangeMonths.length > 1 ? `${rangeMonths.length} months` : activeMonth === selectedMonth ? "This month" : "Selected month"}
+                </p>
+              </div>
             </div>
           </div>
 
