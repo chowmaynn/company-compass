@@ -37,25 +37,6 @@ export function FocusBoardSection() {
   const [newGoalTitle, setNewGoalTitle] = useState("");
   const [filterGoalId, setFilterGoalId] = useState<string | null>(null);
 
-  // Group foci by user, current user first
-  const grouped = useMemo(() => {
-    const map = new Map<string, { email: string; userId: string; items: FocusItem[] }>();
-    for (const f of filteredFoci) {
-      if (!map.has(f.user_id)) {
-        map.set(f.user_id, { email: f.user_email, userId: f.user_id, items: [] });
-      }
-      map.get(f.user_id)!.items.push(f);
-    }
-    const groups = [...map.values()];
-    // Current user first, then alphabetical
-    groups.sort((a, b) => {
-      if (a.userId === userId) return -1;
-      if (b.userId === userId) return 1;
-      return a.email.localeCompare(b.email);
-    });
-    return groups;
-  }, [filteredFoci, userId]);
-
   // Goals lookup + progress
   const goalMap = useMemo(() => {
     const m = new Map<string, QuarterlyGoal>();
@@ -81,6 +62,24 @@ export function FocusBoardSection() {
     if (!filterGoalId) return foci;
     return foci.filter((f) => f.quarterly_goal_id === filterGoalId);
   }, [foci, filterGoalId]);
+
+  // Group foci by user, current user first
+  const grouped = useMemo(() => {
+    const map = new Map<string, { email: string; userId: string; items: FocusItem[] }>();
+    for (const f of filteredFoci) {
+      if (!map.has(f.user_id)) {
+        map.set(f.user_id, { email: f.user_email, userId: f.user_id, items: [] });
+      }
+      map.get(f.user_id)!.items.push(f);
+    }
+    const groups = [...map.values()];
+    groups.sort((a, b) => {
+      if (a.userId === userId) return -1;
+      if (b.userId === userId) return 1;
+      return a.email.localeCompare(b.email);
+    });
+    return groups;
+  }, [filteredFoci, userId]);
 
   async function handleAddFocus() {
     if (!newTitle.trim()) return;
