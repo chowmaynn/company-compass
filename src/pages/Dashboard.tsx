@@ -6,6 +6,7 @@ import { useCurrency, useSelectedMonth } from "@/components/AppLayout";
 import { fetchRevenueHistory, fetchFinancialSummary, type ScorecardRow } from "@/lib/supabase-scorecard";
 import { useAuth } from "@/hooks/use-auth";
 import { FunnelSankey } from "@/components/FunnelSankey";
+import { FocusBoardSection } from "@/components/FocusBoardSection";
 import { DateRangePicker, type DateRangeValue } from "@/components/DateRangePicker";
 import {
   AreaChart,
@@ -220,6 +221,9 @@ export default function Dashboard() {
           </div>
         </div>
       </Card>
+
+      {/* ── Focus Board ─────────────────────────────────────── */}
+      <FocusBoardSection />
 
       {/* ── Conversion Funnel ─────────────────────────────── */}
       <FunnelSankey metrics={scorecardData} formatCurrency={formatCurrency} />
