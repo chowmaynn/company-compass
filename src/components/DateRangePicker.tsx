@@ -73,11 +73,15 @@ export function presetToRange(preset: Exclude<Preset, "custom">): { from: Date; 
 }
 
 export function rangeToStrings(from: Date, to: Date): DateRangeValue {
+  // Use NZ date strings for both display and query boundaries
+  // This ensures a NZ user selecting "Today" gets NZ-today, not UTC-today
+  const startDate = toNZDate(from);
+  const endDate = toNZDate(to);
   return {
-    start: from.toISOString(),
-    end: to.toISOString(),
-    startDate: toNZDate(from),
-    endDate: toNZDate(to),
+    start: startDate + "T00:00:00Z",
+    end: endDate + "T23:59:59Z",
+    startDate,
+    endDate,
   };
 }
 
