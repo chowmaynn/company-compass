@@ -113,10 +113,11 @@ export function useSupabaseMetrics(from: string, to: string) {
     sourceQualified[displayName] = totalBk - caseyCx;
   });
 
-  // Fallback: if source_google or source_aios_lp have no data, use event-level qualified
+  // Fallback: if a source has no source_ entry, use event-level qualified
   const EVENT_FALLBACKS: { displayName: string; eventName: string }[] = [
     { displayName: "Google", eventName: "AAA Accelerator Business Call (Google)" },
     { displayName: "AIOS LP", eventName: "AAA Accelerator Business Call (Masterclass)" },
+    { displayName: "Skool P", eventName: "AAA Accelerator Business Call (Skool P)" },
   ];
   for (const { displayName, eventName } of EVENT_FALLBACKS) {
     if (!sourceQualified[displayName] || sourceQualified[displayName] === 0) {
