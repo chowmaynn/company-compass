@@ -9,7 +9,7 @@ import { useSupabaseMetrics } from "@/hooks/use-supabase-metrics";
 import { useKitMarketing } from "@/hooks/use-kit-marketing";
 import { useGoogleAnalytics } from "@/hooks/use-google-analytics";
 import { useSkoolScorecard } from "@/hooks/use-skool-scorecard";
-import { useSkoolJoinsRange } from "@/hooks/use-skool-joins";
+import { useSkoolJoinsByDate, sumJoinsInRange } from "@/hooks/use-skool-joins";
 import { WebsiteChannelCard } from "@/components/WebsiteChannelCard";
 import { LoadingDots } from "@/components/LoadingDots";
 import { useCalendly } from "@/hooks/use-calendly";
@@ -104,7 +104,13 @@ export default function MarketingDashboard() {
 
   // Skool scorecard metrics
   const skoolScorecard = useSkoolScorecard();
-  const skoolJoinsRange = useSkoolJoinsRange(skoolRange.startDate, skoolRange.endDate);
+  // Skool joins — use the same shared daily data as the KPI tracker
+  const skoolMonth = skoolRange.startDate ? new Date(skoolRange.startDate + "T12:00:00") : new Date();
+  const skoolJoinsDaily = useSkoolJoinsByDate(skoolMonth.getFullYear(), skoolMonth.getMonth());
+  const skoolJoinsTotal = useMemo(() => {
+    if (skoolJoinsDaily.loading || !skoolRange.startDate || !skoolRange.endDate) return null;
+    return sumJoinsInRange(skoolJoinsDaily.joinsByDate, skoolRange.startDate, skoolRange.endDate);
+  }, [skoolJoinsDaily.joinsByDate, skoolJoinsDaily.loading, skoolRange.startDate, skoolRange.endDate]);
 
   // Data — each section uses its own date range
   const supabase = useSupabaseMetrics(range.start, range.end);
@@ -371,7 +377,7 @@ export default function MarketingDashboard() {
                 <div className="bg-muted/30 rounded-lg p-3">
                   <p className="text-xs text-muted-foreground uppercase tracking-wider font-medium mb-1">Skool Joins</p>
                   <p className="text-xl font-bold text-foreground">
-                    {skoolJoinsRange.loading ? <LoadingDots /> : skoolJoinsRange.joins != null ? fmt(skoolJoinsRange.joins) : "—"}
+                    {skoolJoinsDaily.loading ? <LoadingDots /> : skoolJoinsTotal != null ? fmt(skoolJoinsTotal) : "—"}
                   </p>
                 </div>
                 <div className="bg-muted/30 rounded-lg p-3">

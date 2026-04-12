@@ -4,6 +4,7 @@ import { type VideoItem } from "@/lib/youtube";
 import { fetchBroadcastsInRange, type BroadcastItem } from "@/lib/kit";
 import { fetchDailyActiveUsers } from "@/lib/google-analytics";
 import { useSupabaseMetrics } from "@/hooks/use-supabase-metrics";
+import { useSkoolJoinsByDate } from "@/hooks/use-skool-joins";
 import { LoadingDots } from "@/components/LoadingDots";
 
 // ─── Note Popover ─────────────────────────────────────────────────────────────
@@ -349,79 +350,8 @@ export function BookingKPITracker() {
   const supabaseTo = useMemo(() => new Date(Date.UTC(year, month + 1, 0, 23, 59, 59)).toISOString(), [year, month]);
   const bookingData = useSupabaseMetrics(supabaseFrom, supabaseTo);
 
-  // Map metric names to source-level data from the cube
-  // Source qualified = total_bookings - casey_cancelled per day
-  // Fetch Skool joins per day — cached in React state (useRef) across month switches
-  const skoolCache = useRef<Record<string, Record<string, number>>>({});
-  const [skoolJoinsByDate, setSkoolJoinsByDate] = useState<Record<string, number>>({});
-  const [skoolLoading, setSkoolLoading] = useState(true);
-  useEffect(() => {
-    let cancelled = false;
-    const mm = String(month + 1).padStart(2, "0");
-    const cacheKey = `${year}-${mm}`;
-
-    // Use in-memory cache if available
-    if (skoolCache.current[cacheKey] && Object.keys(skoolCache.current[cacheKey]).length > 0) {
-      setSkoolJoinsByDate(skoolCache.current[cacheKey]);
-      setSkoolLoading(false);
-      // Past months: don't refetch
-      const currentMonth = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, "0")}`;
-      if (cacheKey !== currentMonth) return;
-    } else {
-      setSkoolJoinsByDate({});
-      setSkoolLoading(true);
-    }
-
-    const SKOOL_BASE = "/api/skool-supabase";
-    const TABLE = "Skool%20Lead%20Logs";
-    const COL = "%22Created%20At%22";
-    const PID = "%22Project%20ID%22";
-    const PROJECT_ID = "recW9TFcHNzEYV7ql";
-
-    async function fetchSkoolMonth() {
-      const result: Record<string, number> = {};
-      const daysInMo = new Date(year, month + 1, 0).getDate();
-      const isCurrentMo = year === now.getFullYear() && month === now.getMonth();
-      const maxDay = isCurrentMo ? now.getDate() : daysInMo;
-
-      // Fetch in 2-day chunks using Created At (ISO format) + Project ID filter
-      const CHUNK_DAYS = 2;
-      for (let startDay = 1; startDay <= maxDay; startDay += CHUNK_DAYS) {
-        if (cancelled) break;
-        const endDay = Math.min(startDay + CHUNK_DAYS, maxDay + 1);
-        const chunkStart = `${year}-${mm}-${String(startDay).padStart(2, "0")}T00:00:00Z`;
-        const chunkEndDay = endDay > daysInMo
-          ? (month === 11 ? `${year + 1}-01-01` : `${year}-${String(month + 2).padStart(2, "0")}-01`)
-          : `${year}-${mm}-${String(endDay).padStart(2, "0")}`;
-        const chunkEnd = `${chunkEndDay}T00:00:00Z`;
-        try {
-          const res = await fetch(`${SKOOL_BASE}/rest/v1/${TABLE}?select=${COL}&${PID}=eq.${PROJECT_ID}&${COL}=gte.${chunkStart}&${COL}=lt.${chunkEnd}&limit=2000`);
-          if (res.ok) {
-            const rows: { "Created At": string }[] = await res.json();
-            for (const row of rows) {
-              // Bucket by date portion of Created At (substring 0-10)
-              const date = (row["Created At"] ?? "").substring(0, 10);
-              if (date && date.startsWith(`${year}-${mm}`)) {
-                result[date] = (result[date] || 0) + 1;
-              }
-            }
-          }
-        } catch {}
-        await new Promise(r => setTimeout(r, 200));
-      }
-
-      if (!cancelled) {
-        if (Object.keys(result).length > 0) {
-          skoolCache.current[cacheKey] = result;
-          setSkoolJoinsByDate(result);
-        }
-        setSkoolLoading(false);
-      }
-    }
-
-    fetchSkoolMonth();
-    return () => { cancelled = true; };
-  }, [year, month]);
+  // Skool joins per NZ day (shared hook — same data used on marketing overview)
+  const { joinsByDate: skoolJoinsByDate, loading: skoolLoading } = useSkoolJoinsByDate(year, month);
 
   // Fetch GA4 active users per day for the displayed month
   const [ga4ActiveByDate, setGa4ActiveByDate] = useState<Record<string, number>>({});
