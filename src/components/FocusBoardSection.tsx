@@ -38,11 +38,12 @@ function progressColor(completed: number, total: number): string {
 
 export function FocusBoardSection() {
   const { user, isAdmin } = useAuth();
-  const { foci, goals, weekLabel, quarter, addFocus, editFocus, toggleComplete, removeFocus, addGoal, editGoal, removeGoal, loading } = useFocusBoard();
+  const { foci, goals, teamUsers, weekLabel, quarter, addFocus, editFocus, toggleComplete, removeFocus, addGoal, editGoal, removeGoal, loading } = useFocusBoard();
   const userId = user?.id ?? "";
 
   const [newTitle, setNewTitle] = useState("");
   const [newGoalId, setNewGoalId] = useState<string>("");
+  const [assigneeId, setAssigneeId] = useState<string>("");
   const [showGoalForm, setShowGoalForm] = useState(false);
   const [newGoalTitle, setNewGoalTitle] = useState("");
   const [newGoalDept, setNewGoalDept] = useState<string>("");
@@ -98,7 +99,13 @@ export function FocusBoardSection() {
 
   async function handleAddFocus() {
     if (!newTitle.trim()) return;
-    await addFocus(newTitle, newGoalId || null);
+    const targetUser = assigneeId ? teamUsers.find((u) => u.user_id === assigneeId) : null;
+    await addFocus(
+      newTitle,
+      newGoalId || null,
+      targetUser?.user_id,
+      targetUser?.user_email,
+    );
     setNewTitle("");
     setNewGoalId("");
   }
@@ -262,15 +269,33 @@ export function FocusBoardSection() {
           <div className="flex items-center justify-center py-12"><LoadingDots /></div>
         ) : (
           <div className="space-y-6">
-            {/* Current user's add form */}
+            {/* Add focus form */}
             <div className="flex items-center gap-2">
               <Input
                 value={newTitle}
                 onChange={(e) => setNewTitle(e.target.value)}
-                placeholder="Add a focus for this week..."
+                placeholder={assigneeId && assigneeId !== userId
+                  ? `Add focus for ${displayName(teamUsers.find((u) => u.user_id === assigneeId)?.user_email ?? "")}...`
+                  : "Add a focus for this week..."}
                 className="text-sm"
                 onKeyDown={(e) => e.key === "Enter" && handleAddFocus()}
               />
+              {isAdmin && teamUsers.length > 0 && (
+                <select
+                  value={assigneeId}
+                  onChange={(e) => setAssigneeId(e.target.value)}
+                  className="text-xs bg-transparent border border-border rounded-md px-2 py-2 text-muted-foreground min-w-[120px]"
+                >
+                  <option value="">Me</option>
+                  {teamUsers
+                    .filter((u) => u.user_id !== userId)
+                    .map((u) => (
+                      <option key={u.user_id} value={u.user_id}>
+                        {displayName(u.user_email)}
+                      </option>
+                    ))}
+                </select>
+              )}
               {goals.length > 0 && (
                 <select
                   value={newGoalId}
@@ -314,6 +339,20 @@ export function FocusBoardSection() {
                       </span>
                     </div>
                     <div className="flex items-center gap-2">
+                      {isAdmin && !isMe && (
+                        <button
+                          onClick={() => {
+                            setAssigneeId(group.userId);
+                            // Focus the input
+                            const input = document.querySelector<HTMLInputElement>('input[placeholder*="focus"]');
+                            input?.focus();
+                          }}
+                          className="text-muted-foreground hover:text-primary transition-colors"
+                          title={`Add focus for ${displayName(group.email)}`}
+                        >
+                          <Plus className="h-3.5 w-3.5" />
+                        </button>
+                      )}
                       <span className="text-xs text-muted-foreground">{completed}/{total}</span>
                       <div className="w-16 h-1.5 rounded-full bg-muted overflow-hidden">
                         <div
@@ -339,8 +378,8 @@ export function FocusBoardSection() {
                         >
                           <Checkbox
                             checked={item.completed}
-                            onCheckedChange={() => isMe && toggleComplete(item.id, item.completed)}
-                            disabled={!isMe}
+                            onCheckedChange={() => (isMe || isAdmin) && toggleComplete(item.id, item.completed)}
+                            disabled={!isMe && !isAdmin}
                             className="shrink-0"
                           />
                           <div className="flex-1 min-w-0 flex items-center gap-2">
@@ -370,7 +409,7 @@ export function FocusBoardSection() {
                               </span>
                             )}
                           </div>
-                          {isMe && !item.completed && !isEditingThis && (
+                          {(isMe || isAdmin) && !item.completed && !isEditingThis && (
                             <div className="flex items-center gap-4 opacity-0 group-hover/item:opacity-100 transition-opacity">
                               <button
                                 onClick={() => { setEditingFocusId(item.id); setEditingFocusTitle(item.title); }}

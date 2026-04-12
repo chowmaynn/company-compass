@@ -26,6 +26,34 @@ export interface FocusItem {
   updated_at: string;
 }
 
+// ── Team Users ──────────────────────────────────────────────
+
+export async function fetchTeamUsers(): Promise<{ user_id: string; user_email: string }[]> {
+  const headers = await getSupabaseHeaders();
+  // Query the team_members view (exposes auth.users id + email)
+  const res = await fetch(
+    `${SUPABASE_URL}/rest/v1/team_members?select=user_id,user_email&order=user_email`,
+    { headers }
+  );
+  if (res.ok) {
+    const rows: { user_id: string; user_email: string }[] = await res.json();
+    if (Array.isArray(rows) && rows.length > 0) return rows;
+  }
+  // Fallback: distinct users from team_tasks
+  const fallback = await fetch(
+    `${SUPABASE_URL}/rest/v1/team_tasks?select=user_id,user_email&order=user_email`,
+    { headers }
+  );
+  if (!fallback.ok) return [];
+  const fbRows: { user_id: string; user_email: string }[] = await fallback.json();
+  const seen = new Set<string>();
+  return fbRows.filter((r) => {
+    if (seen.has(r.user_id)) return false;
+    seen.add(r.user_id);
+    return true;
+  });
+}
+
 // ── Focus Items ──────────────────────────────────────────────
 
 export async function fetchFociForWeek(weekStart: string): Promise<FocusItem[]> {

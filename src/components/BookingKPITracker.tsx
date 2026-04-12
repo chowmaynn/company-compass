@@ -476,11 +476,24 @@ export function BookingKPITracker() {
       }
       case "allSources": {
         let total = 0;
+        const sourcesWithData = new Set<string>();
         for (const cat of Object.keys(cube[date] ?? {})) {
           if (cat.startsWith("source_")) {
+            sourcesWithData.add(cat);
             const totalBk = cube[date]?.[cat]?.total_bookings ?? 0;
             const casey = cube[date]?.[cat]?.casey_cancelled ?? 0;
             total += totalBk - casey;
+          }
+        }
+        // Include event-level fallbacks for sources that have no source_ entry
+        const EVENT_FALLBACKS: { source: string; event: string }[] = [
+          { source: "source_google", event: "AAA Accelerator Business Call (Google)" },
+          { source: "source_aios lp", event: "AAA Accelerator Business Call (Masterclass)" },
+          { source: "source_skool post", event: "AAA Accelerator Business Call (Skool P)" },
+        ];
+        for (const { source, event } of EVENT_FALLBACKS) {
+          if (!sourcesWithData.has(source)) {
+            total += cube[date]?.[`event_${event}`]?.qualified ?? 0;
           }
         }
         return total;

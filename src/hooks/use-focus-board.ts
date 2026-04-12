@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useRef } from "react";
+import { useCallback, useEffect, useMemo, useRef } from "react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { useAuth } from "@/hooks/use-auth";
 import {
@@ -11,6 +11,7 @@ import {
   createQuarterlyGoal,
   updateQuarterlyGoal,
   deleteQuarterlyGoal,
+  fetchTeamUsers,
   type FocusItem,
   type QuarterlyGoal,
 } from "@/lib/supabase-focus";
@@ -71,6 +72,13 @@ export function useFocusBoard() {
     staleTime: 10 * 60 * 1000,
   });
 
+  // Fetch distinct team users (for admin assignment)
+  const teamUsersQuery = useQuery({
+    queryKey: ["team-users"],
+    queryFn: fetchTeamUsers,
+    staleTime: 30 * 60 * 1000,
+  });
+
   // ── Carry-over logic ─────────────────────────────────────
   useEffect(() => {
     if (!userId || !fociQuery.data || carryOverDone.current) return;
@@ -103,11 +111,11 @@ export function useFocusBoard() {
   // ── Mutations ────────────────────────────────────────────
 
   const addFocus = useCallback(
-    async (title: string, quarterlyGoalId?: string | null) => {
+    async (title: string, quarterlyGoalId?: string | null, targetUserId?: string, targetUserEmail?: string) => {
       if (!userId || !title.trim()) return;
       const newItem = await createFocusItem({
-        user_id: userId,
-        user_email: userEmail,
+        user_id: targetUserId ?? userId,
+        user_email: targetUserEmail ?? userEmail,
         title: title.trim(),
         week_start: weekStart,
         quarterly_goal_id: quarterlyGoalId ?? null,
@@ -199,9 +207,19 @@ export function useFocusBoard() {
     [quarter, queryClient]
   );
 
+  // Ensure current user is in the team users list
+  const teamUsers = useMemo(() => {
+    const raw = teamUsersQuery.data ?? [];
+    if (userId && userEmail && !raw.some((u) => u.user_id === userId)) {
+      return [{ user_id: userId, user_email: userEmail }, ...raw];
+    }
+    return raw;
+  }, [teamUsersQuery.data, userId, userEmail]);
+
   return {
     foci: fociQuery.data ?? [],
     goals: goalsQuery.data ?? [],
+    teamUsers,
     weekStart,
     weekLabel,
     quarter,
