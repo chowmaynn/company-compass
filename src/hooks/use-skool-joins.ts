@@ -136,13 +136,23 @@ export function useSkoolJoins(): SkoolJoinsData {
 }
 
 /**
- * Convert a NZ date string (YYYY-MM-DD) to UTC ISO for the start of that NZ day.
- * NZ is UTC+12 (NZST) or UTC+13 (NZDT). We approximate using a fixed offset;
- * for exact accuracy we'd need a timezone library, but ±1h is acceptable here.
+ * Convert a NZ date string (YYYY-MM-DD) to UTC ISO for the start/end of that NZ day.
+ * Uses the browser's Intl API to get the correct NZ offset (handles DST automatically).
+ * e.g. NZ Apr 13 midnight = Apr 12 12:00:00 UTC (NZST, UTC+12)
  */
 function dayToUtc(date: string, endOfDay = false): string {
-  // Use UTC day boundaries to match Skool lead log timestamps
-  return `${date}T${endOfDay ? "23:59:59" : "00:00:00"}Z`;
+  // Parse as NZ time by creating a date and finding the NZ offset
+  const probe = new Date(`${date}T${endOfDay ? "23:59:59" : "00:00:00"}`);
+  // Get what NZ thinks this moment is vs UTC
+  const nzStr = probe.toLocaleString("en-US", { timeZone: "Pacific/Auckland" });
+  const nzTime = new Date(nzStr);
+  const utcStr = probe.toLocaleString("en-US", { timeZone: "UTC" });
+  const utcTime = new Date(utcStr);
+  const offsetMs = nzTime.getTime() - utcTime.getTime();
+
+  // Target: the UTC moment when it's midnight (or 23:59:59) in NZ on this date
+  const nzMoment = new Date(`${date}T${endOfDay ? "23:59:59" : "00:00:00"}Z`);
+  return new Date(nzMoment.getTime() - offsetMs).toISOString();
 }
 
 /**
