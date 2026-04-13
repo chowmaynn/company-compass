@@ -75,12 +75,15 @@ export async function getCategorizedClicks(
     }
 
     const byDate = new Map<string, number>();
-    const BATCH_SIZE = 10;
+    const BATCH_SIZE = 5;
 
     for (let i = 0; i < links.length; i += BATCH_SIZE) {
       const batch = links.slice(i, i + BATCH_SIZE);
       const batchResults = await Promise.all(
-        batch.map((id) => fetchDailyClicks(id, days).catch(() => [] as ClicksByDay[]))
+        batch.map((id) => fetchDailyClicks(id, days).catch((err) => {
+          console.warn(`Bitly fetch failed for ${id}:`, err);
+          return [] as ClicksByDay[];
+        }))
       );
 
       for (const linkClicks of batchResults) {
@@ -88,6 +91,11 @@ export async function getCategorizedClicks(
           const date = entry.date.slice(0, 10);
           byDate.set(date, (byDate.get(date) || 0) + entry.clicks);
         }
+      }
+
+      // Throttle between batches to avoid Bitly rate limits
+      if (i + BATCH_SIZE < links.length) {
+        await new Promise((r) => setTimeout(r, 500));
       }
     }
 

@@ -344,7 +344,7 @@ export function useScorecard(month: string = DEFAULT_MONTH) {
 
     const parseWeekVal = (raw: number | string): number | null => {
       if (typeof raw === "number") return raw;
-      const s = String(raw).replace(/,/g, "").trim();
+      const s = String(raw).replace(/[$,]/g, "").trim();
       if (s === "—" || s === "") return null;
       const lower = s.toLowerCase();
       if (lower.endsWith("k")) { const n = parseFloat(lower); return isNaN(n) ? null : n * 1000; }
