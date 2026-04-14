@@ -27,11 +27,21 @@ function getCatchUpDateLabel(usFormat: boolean, configs: typeof defaultWeekConfi
   return `${fmt(startDay, mmStr)}\u2013${fmt(endDay, mmStr)}`;
 }
 
-function formatDateLabel(dateLabel: string, usFormat: boolean): string {
-  if (!usFormat) return dateLabel;
-  // dateLabel is "dd/mm" — flip to "mm/dd"
-  const [day, month] = dateLabel.split("/");
-  return `${month}/${day}`;
+function formatWeekRange(wc: { start: string; end: string }, usFormat: boolean, nzOffset: number): string {
+  const toNZ = (iso: string) => {
+    const d = new Date(iso);
+    return new Date(d.getTime() + nzOffset * 60 * 60 * 1000);
+  };
+  const startNZ = toNZ(wc.start);
+  // end is exclusive (next week's start), so subtract 1 day
+  const endNZ = new Date(toNZ(wc.end).getTime() - 86400000);
+  const dd = (n: number) => String(n).padStart(2, "0");
+  const fmt = (d: Date) => {
+    const day = dd(d.getUTCDate());
+    const month = dd(d.getUTCMonth() + 1);
+    return usFormat ? `${month}/${day}` : `${day}/${month}`;
+  };
+  return `${fmt(startNZ)}–${fmt(endNZ)}`;
 }
 
 interface MetricTableProps {
@@ -51,6 +61,11 @@ interface MetricTableProps {
 export function MetricTable({ metrics, onMetricChange, readOnlyMetrics, currencyRate, usDateFormat, canEditMetric, month }: MetricTableProps) {
   const usFormat = !!usDateFormat;
   const weekConfigs = month ? generateWeekConfigs(month) : defaultWeekConfigs;
+  // Compute NZ offset from first week config
+  const nzOffset = useMemo(() => {
+    const w1Month = new Date(weekConfigs[0].start).getUTCMonth();
+    return (w1Month >= 9 || w1Month <= 2) ? 13 : 12;
+  }, [weekConfigs]);
   const convert = (val: number | string | ""): number | string | "" => {
     if (!currencyRate || val === "" || val === "—") return val;
     if (typeof val === "number") return Math.round(val * currencyRate);
@@ -79,7 +94,7 @@ export function MetricTable({ metrics, onMetricChange, readOnlyMetrics, currency
               <th key={wc.label} colSpan={2} className="px-1 py-2 text-center font-semibold text-foreground border-r border-border/30">
                 <div className="flex flex-col items-center">
                   <span>{wc.label}</span>
-                  <span className="text-[10px] font-normal text-muted-foreground">{formatDateLabel(wc.dateLabel, usFormat)}</span>
+                  <span className="text-[10px] font-normal text-muted-foreground">{formatWeekRange(wc, usFormat, nzOffset)}</span>
                 </div>
               </th>
             ))}
