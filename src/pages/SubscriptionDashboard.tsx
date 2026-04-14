@@ -468,8 +468,8 @@ function FinancialOverview({ convert, symbol }: { convert: (v: number) => number
       {/* ── Revenue, CoGs & Rev/Employee Chart ─────────────────────── */}
       <Card className="border-border/50">
         <CardContent className="p-5">
-          <h3 className="text-sm font-semibold text-foreground mb-1">Revenue, Cost of Goods & Revenue per Employee</h3>
-          <p className="text-xs text-muted-foreground mb-4">Monthly · Rev/Employee on right axis</p>
+          <h3 className="text-sm font-semibold text-foreground mb-1">Revenue & Cost of Goods</h3>
+          <p className="text-xs text-muted-foreground mb-4">Monthly trend</p>
           {loading ? (
             <div className="flex items-center justify-center py-16"><LoadingDots /></div>
           ) : (
@@ -488,8 +488,34 @@ function FinancialOverview({ convert, symbol }: { convert: (v: number) => number
                 <Legend wrapperStyle={{ fontSize: 11 }} />
                 <Area type="monotone" dataKey="revenue" name="Revenue" stroke="#10b981" strokeWidth={2} fill="url(#revGrad)" dot={false} activeDot={{ r: 4, fill: "#10b981" }} />
                 <Bar dataKey="cogs" name="Cost of Goods" fill="#f59e0b" radius={[3, 3, 0, 0]} barSize={20} opacity={0.7} />
-                <Line type="monotone" dataKey="revPerEmployee" name="Rev/Employee" stroke="#3b82f6" strokeWidth={2} dot={{ r: 3, fill: "#3b82f6" }} />
               </ComposedChart>
+            </ResponsiveContainer>
+          )}
+        </CardContent>
+      </Card>
+
+      {/* ── Revenue per Employee ────────────────────────────────── */}
+      <Card className="border-border/50">
+        <CardContent className="p-5">
+          <h3 className="text-sm font-semibold text-foreground mb-1">Revenue per Employee</h3>
+          <p className="text-xs text-muted-foreground mb-4">Monthly trend</p>
+          {loading ? (
+            <div className="flex items-center justify-center py-12"><LoadingDots /></div>
+          ) : (
+            <ResponsiveContainer width="100%" height={160}>
+              <AreaChart data={chartData} margin={{ top: 5, right: 10, left: -10, bottom: 0 }}>
+                <defs>
+                  <linearGradient id="rpeGrad" x1="0" y1="0" x2="0" y2="1">
+                    <stop offset="5%" stopColor="#3b82f6" stopOpacity={0.2} />
+                    <stop offset="95%" stopColor="#3b82f6" stopOpacity={0} />
+                  </linearGradient>
+                </defs>
+                <CartesianGrid strokeDasharray="3 3" stroke={GRID} vertical={false} />
+                <XAxis dataKey="month" tick={{ fontSize: 10, fill: TICK }} axisLine={{ stroke: GRID }} tickLine={false} />
+                <YAxis tick={{ fontSize: 10, fill: TICK }} axisLine={false} tickLine={false} tickFormatter={(v: number) => `$${compact(v)}`} />
+                <Tooltip contentStyle={CHART_TOOLTIP} formatter={(v: number) => [`$${compact(v)}`, "Rev/Employee"]} />
+                <Area type="monotone" dataKey="revPerEmployee" name="Rev/Employee" stroke="#3b82f6" strokeWidth={2} fill="url(#rpeGrad)" dot={{ r: 3, fill: "#3b82f6" }} activeDot={{ r: 4, fill: "#3b82f6" }} />
+              </AreaChart>
             </ResponsiveContainer>
           )}
         </CardContent>

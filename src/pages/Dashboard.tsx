@@ -4,7 +4,9 @@ import { generateWeekConfigs } from "@/data/scorecardData";
 import { useScorecard } from "@/hooks/use-scorecard";
 import { useCurrency, useSelectedMonth } from "@/components/AppLayout";
 import { fetchRevenueHistory, fetchFinancialSummary, type ScorecardRow } from "@/lib/supabase-scorecard";
+import { fetchSalesTracking } from "@/lib/supabase-sales";
 import { useAuth } from "@/hooks/use-auth";
+import { useFinanceOverview } from "@/hooks/use-finance-overview";
 import { FunnelSankey } from "@/components/FunnelSankey";
 import { FocusBoardSection } from "@/components/FocusBoardSection";
 import { DateRangePicker, type DateRangeValue } from "@/components/DateRangePicker";
@@ -17,6 +19,101 @@ import {
   Tooltip,
   ResponsiveContainer,
 } from "recharts";
+
+// ── Speedometer Gauge ────────────────────────────────────────
+
+function SpeedometerCard({
+  label,
+  value,
+  target,
+  symbol,
+  formatValue,
+  subtitle,
+}: {
+  label: string;
+  value: number | null;
+  target: number | null;
+  symbol: string;
+  formatValue?: (v: number) => string;
+  subtitle?: string;
+}) {
+  const fmt = formatValue ?? ((v: number) => `${symbol}${compactNumber(v)}`);
+  const pct = value !== null && target !== null && target > 0 ? Math.min((value / target) * 100, 120) : null;
+
+  // SVG arc params — 240 degree sweep (from 150° to 390°)
+  const cx = 130, cy = 130, r = 100;
+  const startAngle = 150, endAngle = 390, sweep = endAngle - startAngle;
+
+  const polarToCart = (angle: number) => {
+    const rad = (angle * Math.PI) / 180;
+    return { x: cx + r * Math.cos(rad), y: cy + r * Math.sin(rad) };
+  };
+
+  const arcPath = (fromAngle: number, toAngle: number) => {
+    const start = polarToCart(fromAngle);
+    const end = polarToCart(toAngle);
+    const largeArc = toAngle - fromAngle > 180 ? 1 : 0;
+    return `M ${start.x} ${start.y} A ${r} ${r} 0 ${largeArc} 1 ${end.x} ${end.y}`;
+  };
+
+  const bgPath = arcPath(startAngle, endAngle);
+  const fillAngle = pct !== null ? startAngle + (sweep * Math.min(pct, 100)) / 100 : startAngle;
+  const fillPath = pct !== null && pct > 0 ? arcPath(startAngle, fillAngle) : "";
+
+  const color = pct === null ? "stroke-muted-foreground"
+    : pct >= 80 ? "stroke-emerald-500"
+    : pct >= 50 ? "stroke-amber-400"
+    : "stroke-red-400";
+
+  return (
+    <Card className="overflow-hidden p-5 flex flex-col items-center">
+      <span className="text-sm font-medium text-muted-foreground">{label}</span>
+      {subtitle && (
+        <span className="text-[10px] text-muted-foreground mb-1">{subtitle}</span>
+      )}
+      <div className="relative w-[260px] h-[190px]">
+        <svg viewBox="0 0 260 210" className="w-full h-full">
+          {/* Background track */}
+          <path d={bgPath} fill="none" strokeWidth={12} strokeLinecap="round"
+            className="stroke-muted/50" />
+          {/* Fill arc */}
+          {fillPath && (
+            <path d={fillPath} fill="none" strokeWidth={12} strokeLinecap="round"
+              className={color} style={{ transition: "stroke-dashoffset 0.6s ease" }} />
+          )}
+          {/* Tick marks */}
+          {[0, 25, 50, 75, 100].map((tick) => {
+            const angle = startAngle + (sweep * tick) / 100;
+            const outer = polarToCart(angle);
+            const inner = { x: cx + (r - 10) * Math.cos((angle * Math.PI) / 180), y: cy + (r - 10) * Math.sin((angle * Math.PI) / 180) };
+            return (
+              <line key={tick} x1={inner.x} y1={inner.y} x2={outer.x} y2={outer.y}
+                strokeWidth={1.5} className="stroke-muted-foreground/30" />
+            );
+          })}
+        </svg>
+        {/* Center value */}
+        <div className="absolute inset-0 flex flex-col items-center justify-center pt-4">
+          <span className="text-xl font-bold tracking-tight text-foreground">
+            {value !== null ? fmt(value) : "—"}
+          </span>
+          {target !== null && (
+            <span className="text-[10px] text-muted-foreground">
+              Target: {fmt(target)}
+            </span>
+          )}
+          {pct !== null && (
+            <span className={`text-xs font-mono font-semibold mt-0.5 ${
+              pct >= 80 ? "text-emerald-500" : pct >= 50 ? "text-amber-400" : "text-red-400"
+            }`}>
+              {Math.round(pct)}%
+            </span>
+          )}
+        </div>
+      </div>
+    </Card>
+  );
+}
 
 // ── Helpers ──────────────────────────────────────────────────
 
@@ -102,6 +199,31 @@ export default function Dashboard() {
       .catch(() => {});
   }, []);
 
+  // Deals closed for active month (from sales_tracking)
+  const [monthlyCloses, setMonthlyCloses] = useState<number | null>(null);
+  useEffect(() => {
+    if (!activeMonth) return;
+    let cancelled = false;
+    fetchSalesTracking(activeMonth).then((rows) => {
+      if (!cancelled) {
+        const total = rows.reduce((sum, r) => sum + (r.closes ?? 0), 0);
+        setMonthlyCloses(total);
+      }
+    });
+    return () => { cancelled = true; };
+  }, [activeMonth]);
+
+  // Finance data from Supabase (for gauges)
+  const financeOverview = useFinanceOverview();
+  // Match finance data to the selected month, fall back to latest
+  const selectedFinance = useMemo(() => {
+    if (financeOverview.data.length === 0) return null;
+    const match = financeOverview.data.find((d) => d.month === activeMonth);
+    if (match) return match;
+    // Fall back to latest
+    return financeOverview.data[0];
+  }, [financeOverview.data, activeMonth]);
+
   // Multi-month financial summary (Revenue + Cash Collected summed across range)
   const [financialSummary, setFinancialSummary] = useState<ScorecardRow[]>([]);
   useEffect(() => {
@@ -171,77 +293,30 @@ export default function Dashboard() {
         </div>
       </div>
 
-      {/* ── Financial Overview + Revenue Chart (single card) ── */}
-      <Card className="overflow-hidden" data-glass-padding="4px">
-        <div className="flex flex-col lg:flex-row">
-          {/* Left: Summary stats */}
-          <div className="lg:w-[280px] shrink-0 lg:border-r border-white/[0.06]">
-            <div className="p-5">
-              <span className="text-sm font-medium text-muted-foreground mb-2 block">Cash Collected</span>
-              <p className="text-3xl font-bold tracking-tight text-foreground">
-                {cashActual !== null ? `${symbol}${compactNumber(convert(cashActual))}` : "—"}
-              </p>
-              <p className="text-xs text-muted-foreground mt-1">Target: {cashTarget !== null ? `${symbol}${compactNumber(convert(cashTarget))}` : "—"}</p>
-              {cashPct !== null && (
-                <div className="mt-3">
-                  <div className="flex justify-between text-xs mb-1.5">
-                    <span className="text-muted-foreground">Progress</span>
-                    <span className={`font-mono font-semibold ${cashPct >= 80 ? "text-status-green" : cashPct >= 50 ? "text-status-yellow" : "text-status-red"}`}>{cashPct}%</span>
-                  </div>
-                  <div className="h-2 rounded-full bg-muted overflow-hidden">
-                    <div
-                      className={`h-full rounded-full transition-all ${cashPct >= 80 ? "bg-status-green" : cashPct >= 50 ? "bg-status-yellow" : "bg-status-red"}`}
-                      style={{ width: `${Math.min(cashPct, 100)}%` }}
-                    />
-                  </div>
-                </div>
-              )}
-            </div>
-            <div className="border-t border-white/[0.06] grid grid-cols-2 divide-x divide-white/[0.06]">
-              <div className="p-5 pt-3">
-                <span className="text-sm font-medium text-muted-foreground mb-2 block">Team Size</span>
-                <p className="text-3xl font-bold tracking-tight text-foreground">
-                  {headcount !== null ? headcount : "—"}
-                </p>
-                <p className="text-xs text-muted-foreground mt-1">Active employees</p>
-              </div>
-              <div className="p-5 pt-3">
-                <span className="text-sm font-medium text-muted-foreground mb-2 block">Revenue / Employee</span>
-                <p className="text-3xl font-bold tracking-tight text-foreground">
-                  {revActual !== null && headcount
-                    ? `${symbol}${compactNumber(convert(Math.round(revActual / headcount)))}`
-                    : "—"}
-                </p>
-                <p className="text-xs text-muted-foreground mt-1">
-                  {(() => {
-                    const now = new Date();
-                    const currentMonth = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, "0")}`;
-                    const prevMonth = now.getMonth() === 0
-                      ? `${now.getFullYear() - 1}-12`
-                      : `${now.getFullYear()}-${String(now.getMonth()).padStart(2, "0")}`;
-                    if (activeMonth === currentMonth) return "This month";
-                    if (activeMonth === prevMonth) return "Last month";
-                    const [y, m] = activeMonth.split("-");
-                    const names = ["", "Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
-                    return `${names[parseInt(m)]} ${y}`;
-                  })()}
-                </p>
-              </div>
-            </div>
-          </div>
-
-          {/* Right: Revenue Trend chart */}
-          <div className="flex-1 min-w-0">
-            <RevenueTrendChart
-              convert={convert}
-              symbol={symbol}
-              fallbackData={revenueWeekly}
-              months={rangeMonths}
-              selectedMonth={selectedMonth}
-            />
-          </div>
-        </div>
-      </Card>
+      {/* ── Financial Gauges ──────────────────────────────── */}
+      <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+        <SpeedometerCard
+          label="Revenue"
+          value={selectedFinance?.revenue != null ? convert(selectedFinance.revenue) : null}
+          target={selectedFinance?.revenue_target != null ? convert(selectedFinance.revenue_target) : null}
+          symbol={symbol}
+        />
+        <SpeedometerCard
+          label="Revenue / Employee"
+          value={selectedFinance?.revenue_per_employee != null ? convert(selectedFinance.revenue_per_employee) : null}
+          target={selectedFinance?.revenue_per_employee_target != null ? convert(selectedFinance.revenue_per_employee_target) : null}
+          symbol={symbol}
+          subtitle={`${selectedFinance?.headcount ?? headcount ?? "—"} employees`}
+        />
+        <SpeedometerCard
+          label="Deals Closed"
+          value={monthlyCloses}
+          target={100}
+          symbol=""
+          formatValue={(v) => String(v)}
+          subtitle={activeMonth}
+        />
+      </div>
 
       {/* ── Focus Board ─────────────────────────────────────── */}
       <FocusBoardSection />

@@ -7,13 +7,21 @@ import {
   createFocusItem,
   updateFocusItem,
   deleteFocusItem,
-  fetchQuarterlyGoals,
-  createQuarterlyGoal,
-  updateQuarterlyGoal,
-  deleteQuarterlyGoal,
+  fetchQuarterlyInitiatives,
+  createQuarterlyInitiative,
+  updateQuarterlyInitiative,
+  deleteQuarterlyInitiative,
+  fetchNorthStarMetrics,
+  createNorthStarMetric,
+  updateNorthStarMetric,
+  deleteNorthStarMetric,
   fetchTeamUsers,
+  fetchQuarterlySettings,
+  upsertQuarterlySettings,
   type FocusItem,
-  type QuarterlyGoal,
+  type QuarterlyInitiative,
+  type NorthStarMetric,
+  type QuarterlySettings,
 } from "@/lib/supabase-focus";
 
 // ── Helpers ──────────────────────────────────────────────────
@@ -46,13 +54,15 @@ export function getCurrentQuarter(): string {
 
 // ── Hook ─────────────────────────────────────────────────────
 
-export function useFocusBoard() {
+export function useFocusBoard(weekStartOverride?: string) {
   const { user } = useAuth();
   const queryClient = useQueryClient();
   const carryOverDone = useRef(false);
 
-  const weekStart = getCurrentWeekStart();
+  const currentWeekStart = getCurrentWeekStart();
+  const weekStart = weekStartOverride ?? currentWeekStart;
   const weekLabel = getWeekLabel(weekStart);
+  const isCurrentWeek = weekStart === currentWeekStart;
   const quarter = getCurrentQuarter();
   const userId = user?.id ?? "";
   const userEmail = user?.email ?? "";
@@ -65,10 +75,24 @@ export function useFocusBoard() {
     enabled: !!userId,
   });
 
-  // Fetch quarterly goals
-  const goalsQuery = useQuery({
-    queryKey: ["quarterly-goals", quarter],
-    queryFn: () => fetchQuarterlyGoals(quarter),
+  // Fetch quarterly initiatives
+  const initiativesQuery = useQuery({
+    queryKey: ["quarterly-initiatives", quarter],
+    queryFn: () => fetchQuarterlyInitiatives(quarter),
+    staleTime: 10 * 60 * 1000,
+  });
+
+  // Fetch north star metrics
+  const northStarsQuery = useQuery({
+    queryKey: ["north-stars"],
+    queryFn: fetchNorthStarMetrics,
+    staleTime: 10 * 60 * 1000,
+  });
+
+  // Fetch quarterly settings (rallying cry)
+  const settingsQuery = useQuery({
+    queryKey: ["quarterly-settings", quarter],
+    queryFn: () => fetchQuarterlySettings(quarter),
     staleTime: 10 * 60 * 1000,
   });
 
@@ -79,9 +103,9 @@ export function useFocusBoard() {
     staleTime: 30 * 60 * 1000,
   });
 
-  // ── Carry-over logic ─────────────────────────────────────
+  // ── Carry-over logic (only for current week) ────────────
   useEffect(() => {
-    if (!userId || !fociQuery.data || carryOverDone.current) return;
+    if (!isCurrentWeek || !userId || !fociQuery.data || carryOverDone.current) return;
     carryOverDone.current = true;
 
     const myItems = fociQuery.data.filter((f) => f.user_id === userId);
@@ -98,7 +122,7 @@ export function useFocusBoard() {
             user_email: userEmail,
             title: item.title,
             week_start: weekStart,
-            quarterly_goal_id: item.quarterly_goal_id,
+            quarterly_initiative_id: item.quarterly_initiative_id,
             carried_over_from: item.id,
           })
         )
@@ -108,17 +132,17 @@ export function useFocusBoard() {
     })();
   }, [userId, fociQuery.data, weekStart, userEmail, queryClient]);
 
-  // ── Mutations ────────────────────────────────────────────
+  // ── Focus Item Mutations ────────────────────────────────
 
   const addFocus = useCallback(
-    async (title: string, quarterlyGoalId?: string | null, targetUserId?: string, targetUserEmail?: string) => {
+    async (title: string, initiativeId?: string | null, targetUserId?: string, targetUserEmail?: string) => {
       if (!userId || !title.trim()) return;
       const newItem = await createFocusItem({
         user_id: targetUserId ?? userId,
         user_email: targetUserEmail ?? userEmail,
         title: title.trim(),
         week_start: weekStart,
-        quarterly_goal_id: quarterlyGoalId ?? null,
+        quarterly_initiative_id: initiativeId ?? null,
       });
       if (newItem) {
         queryClient.setQueryData<FocusItem[]>(["focus-board", weekStart], (old) =>
@@ -142,7 +166,6 @@ export function useFocusBoard() {
   const toggleComplete = useCallback(
     async (id: string, currentlyCompleted: boolean) => {
       const newCompleted = !currentlyCompleted;
-      // Optimistic update
       queryClient.setQueryData<FocusItem[]>(["focus-board", weekStart], (old) =>
         old?.map((f) =>
           f.id === id
@@ -160,7 +183,6 @@ export function useFocusBoard() {
 
   const removeFocus = useCallback(
     async (id: string) => {
-      // Optimistic update
       queryClient.setQueryData<FocusItem[]>(["focus-board", weekStart], (old) =>
         old?.filter((f) => f.id !== id)
       );
@@ -169,40 +191,134 @@ export function useFocusBoard() {
     [weekStart, queryClient]
   );
 
-  const addGoal = useCallback(
-    async (title: string, department?: string | null) => {
-      if (!userId || !title.trim()) return;
-      const newGoal = await createQuarterlyGoal({
-        title: title.trim(),
+  // ── Initiative Mutations ────────────────────────────────
+
+  interface InitiativeInput {
+    title: string;
+    department?: string | null;
+    northStarId?: string | null;
+    dueDate?: string | null;
+    owner?: string | null;
+    stakeholders?: string | null;
+  }
+
+  const addInitiative = useCallback(
+    async (input: InitiativeInput) => {
+      if (!userId || !input.title.trim()) return;
+      const newInit = await createQuarterlyInitiative({
+        title: input.title.trim(),
         quarter,
-        department: department ?? null,
+        department: input.department ?? null,
+        north_star_id: input.northStarId ?? null,
+        due_date: input.dueDate ?? null,
+        owner: input.owner ?? null,
+        stakeholders: input.stakeholders ?? null,
         created_by: userId,
       });
-      if (newGoal) {
-        queryClient.setQueryData<QuarterlyGoal[]>(["quarterly-goals", quarter], (old) =>
-          old ? [...old, newGoal] : [newGoal]
+      if (newInit) {
+        queryClient.setQueryData<QuarterlyInitiative[]>(["quarterly-initiatives", quarter], (old) =>
+          old ? [...old, newInit] : [newInit]
         );
       }
     },
     [userId, quarter, queryClient]
   );
 
-  const editGoal = useCallback(
-    async (id: string, title: string, department?: string | null) => {
-      queryClient.setQueryData<QuarterlyGoal[]>(["quarterly-goals", quarter], (old) =>
-        old?.map((g) => g.id === id ? { ...g, title, department: department ?? g.department } : g)
+  interface InitiativeUpdate {
+    title?: string;
+    department?: string | null;
+    northStarId?: string | null;
+    status?: QuarterlyInitiative["status"];
+    dueDate?: string | null;
+    owner?: string | null;
+    stakeholders?: string | null;
+  }
+
+  const editInitiative = useCallback(
+    async (id: string, updates: InitiativeUpdate) => {
+      const opt = (key: string, val: unknown) => val !== undefined ? { [key]: val } : {};
+      queryClient.setQueryData<QuarterlyInitiative[]>(["quarterly-initiatives", quarter], (old) =>
+        old?.map((i) => i.id === id ? {
+          ...i,
+          ...opt("title", updates.title),
+          ...opt("department", updates.department),
+          ...opt("north_star_id", updates.northStarId),
+          ...opt("status", updates.status),
+          ...opt("due_date", updates.dueDate),
+          ...opt("owner", updates.owner),
+          ...opt("stakeholders", updates.stakeholders),
+        } : i)
       );
-      await updateQuarterlyGoal(id, { title, department: department ?? undefined });
+      await updateQuarterlyInitiative(id, {
+        ...opt("title", updates.title),
+        ...opt("department", updates.department),
+        ...opt("north_star_id", updates.northStarId),
+        ...opt("status", updates.status),
+        ...opt("due_date", updates.dueDate),
+        ...opt("owner", updates.owner),
+        ...opt("stakeholders", updates.stakeholders),
+      });
     },
     [quarter, queryClient]
   );
 
-  const removeGoal = useCallback(
+  const removeInitiative = useCallback(
     async (id: string) => {
-      queryClient.setQueryData<QuarterlyGoal[]>(["quarterly-goals", quarter], (old) =>
-        old?.filter((g) => g.id !== id)
+      queryClient.setQueryData<QuarterlyInitiative[]>(["quarterly-initiatives", quarter], (old) =>
+        old?.filter((i) => i.id !== id)
       );
-      await deleteQuarterlyGoal(id);
+      await deleteQuarterlyInitiative(id);
+    },
+    [quarter, queryClient]
+  );
+
+  // ── North Star Mutations ────────────────────────────────
+
+  const addNorthStar = useCallback(
+    async (title: string, description?: string | null) => {
+      if (!userId || !title.trim()) return;
+      const newNs = await createNorthStarMetric({
+        title: title.trim(),
+        description: description ?? null,
+        created_by: userId,
+      });
+      if (newNs) {
+        queryClient.setQueryData<NorthStarMetric[]>(["north-stars"], (old) =>
+          old ? [...old, newNs] : [newNs]
+        );
+      }
+    },
+    [userId, queryClient]
+  );
+
+  const editNorthStar = useCallback(
+    async (id: string, title: string, description?: string | null) => {
+      queryClient.setQueryData<NorthStarMetric[]>(["north-stars"], (old) =>
+        old?.map((ns) => ns.id === id ? { ...ns, title, description: description ?? ns.description } : ns)
+      );
+      await updateNorthStarMetric(id, { title, description: description ?? undefined });
+    },
+    [queryClient]
+  );
+
+  const removeNorthStar = useCallback(
+    async (id: string) => {
+      queryClient.setQueryData<NorthStarMetric[]>(["north-stars"], (old) =>
+        old?.filter((ns) => ns.id !== id)
+      );
+      await deleteNorthStarMetric(id);
+    },
+    [queryClient]
+  );
+
+  // ── Rallying Cry ─────────────────────────────────────────
+
+  const saveRallyingCry = useCallback(
+    async (cry: string) => {
+      queryClient.setQueryData<QuarterlySettings | null>(["quarterly-settings", quarter], (old) =>
+        old ? { ...old, rallying_cry: cry } : { id: "", quarter, rallying_cry: cry, updated_at: new Date().toISOString() }
+      );
+      await upsertQuarterlySettings(quarter, cry);
     },
     [quarter, queryClient]
   );
@@ -218,18 +334,25 @@ export function useFocusBoard() {
 
   return {
     foci: fociQuery.data ?? [],
-    goals: goalsQuery.data ?? [],
+    initiatives: initiativesQuery.data ?? [],
+    northStars: northStarsQuery.data ?? [],
+    rallyingCry: settingsQuery.data?.rallying_cry ?? null,
+    saveRallyingCry,
     teamUsers,
     weekStart,
     weekLabel,
+    isCurrentWeek,
     quarter,
     addFocus,
     editFocus,
     toggleComplete,
     removeFocus,
-    addGoal,
-    editGoal,
-    removeGoal,
+    addInitiative,
+    editInitiative,
+    removeInitiative,
+    addNorthStar,
+    editNorthStar,
+    removeNorthStar,
     loading: fociQuery.isLoading,
   };
 }

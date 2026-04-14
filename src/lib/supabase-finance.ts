@@ -11,6 +11,8 @@ export interface FinanceMonthly {
   product_cost_ratio_pct: number | null;
   headcount: number | null;
   revenue_per_employee: number | null;
+  revenue_target: number | null;
+  revenue_per_employee_target: number | null;
 }
 
 export async function fetchFinanceMonthly(): Promise<FinanceMonthly[]> {
