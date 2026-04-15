@@ -59,8 +59,8 @@ async function firefliesQuery(query: string, variables: Record<string, unknown>)
  */
 async function fetchTranscriptsForTitle(title: string, fromDate: Date): Promise<FirefliesTranscript[]> {
   const query = `
-    query Transcripts($keyword: String, $fromDate: DateTime, $limit: Int) {
-      transcripts(keyword: $keyword, fromDate: $fromDate, limit: $limit) {
+    query Transcripts($keyword: String, $fromDate: DateTime, $limit: Int, $skip: Int) {
+      transcripts(keyword: $keyword, fromDate: $fromDate, limit: $limit, skip: $skip) {
         id
         title
         date
@@ -92,14 +92,35 @@ async function fetchTranscriptsForTitle(title: string, fromDate: Date): Promise<
     }
   `;
 
-  const data = await firefliesQuery(query, {
-    keyword: title,
-    fromDate: fromDate.toISOString(),
-    limit: 50,
-  }) as { transcripts: FirefliesTranscript[] };
+  const PAGE_SIZE = 50;
+  const all: FirefliesTranscript[] = [];
+  let skip = 0;
+
+  // Page until we get fewer than PAGE_SIZE back (= no more pages)
+  while (true) {
+    const data = await firefliesQuery(query, {
+      keyword: title,
+      fromDate: fromDate.toISOString(),
+      limit: PAGE_SIZE,
+      skip,
+    }) as { transcripts: FirefliesTranscript[] };
+
+    const page = data.transcripts ?? [];
+    all.push(...page);
+    console.log(`[fireflies-sync] "${title}" page skip=${skip}: ${page.length} fetched (running total ${all.length})`);
+
+    if (page.length < PAGE_SIZE) break;
+    skip += PAGE_SIZE;
+
+    // Safety cap — don't loop forever if Fireflies misbehaves
+    if (skip >= 5000) {
+      console.warn(`[fireflies-sync] Hit 5000-record safety cap for "${title}"`);
+      break;
+    }
+  }
 
   // Filter to exact title match (Fireflies keyword search is fuzzy)
-  return (data.transcripts ?? []).filter((t) => t.title === title);
+  return all.filter((t) => t.title === title);
 }
 
 async function upsertTranscript(t: FirefliesTranscript) {

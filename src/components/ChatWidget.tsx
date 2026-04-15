@@ -267,7 +267,7 @@ function MessageBubble({ message, streaming }: { message: ChatMessage; streaming
     <div className={`flex ${isUser ? "justify-end" : "justify-start"}`}>
       <div className={`max-w-[90%] ${isUser ? "order-2" : ""}`}>
         <div
-          className={`rounded-lg px-3 py-2 text-xs ${
+          className={`rounded-lg px-3 py-2 text-[16px] ${
             isUser
               ? "bg-primary text-primary-foreground"
               : "bg-muted/50 text-foreground"
@@ -286,7 +286,7 @@ function MessageBubble({ message, streaming }: { message: ChatMessage; streaming
                     p: ({children}) => <p className="mb-2 last:mb-0">{children}</p>,
                     ul: ({children}) => <ul className="list-disc pl-4 mb-2 space-y-0.5">{children}</ul>,
                     ol: ({children}) => <ol className="list-decimal pl-4 mb-2 space-y-0.5">{children}</ol>,
-                    li: ({children}) => <li className="text-xs">{children}</li>,
+                    li: ({children}) => <li className="text-[16px]">{children}</li>,
                     strong: ({children}) => <strong className="font-semibold text-foreground">{children}</strong>,
                     em: ({children}) => <em className="italic">{children}</em>,
                     code: ({children}) => <code className="text-[10px] bg-muted px-1 py-0.5 rounded">{children}</code>,
