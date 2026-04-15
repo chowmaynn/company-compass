@@ -13,7 +13,7 @@ import { Card, CardContent } from "@/components/ui/card";
 import { StatCard } from "@/components/StatCard";
 import { LoadingDots } from "@/components/LoadingDots";
 import { DashboardShell } from "@/components/DashboardShell";
-import { DateRangePicker, presetToRange, rangeToStrings, type DateRangeValue } from "@/components/DateRangePicker";
+import { DateRangePicker, presetToRange, type DateRangeValue } from "@/components/DateRangePicker";
 import { useCurrency } from "@/components/AppLayout";
 import { formatYearMonth } from "@/lib/dates";
 import { fmtCurrency } from "@/lib/formatNumber";
@@ -40,8 +40,13 @@ export default function SubscriptionDashboard() {
   const cfmt = (n: number) => fmtCurrency(convert(n), symbol);
 
   const [dateRange, setDateRange] = useState<DateRangeValue>(() => {
-    const { from, to } = presetToRange("TW");
-    return rangeToStrings(from, to);
+    const { startDate, endDate } = presetToRange("TW");
+    return {
+      start: startDate + "T00:00:00Z",
+      end: endDate + "T23:59:59Z",
+      startDate,
+      endDate,
+    };
   });
   // Round to day boundaries so query keys are stable across remounts
   const startTs = useMemo(() => {

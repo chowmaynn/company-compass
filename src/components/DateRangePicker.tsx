@@ -20,69 +20,105 @@ export interface DateRangeValue {
 }
 
 // ── Helpers ──────────────────────────────────────────────────
+// All date logic is anchored to NZ time (Pacific/Auckland) regardless
+// of where the user's browser is located. Operates purely on YYYY-MM-DD
+// strings to avoid any local-timezone interpretation by the JS Date constructor.
 
-function getCurrentMonthWeek(): { from: Date; to: Date; weekNum: number } {
-  const now = new Date();
-  const year = now.getFullYear();
-  const month = now.getMonth();
-  const monthStart = new Date(year, month, 1);
-
-  const sundays: Date[] = [monthStart];
-  for (let d = 1; d <= 31; d++) {
-    const date = new Date(year, month, d);
-    if (date.getMonth() !== month) break;
-    if (date.getDay() === 0 && d > 1) sundays.push(date);
-  }
-
-  let weekIdx = sundays.length - 1;
-  for (let i = 0; i < sundays.length - 1; i++) {
-    if (now < sundays[i + 1]) { weekIdx = i; break; }
-  }
-
-  const weekStart = sundays[weekIdx];
-  const nextSunday = weekIdx < sundays.length - 1
-    ? sundays[weekIdx + 1]
-    : new Date(year, month + 1, 1);
-  const weekEnd = now < nextSunday ? now : new Date(nextSunday.getTime() - 1);
-
-  return { from: weekStart, to: weekEnd, weekNum: weekIdx + 1 };
+/** Get today's date in NZ as YYYY-MM-DD. */
+function nzToday(): string {
+  return new Date().toLocaleDateString("en-CA", { timeZone: "Pacific/Auckland" });
 }
 
-export function presetToRange(preset: Exclude<Preset, "custom">): { from: Date; to: Date } {
-  const now = new Date();
+/** Add (or subtract) days from a YYYY-MM-DD string. Pure string math. */
+function addDays(dateStr: string, days: number): string {
+  // Use UTC math on a date-only timestamp — no local timezone involvement
+  const ms = Date.parse(dateStr + "T00:00:00Z") + days * 86400000;
+  return new Date(ms).toISOString().slice(0, 10);
+}
+
+/** Get the day-of-week (0=Sun, 1=Mon, ..., 6=Sat) for a YYYY-MM-DD string in NZ. */
+function dayOfWeek(dateStr: string): number {
+  return new Date(dateStr + "T00:00:00Z").getUTCDay();
+}
+
+/** Returns NZ year/month/day from a YYYY-MM-DD string. */
+function parts(dateStr: string): { y: number; m: number; d: number } {
+  const [y, m, d] = dateStr.split("-").map(Number);
+  return { y, m, d };
+}
+
+/** Format YYYY-MM-DD with month/day padding. */
+function fmt(y: number, m: number, d: number): string {
+  return `${y}-${String(m).padStart(2, "0")}-${String(d).padStart(2, "0")}`;
+}
+
+/** Returns the start (Sunday) of the current week in NZ + the current week's end. */
+function currentWeekRange(): { startDate: string; endDate: string } {
+  const today = nzToday();
+  const dow = dayOfWeek(today); // 0=Sun
+  const startDate = addDays(today, -dow);
+  return { startDate, endDate: today };
+}
+
+/** Returns first day of the current NZ month, and today. */
+function currentMonthRange(): { startDate: string; endDate: string } {
+  const today = nzToday();
+  const { y, m } = parts(today);
+  return { startDate: fmt(y, m, 1), endDate: today };
+}
+
+/** Returns the start and end of the previous NZ month. */
+function lastMonthRange(): { startDate: string; endDate: string } {
+  const today = nzToday();
+  const { y, m } = parts(today);
+  const prevY = m === 1 ? y - 1 : y;
+  const prevM = m === 1 ? 12 : m - 1;
+  // Last day of previous month: day 0 of current month
+  const lastDay = new Date(Date.UTC(y, m - 1, 0)).getUTCDate();
+  return { startDate: fmt(prevY, prevM, 1), endDate: fmt(prevY, prevM, lastDay) };
+}
+
+/** Returns 3 months ago to today. */
+function threeMonthsRange(): { startDate: string; endDate: string } {
+  const today = nzToday();
+  const { y, m, d } = parts(today);
+  const startY = m <= 3 ? y - 1 : y;
+  const startM = ((m - 3 + 12 - 1) % 12) + 1;
+  return { startDate: fmt(startY, startM, d), endDate: today };
+}
+
+/** Convert preset → NZ date strings (single source of truth). */
+export function presetToRange(preset: Exclude<Preset, "custom">): { startDate: string; endDate: string } {
   if (preset === "today") {
-    // Use NZ date for both start and end so GA4 gets a single-day range
-    const nzToday = toNZDate(now);
-    const todayDate = new Date(nzToday + "T00:00:00");
-    return { from: todayDate, to: todayDate };
+    const t = nzToday();
+    return { startDate: t, endDate: t };
   }
   if (preset === "yesterday") {
-    const nzToday = toNZDate(now);
-    const todayDate = new Date(nzToday + "T00:00:00");
-    const yesterdayDate = new Date(todayDate.getTime() - 86400000);
-    return { from: yesterdayDate, to: yesterdayDate };
+    const y = addDays(nzToday(), -1);
+    return { startDate: y, endDate: y };
   }
-  if (preset === "MTD") return { from: new Date(now.getFullYear(), now.getMonth(), 1), to: now };
-  if (preset === "TW")  { const w = getCurrentMonthWeek(); return { from: w.from, to: w.to }; }
-  if (preset === "LM") {
-    const lastMonthEnd = new Date(now.getFullYear(), now.getMonth(), 0, 23, 59, 59);
-    const lastMonthStart = new Date(lastMonthEnd.getFullYear(), lastMonthEnd.getMonth(), 1);
-    return { from: lastMonthStart, to: lastMonthEnd };
-  }
-  return { from: new Date(now.getFullYear(), now.getMonth() - 3, now.getDate()), to: now };
+  if (preset === "MTD") return currentMonthRange();
+  if (preset === "TW") return currentWeekRange();
+  if (preset === "LM") return lastMonthRange();
+  return threeMonthsRange();
 }
 
-export function rangeToStrings(from: Date, to: Date): DateRangeValue {
-  // Use NZ date strings for both display and query boundaries
-  // This ensures a NZ user selecting "Today" gets NZ-today, not UTC-today
-  const startDate = toNZDate(from);
-  const endDate = toNZDate(to);
+/** Build the full DateRangeValue from NZ date strings. */
+function buildRange(startDate: string, endDate: string): DateRangeValue {
   return {
     start: startDate + "T00:00:00Z",
     end: endDate + "T23:59:59Z",
     startDate,
     endDate,
   };
+}
+
+/**
+ * Backward-compat wrapper for the calendar picker which provides Date objects.
+ * Converts the picked Dates to NZ date strings.
+ */
+export function rangeToStrings(from: Date, to: Date): DateRangeValue {
+  return buildRange(toNZDate(from), toNZDate(to));
 }
 
 function fmtDateLabel(d: Date): string {
@@ -120,8 +156,13 @@ export function DateRangePicker({ defaultPreset = "TW", onChange }: Props) {
       }
       return null; // Don't emit until both dates are selected
     }
-    const { from, to } = presetToRange(preset as Exclude<Preset, "custom">);
-    return rangeToStrings(from, to);
+    const { startDate, endDate } = presetToRange(preset as Exclude<Preset, "custom">);
+    return {
+      start: startDate + "T00:00:00Z",
+      end: endDate + "T23:59:59Z",
+      startDate,
+      endDate,
+    };
   }, [preset, customRange]);
 
   useEffect(() => {
