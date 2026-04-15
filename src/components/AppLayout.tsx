@@ -1,4 +1,5 @@
 import { AppSidebar } from "@/components/AppSidebar";
+import { ChatWidget } from "@/components/ChatWidget";
 import { useAuth } from "@/hooks/use-auth";
 import { Outlet, useLocation, Link } from "react-router-dom";
 import { isAuthorized, getAuthUrl, clearTokens } from "@/lib/youtube-auth";
@@ -233,6 +234,7 @@ export function AppLayout() {
           </main>
         </div>
       </div>
+      <ChatWidget />
     </StatusModalContext.Provider>
     </CurrencyContext.Provider>
     </MonthContext.Provider>
