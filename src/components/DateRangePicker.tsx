@@ -235,5 +235,3 @@ export function DateRangePicker({ defaultPreset = "TW", onChange }: Props) {
   );
 }
 
-// Re-export helpers not already exported inline
-export { getCurrentMonthWeek };
