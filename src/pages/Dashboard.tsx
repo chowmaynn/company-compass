@@ -17,6 +17,7 @@ import { fetchVideoCountInRange } from "@/hooks/use-channel-videos";
 import { useWhosOut } from "@/hooks/use-whos-out";
 import { fetchPageSessions } from "@/lib/google-analytics";
 import { fetchWebinarJoins } from "@/lib/kit";
+import { getCategorizedClicks, getPerVideoClicks } from "@/lib/bitly";
 import { FunnelSankey } from "@/components/FunnelSankey";
 import { Checkbox } from "@/components/ui/checkbox";
 import { useFocusBoard, getCurrentWeekStart, getCurrentQuarter } from "@/hooks/use-focus-board";
@@ -311,6 +312,20 @@ export default function Dashboard() {
   });
   const websiteViewsValue = typeof websiteViewsQuery.data === "number" ? websiteViewsQuery.data : null;
 
+  // Bookings attribution: split the qualified bookings by source so we can draw
+  // connection lines from each Nurturing card to the Bookings gauge.
+  const nurturingBookings = useMemo(() => {
+    const breakdown = dailyBookings.salesEventBreakdown ?? [];
+    let website = 0, skool = 0, webinar = 0;
+    for (const e of breakdown) {
+      const n = e.name.toLowerCase();
+      if (n.startsWith("skool")) skool += e.qualified;
+      else if (n.startsWith("website")) website += e.qualified;
+      else if (n.includes("masterclass") || n.includes("webinar")) webinar += e.qualified;
+    }
+    return { website, skool, webinar };
+  }, [dailyBookings.salesEventBreakdown]);
+
   // YouTube videos → liam_videos table in Supabase (same source the Content page uses)
   const youtubeVideosQuery = useQuery({
     queryKey: ["liam-videos-count", range.startDate, range.endDate],
@@ -318,6 +333,45 @@ export default function Dashboard() {
     enabled: !!range.startDate && !!range.endDate,
   });
   const youtubeVideosValue = typeof youtubeVideosQuery.data === "number" ? youtubeVideosQuery.data : null;
+
+  // YouTube → Skool / Website attribution: Bitly clicks per category over the range.
+  // yt-skool → clicks on Bitly links from YouTube videos that land on Skool.
+  // yt-accelerator → clicks on Bitly links from YouTube videos that land on the website (accelerator LP).
+  const ytClicksQuery = useQuery({
+    queryKey: ["bitly-yt-clicks", range.startDate, range.endDate],
+    queryFn: async () => {
+      // Bitly's API only lets us pull per-day clicks for a number of days back from today.
+      // Pull enough days to cover the range start, then filter to the range below.
+      const today = toNZDate(new Date());
+      const days = Math.max(1, Math.ceil(
+        (Date.parse(today + "T00:00:00Z") - Date.parse(range.startDate + "T00:00:00Z")) / 86400000
+      ) + 1);
+      const clicks = await getCategorizedClicks(days);
+      const sumInRange = (rows: { date: string; clicks: number }[]) =>
+        rows
+          .filter((r) => r.date >= range.startDate && r.date <= range.endDate)
+          .reduce((s, r) => s + r.clicks, 0);
+      return {
+        ytToSkool: sumInRange(clicks.get("yt-skool") ?? []),
+        ytToWebsite: sumInRange(clicks.get("yt-accelerator") ?? []),
+      };
+    },
+    enabled: !!range.startDate && !!range.endDate,
+    staleTime: 30 * 60 * 1000,
+  });
+  const ytToSkoolClicks = ytClicksQuery.data?.ytToSkool ?? null;
+  const ytToWebsiteClicks = ytClicksQuery.data?.ytToWebsite ?? null;
+
+  // Per-video Bitly attribution: clicks driven specifically by videos PUBLISHED in this range.
+  // Rendered as a blue line layered over the grey aggregate line.
+  const perVideoClicksQuery = useQuery({
+    queryKey: ["bitly-per-video-clicks", range.startDate, range.endDate],
+    queryFn: () => getPerVideoClicks(range.startDate, range.endDate),
+    enabled: !!range.startDate && !!range.endDate,
+    staleTime: 30 * 60 * 1000,
+  });
+  const ytFromRangeVideosToSkool = perVideoClicksQuery.data?.ytToSkool ?? null;
+  const ytFromRangeVideosToWebsite = perVideoClicksQuery.data?.ytToWebsite ?? null;
 
   // Webinar joins → Kit (count of subscribers tagged with any "webinar" tag in range)
   const webinarJoinsQuery = useQuery({
@@ -460,6 +514,16 @@ export default function Dashboard() {
         skoolJoinsValue={skoolJoinsValue}
         websiteViewsValue={websiteViewsValue}
         webinarJoinsValue={webinarJoinsValue}
+        skoolBookings={nurturingBookings.skool}
+        websiteBookings={nurturingBookings.website}
+        webinarBookings={nurturingBookings.webinar}
+        ytToSkoolClicks={ytToSkoolClicks}
+        ytToWebsiteClicks={ytToWebsiteClicks}
+        ytFromRangeVideosToSkool={ytFromRangeVideosToSkool}
+        ytFromRangeVideosToWebsite={ytFromRangeVideosToWebsite}
+        ytClicksLoading={ytClicksQuery.isLoading}
+        ytPerVideoLoading={perVideoClicksQuery.isLoading}
+        bookingsAttributionLoading={dailyBookings.isLoading}
         youtubeVideosLoading={youtubeVideosQuery.isLoading}
         emailBroadcastsLoading={kit.loading}
         skoolJoinsLoading={skoolJoinsDaily.loading}

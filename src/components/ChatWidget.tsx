@@ -255,7 +255,7 @@ export function ChatWidget() {
             <Input
               value={input}
               onChange={(e) => setInput(e.target.value)}
-              placeholder="Ask anything..."
+              placeholder="Ask anything about our meetings..."
               disabled={loading}
               className="text-sm bg-white/[0.04] border-white/10 focus-visible:ring-white/20"
               onKeyDown={(e) => {

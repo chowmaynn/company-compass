@@ -15,6 +15,14 @@
   100% { transform: translateX(100%); }
 }
 
+/* "Scanning light" effect for SVG paths: a small bright segment travels along the path.
+ * The path needs `pathLength="100"` and an initial strokeDasharray; this animates
+ * the offset so the visible segment slides from one end to the other. */
+@keyframes line-shimmer {
+  0% { stroke-dashoffset: 110; }
+  100% { stroke-dashoffset: -10; }
+}
+
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
@@ -132,55 +140,43 @@
     min-height: 100vh;
   }
 
-  /* Metallic gradient sheen — two off-center radial highlights layered over the
-     base background. Fixed-position + pointer-events:none so it doesn't affect
-     layout or interaction. GPU-composited via transform: translateZ(0). */
+  /* Static radial vignette — never animates, lives on body so it doesn't share
+     a layer with the animated sheen above. */
+  body {
+    background-image: radial-gradient(
+      ellipse 100% 100% at 50% 50%,
+      transparent 20%,
+      rgba(0, 0, 0, 0.4) 100%
+    );
+    background-attachment: fixed;
+  }
+
+  /* Animated metallic sheen — a single asymmetric linear gradient that slowly drifts
+     across the viewport. We deliberately animate ONLY the transform (GPU-composited)
+     so this layer paints once and the browser just moves it around afterwards. */
   body::before {
     content: "";
     position: fixed;
-    /* Slightly larger than viewport so we can translate it without exposing edges */
-    inset: -10%;
+    /* Slight overshoot so translate doesn't expose edges. -3% works since translate is ±2%. */
+    inset: -3%;
     pointer-events: none;
     z-index: 0;
-    background:
-      linear-gradient(
-        var(--gradient-angle, 115deg),
-        transparent 25%,
-        hsl(var(--foreground) / calc(0.04 * var(--gradient-intensity, 1))) 40%,
-        hsl(var(--foreground) / calc(0.10 * var(--gradient-intensity, 1))) 50%,
-        hsl(var(--foreground) / calc(0.04 * var(--gradient-intensity, 1))) 60%,
-        transparent 75%
-      ),
-      radial-gradient(ellipse 100% 100% at 50% 50%, transparent 20%, rgba(0, 0, 0, 0.4) 100%);
+    background: linear-gradient(
+      115deg,
+      transparent 25%,
+      hsl(var(--foreground) / 0.04) 40%,
+      hsl(var(--foreground) / 0.10) 50%,
+      hsl(var(--foreground) / 0.04) 60%,
+      transparent 75%
+    );
     animation: gradient-drift 24s ease-in-out infinite;
     transform: translateZ(0);
     will-change: transform;
   }
 
-  /* Register CSS variables for animation (modern browsers).
-     This lets us animate the angle and intensity smoothly. */
-  @property --gradient-angle {
-    syntax: "<angle>";
-    inherits: true;
-    initial-value: 115deg;
-  }
-  @property --gradient-intensity {
-    syntax: "<number>";
-    inherits: true;
-    initial-value: 1;
-  }
-
   @keyframes gradient-drift {
-    0%, 100% {
-      --gradient-angle: 105deg;
-      --gradient-intensity: 0.8;
-      transform: translate3d(-2%, -1%, 0);
-    }
-    50% {
-      --gradient-angle: 125deg;
-      --gradient-intensity: 1.2;
-      transform: translate3d(2%, 1%, 0);
-    }
+    0%, 100% { transform: translate3d(-2%, -1%, 0); }
+    50%      { transform: translate3d( 2%,  1%, 0); }
   }
 
   /* Respect reduced-motion preference */
