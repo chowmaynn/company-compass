@@ -14,6 +14,7 @@ import { useFinanceOverview } from "@/hooks/use-finance-overview";
 import { useKitMarketing } from "@/hooks/use-kit-marketing";
 import { useSkoolJoinsByDate, sumJoinsInRange } from "@/hooks/use-skool-joins";
 import { fetchVideoCountInRange } from "@/hooks/use-channel-videos";
+import { useWhosOut } from "@/hooks/use-whos-out";
 import { fetchPageSessions } from "@/lib/google-analytics";
 import { FunnelSankey } from "@/components/FunnelSankey";
 import { Checkbox } from "@/components/ui/checkbox";
@@ -978,7 +979,7 @@ function StakeholderSelect({
       <button
         type="button"
         onClick={() => setOpen(!open)}
-        className="w-full text-xs bg-transparent border-b border-border/30 focus:border-primary/40 px-0 py-1 text-muted-foreground text-left truncate outline-none transition-colors"
+        className="w-full text-xs bg-transparent border-b border-border/30 focus:border-foreground/30 px-0 py-1 text-muted-foreground text-left truncate outline-none transition-colors"
       >
         {selected.length > 0 ? selected.map(s => displayName(s)).join(", ") : "Stakeholders"}
       </button>
@@ -994,6 +995,67 @@ function StakeholderSelect({
               />
               {displayName(u.user_email)}
             </label>
+          ))}
+        </div>
+      )}
+    </div>
+  );
+}
+
+/** Custom popover-based status selector that matches the ItemInitiativeChip glass-popover style. */
+function StatusSelect({
+  value,
+  onChange,
+}: {
+  value: InitiativeStatus;
+  onChange: (s: InitiativeStatus) => void;
+}) {
+  const [open, setOpen] = useState(false);
+  const ref = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    if (!open) return;
+    const handler = (e: MouseEvent) => {
+      if (ref.current && !ref.current.contains(e.target as Node)) setOpen(false);
+    };
+    document.addEventListener("mousedown", handler);
+    return () => document.removeEventListener("mousedown", handler);
+  }, [open]);
+
+  const statusStyle = (s: string) =>
+    s === "On-Track" ? "text-emerald-400 bg-emerald-500/10"
+      : s === "Behind" ? "text-amber-300 bg-amber-500/10"
+      : s === "Accomplished" ? "text-blue-400 bg-blue-500/10"
+      : "text-red-400 bg-red-500/10";
+
+  const options: InitiativeStatus[] = ["Not Started", "On-Track", "Behind", "Accomplished"];
+
+  return (
+    <div ref={ref} className="relative inline-block shrink-0">
+      <button
+        type="button"
+        onMouseDown={(e) => e.preventDefault()}
+        onClick={(e) => { e.stopPropagation(); setOpen(!open); }}
+        className={`text-[10px] font-medium rounded-full px-2 py-0.5 cursor-pointer transition-colors ${statusStyle(value)}`}
+      >
+        {value}
+      </button>
+      {open && (
+        <div className="absolute z-20 mt-1 right-0 bg-popover/95 backdrop-blur-xl border border-border/60 rounded-lg shadow-lg py-1 min-w-[140px]">
+          {options.map((s) => (
+            <button
+              key={s}
+              type="button"
+              onMouseDown={(e) => e.preventDefault()}
+              onClick={(e) => { e.stopPropagation(); onChange(s); setOpen(false); }}
+              className={`w-full text-left px-3 py-1.5 hover:bg-muted/50 transition-colors flex items-center ${
+                s === value ? "bg-muted/30" : ""
+              }`}
+            >
+              <span className={`text-[10px] font-medium rounded-full px-2 py-0.5 ${statusStyle(s)}`}>
+                {s}
+              </span>
+            </button>
           ))}
         </div>
       )}
@@ -1127,14 +1189,14 @@ function QuarterlyInitiativesCard({ activeId, onToggle }: { activeId: string | n
   return (
     <div className="space-y-3">
       {showAdd && (
-        <div className="space-y-2 p-3 rounded-lg bg-primary/[0.04] ring-1 ring-primary/15">
+        <div className="space-y-2 p-3 rounded-lg bg-white/[0.03] ring-1 ring-white/10">
           <input
             autoFocus
             type="text"
             value={newTitle}
             onChange={(e) => setNewTitle(e.target.value)}
             placeholder="e.g. Launch new pricing page this quarter"
-            className="w-full bg-transparent text-sm text-foreground placeholder:text-muted-foreground/60 border-b border-border/50 focus:border-primary/50 outline-none py-1.5 transition-colors"
+            className="w-full bg-transparent text-sm text-foreground placeholder:text-muted-foreground/60 border-b border-border/50 focus:border-foreground/40 outline-none py-1.5 transition-colors"
             onKeyDown={(e) => {
               if (e.key === "Enter") handleAdd();
               if (e.key === "Escape") setShowAdd(false);
@@ -1144,7 +1206,7 @@ function QuarterlyInitiativesCard({ activeId, onToggle }: { activeId: string | n
             <select
               value={newDept}
               onChange={(e) => setNewDept(e.target.value)}
-              className="w-full bg-transparent text-xs text-muted-foreground outline-none py-1 border-b border-border/30 focus:border-primary/40 transition-colors"
+              className="w-full bg-transparent text-xs text-muted-foreground outline-none py-1 border-b border-border/30 focus:border-foreground/30 transition-colors"
             >
               <option value="" disabled>Department *</option>
               <option value="company">Company</option>
@@ -1156,14 +1218,14 @@ function QuarterlyInitiativesCard({ activeId, onToggle }: { activeId: string | n
               type="date"
               value={newDueDate}
               onChange={(e) => setNewDueDate(e.target.value)}
-              className="w-full bg-transparent text-xs text-muted-foreground outline-none py-1 border-b border-border/30 focus:border-primary/40 transition-colors"
+              className="w-full bg-transparent text-xs text-muted-foreground outline-none py-1 border-b border-border/30 focus:border-foreground/30 transition-colors"
             />
           </div>
           <div className="grid grid-cols-2 gap-2">
             <select
               value={newOwner}
               onChange={(e) => setNewOwner(e.target.value)}
-              className="w-full bg-transparent text-xs text-muted-foreground outline-none py-1 border-b border-border/30 focus:border-primary/40 transition-colors"
+              className="w-full bg-transparent text-xs text-muted-foreground outline-none py-1 border-b border-border/30 focus:border-foreground/30 transition-colors"
             >
               <option value="">Owner</option>
               {teamUsers.map((u) => (
@@ -1180,7 +1242,7 @@ function QuarterlyInitiativesCard({ activeId, onToggle }: { activeId: string | n
             <select
               value={newNorthStarId}
               onChange={(e) => setNewNorthStarId(e.target.value)}
-              className="w-full bg-transparent text-xs text-muted-foreground outline-none py-1 border-b border-border/30 focus:border-primary/40 transition-colors"
+              className="w-full bg-transparent text-xs text-muted-foreground outline-none py-1 border-b border-border/30 focus:border-foreground/30 transition-colors"
             >
               <option value="">No North Star</option>
               {northStars.map((ns) => (
@@ -1189,7 +1251,7 @@ function QuarterlyInitiativesCard({ activeId, onToggle }: { activeId: string | n
             </select>
           )}
           <div className="flex items-center gap-3 pt-1">
-            <button onClick={handleAdd} disabled={!newTitle.trim() || !newDept} className="text-xs font-medium text-primary hover:text-primary/80 disabled:opacity-30 disabled:pointer-events-none transition-colors">Add</button>
+            <button onClick={handleAdd} disabled={!newTitle.trim() || !newDept} className="text-xs font-medium text-foreground hover:text-foreground/80 disabled:opacity-30 disabled:pointer-events-none transition-colors">Add</button>
             <button onClick={() => { setShowAdd(false); setNewTitle(""); setNewDept(""); setNewNorthStarId(""); setNewDueDate(""); setNewOwner(""); setNewStakeholders([]); }} className="text-xs text-muted-foreground hover:text-foreground transition-colors">Cancel</button>
           </div>
         </div>
@@ -1262,7 +1324,7 @@ function QuarterlyInitiativesCard({ activeId, onToggle }: { activeId: string | n
                 return (
                   <div
                     key={i.id}
-                    className="space-y-2 p-3 rounded-lg bg-primary/[0.04] ring-1 ring-primary/15"
+                    className="space-y-2 p-3 rounded-lg bg-white/[0.03] ring-1 ring-white/10"
                     onClick={(e) => e.stopPropagation()}
                   >
                     <input
@@ -1270,7 +1332,7 @@ function QuarterlyInitiativesCard({ activeId, onToggle }: { activeId: string | n
                       type="text"
                       value={editTitle}
                       onChange={(e) => setEditTitle(e.target.value)}
-                      className="w-full bg-transparent text-sm text-foreground border-b border-primary/40 outline-none py-0.5"
+                      className="w-full bg-transparent text-sm text-foreground border-b border-foreground/40 outline-none py-0.5"
                       onKeyDown={(e) => {
                         if (e.key === "Enter") saveEdit();
                         if (e.key === "Escape") setEditingId(null);
@@ -1280,7 +1342,7 @@ function QuarterlyInitiativesCard({ activeId, onToggle }: { activeId: string | n
                       <select
                         value={editDept}
                         onChange={(e) => setEditDept(e.target.value)}
-                        className="w-full bg-transparent text-xs text-muted-foreground outline-none py-1 border-b border-border/30 focus:border-primary/40 transition-colors"
+                        className="w-full bg-transparent text-xs text-muted-foreground outline-none py-1 border-b border-border/30 focus:border-foreground/30 transition-colors"
                       >
                         <option value="company">Company</option>
                         {DEPARTMENTS.map((d) => (
@@ -1291,14 +1353,14 @@ function QuarterlyInitiativesCard({ activeId, onToggle }: { activeId: string | n
                         type="date"
                         value={editDueDate}
                         onChange={(e) => setEditDueDate(e.target.value)}
-                        className="w-full bg-transparent text-xs text-muted-foreground outline-none py-1 border-b border-border/30 focus:border-primary/40 transition-colors"
+                        className="w-full bg-transparent text-xs text-muted-foreground outline-none py-1 border-b border-border/30 focus:border-foreground/30 transition-colors"
                       />
                     </div>
                     <div className="grid grid-cols-2 gap-2">
                       <select
                         value={editOwner}
                         onChange={(e) => setEditOwner(e.target.value)}
-                        className="w-full bg-transparent text-xs text-muted-foreground outline-none py-1 border-b border-border/30 focus:border-primary/40 transition-colors"
+                        className="w-full bg-transparent text-xs text-muted-foreground outline-none py-1 border-b border-border/30 focus:border-foreground/30 transition-colors"
                       >
                         <option value="">No owner</option>
                         {teamUsers.map((u) => (
@@ -1315,7 +1377,7 @@ function QuarterlyInitiativesCard({ activeId, onToggle }: { activeId: string | n
                       <select
                         value={editNorthStarId}
                         onChange={(e) => setEditNorthStarId(e.target.value)}
-                        className="w-full bg-transparent text-xs text-muted-foreground outline-none py-1 border-b border-border/30 focus:border-primary/40 transition-colors"
+                        className="w-full bg-transparent text-xs text-muted-foreground outline-none py-1 border-b border-border/30 focus:border-foreground/30 transition-colors"
                       >
                         <option value="">No North Star</option>
                         {northStars.map((ns) => (
@@ -1326,7 +1388,7 @@ function QuarterlyInitiativesCard({ activeId, onToggle }: { activeId: string | n
                     <select
                       value={editStatus}
                       onChange={(e) => setEditStatus(e.target.value as typeof editStatus)}
-                      className="w-full bg-transparent text-xs text-muted-foreground outline-none py-1 border-b border-border/30 focus:border-primary/40 transition-colors"
+                      className="w-full bg-transparent text-xs text-muted-foreground outline-none py-1 border-b border-border/30 focus:border-foreground/30 transition-colors"
                     >
                       <option value="Not Started">Not Started</option>
                       <option value="On-Track">On-Track</option>
@@ -1334,7 +1396,7 @@ function QuarterlyInitiativesCard({ activeId, onToggle }: { activeId: string | n
                       <option value="Accomplished">Accomplished</option>
                     </select>
                     <div className="flex gap-3 pt-0.5">
-                      <button onClick={saveEdit} className="text-[10px] font-medium text-primary hover:text-primary/80">Save</button>
+                      <button onClick={saveEdit} className="text-[10px] font-medium text-foreground hover:text-foreground/80">Save</button>
                       <button onClick={() => setEditingId(null)} className="text-[10px] text-muted-foreground hover:text-foreground">Cancel</button>
                     </div>
                   </div>
@@ -1368,17 +1430,10 @@ function QuarterlyInitiativesCard({ activeId, onToggle }: { activeId: string | n
                       )}
                     </button>
                     {isAdmin ? (
-                      <select
+                      <StatusSelect
                         value={i.status}
-                        onChange={(e) => { e.stopPropagation(); editInitiative(i.id, { status: e.target.value as InitiativeStatus }); }}
-                        onClick={(e) => e.stopPropagation()}
-                        className={`text-[10px] font-medium rounded-full px-2 py-0.5 shrink-0 border-none outline-none cursor-pointer appearance-none ${statusStyle(i.status)}`}
-                      >
-                        <option value="Not Started">Not Started</option>
-                        <option value="On-Track">On-Track</option>
-                        <option value="Behind">Behind</option>
-                        <option value="Accomplished">Accomplished</option>
-                      </select>
+                        onChange={(s) => editInitiative(i.id, { status: s })}
+                      />
                     ) : (
                       <span className={`text-[10px] font-medium rounded-full px-2 py-0.5 shrink-0 ${statusStyle(i.status)}`}>
                         {i.status}
@@ -1439,6 +1494,14 @@ const TEAM_LOCATIONS = [
 
 function TeamClocks() {
   const [now, setNow] = useState(() => new Date());
+  const { outFirstNames, outByName } = useWhosOut(); // BambooHR — who's on time off today
+
+  function fmtRange(start: string, end: string): string {
+    const fmt = (d: string) => new Date(d + "T12:00:00Z").toLocaleDateString("en-US", { month: "short", day: "numeric" });
+    if (start === end) return `Off: ${fmt(start)}`;
+    return `Off: ${fmt(start)} – ${fmt(end)}`;
+  }
+
   useEffect(() => {
     // Tick at the top of every minute so all clocks roll over together
     const next = 60_000 - (Date.now() % 60_000);
@@ -1470,19 +1533,37 @@ function TeamClocks() {
           .join("");
         const dayPeriod = parts.find((p) => p.type === "dayPeriod")?.value ?? "";
         const isAM = dayPeriod.toUpperCase() === "AM";
-        const tintBg = isAM ? "bg-amber-500/[0.06]" : "bg-sky-500/[0.06]";
-        const tintRing = isAM ? "ring-amber-500/20" : "ring-sky-500/15";
+        const isOut = outFirstNames.has(m.name.toLowerCase());
+
+        // When out, tint the pill red so vacation pops; otherwise AM=amber, PM=sky
+        const tintBg = isOut
+          ? "bg-red-500/[0.10]"
+          : isAM ? "bg-amber-500/[0.06]" : "bg-sky-500/[0.06]";
+        const tintRing = isOut
+          ? "ring-red-500/30"
+          : isAM ? "ring-amber-500/20" : "ring-sky-500/15";
+
         return (
           <div
             key={m.name}
             className={`flex items-center justify-between gap-2 px-3 py-1.5 rounded-full ${tintBg} ring-1 ${tintRing} backdrop-blur-sm`}
-            title={`${m.city} (${m.tz})`}
+            title={isOut ? `${m.name} is on vacation` : `${m.city} (${m.tz})`}
           >
             <div className="min-w-0">
-              <p className="text-[11px] font-semibold text-foreground leading-tight truncate">{m.name}</p>
-              <p className="text-[9px] text-muted-foreground/70 leading-tight truncate">{m.city}</p>
+              <p className="text-[11px] font-semibold text-foreground leading-tight truncate flex items-center gap-1">
+                {isOut && <span className="shrink-0" aria-label="On vacation">🌴</span>}
+                {m.name}
+              </p>
+              <p className="text-[9px] text-muted-foreground/70 leading-tight truncate">
+                {isOut
+                  ? (() => {
+                      const r = outByName.get(m.name.toLowerCase());
+                      return r ? fmtRange(r.start, r.end) : "On vacation";
+                    })()
+                  : m.city}
+              </p>
             </div>
-            <p className="text-[12px] font-mono tabular-nums shrink-0 text-foreground/90">
+            <p className={`text-[12px] font-mono tabular-nums shrink-0 ${isOut ? "text-muted-foreground/60 line-through" : "text-foreground/90"}`}>
               {clock}
               <span className="ml-1 text-muted-foreground">{dayPeriod}</span>
             </p>
