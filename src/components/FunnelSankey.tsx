@@ -27,6 +27,8 @@ interface Props {
    *  Rendered as a blue overlay so you can see "what new content is driving" vs the cumulative grey. */
   ytFromRangeVideosToSkool?: number | null;
   ytFromRangeVideosToWebsite?: number | null;
+  /** Skool → Website (Bitly skool-accelerator clicks) — drawn as a horizontal arc */
+  skoolToWebsiteClicks?: number | null;
   /** Loading flags so the YT→Nurturing lines can shimmer while data is being fetched */
   ytClicksLoading?: boolean;
   ytPerVideoLoading?: boolean;
@@ -136,6 +138,7 @@ export function FunnelSankey({
   ytToWebsiteClicks,
   ytFromRangeVideosToSkool,
   ytFromRangeVideosToWebsite,
+  skoolToWebsiteClicks,
   ytClicksLoading,
   ytPerVideoLoading,
   bookingsAttributionLoading,
@@ -282,13 +285,23 @@ export function FunnelSankey({
           loadingFromNew={!!ytPerVideoLoading}
         />
 
-        {/* ── Nurturing ─────────────────── */}
+        {/* ── Nurturing — custom layout that injects a slim Skool→Web indicator
+            column between the Skool and Website cards (instead of an arc above). ── */}
         <FunnelLevel widthClass="w-full max-w-[940px]">
-          <FunnelRow
-            stageLabel="Nurturing"
-            stages={data.nurturing}
-            gridCols="grid-cols-3"
-          />
+          <div>
+            <p className="text-[9px] font-bold text-muted-foreground uppercase tracking-widest text-center pb-3">
+              Nurturing
+            </p>
+            <div className="grid grid-cols-[1fr_auto_1fr_1fr] gap-1.5 items-center">
+              <FunnelCard stage={data.nurturing[0]} />
+              <SkoolToWebIndicator
+                count={skoolToWebsiteClicks ?? 0}
+                loading={!!ytClicksLoading}
+              />
+              <FunnelCard stage={data.nurturing[1]} />
+              <FunnelCard stage={data.nurturing[2]} />
+            </div>
+          </div>
         </FunnelLevel>
 
         {/* Source-attribution flow lines from Nurturing to Bookings */}
@@ -321,6 +334,30 @@ export function FunnelSankey({
           <GaugeSlot label="Cash Collected" gauge={cashGauge} fallbackStage={data.cashCollected} />
         </div>
       </div>
+    </div>
+  );
+}
+
+/** Inline lateral-flow indicator that lives in its OWN column inside the Nurturing row,
+ *  between the Skool Joins and Website Views cards. A short dotted line spans the
+ *  column with a count pill centered on it. */
+function SkoolToWebIndicator({ count, loading }: { count: number; loading?: boolean }) {
+  return (
+    <div className="relative flex items-center justify-center min-w-[64px] px-1">
+      {/* Dotted bridge line — spans the full column width behind the pill */}
+      <div className="absolute inset-x-0 top-1/2 -translate-y-1/2 border-t border-dashed border-emerald-400/40 pointer-events-none" />
+
+      {/* Centered pill — count or loader */}
+      {loading ? (
+        <div className="relative bg-background/95 px-2 py-1 rounded-full ring-1 ring-emerald-400/30 backdrop-blur-sm flex items-center text-emerald-300/70">
+          <LoadingIndicator size={12} className="text-emerald-300/70" />
+        </div>
+      ) : count > 0 ? (
+        <div className="relative bg-background/95 px-2 py-0.5 rounded-full ring-1 ring-emerald-400/40 backdrop-blur-sm text-[11px] font-mono font-semibold tabular-nums shadow-sm flex items-center gap-1 whitespace-nowrap text-foreground">
+          <span className="text-emerald-300/70">→</span>
+          {count}
+        </div>
+      ) : null}
     </div>
   );
 }
@@ -423,22 +460,35 @@ function FlowLabel({
   leftPct,
   topPct,
   count,
+  caption,
   accent,
 }: {
   leftPct: number;
   topPct: number;
   count: number;
-  accent?: "blue";
+  /** Short destination/direction tag shown before the count, e.g. "→ Skool". */
+  caption?: string;
+  accent?: "blue" | "amber" | "emerald";
 }) {
-  const blueClasses = "ring-blue-400/50 text-blue-300";
+  // Color cues for the ring/caption based on destination/series
+  const accentMap: Record<NonNullable<typeof accent>, { ring: string; caption: string }> = {
+    blue: { ring: "ring-blue-400/50", caption: "text-blue-300/80" },
+    amber: { ring: "ring-amber-400/50", caption: "text-amber-300/80" },
+    emerald: { ring: "ring-emerald-400/50", caption: "text-emerald-300/80" },
+  };
+  const a = accent ? accentMap[accent] : { ring: "ring-white/20", caption: "text-muted-foreground/70" };
+
   return (
     <div
-      className={`absolute -translate-x-1/2 -translate-y-1/2 px-2.5 py-0.5 rounded-full bg-background/95 ring-1 backdrop-blur-sm text-[12px] font-mono font-semibold tabular-nums shadow-sm ${
-        accent === "blue" ? blueClasses : "ring-white/20 text-foreground"
-      }`}
+      className={`absolute -translate-x-1/2 -translate-y-1/2 px-2.5 py-0.5 rounded-full bg-background/95 ring-1 ${a.ring} backdrop-blur-sm text-[11px] font-mono font-semibold tabular-nums shadow-sm flex items-center gap-1.5 whitespace-nowrap`}
       style={{ left: `${leftPct}%`, top: `${topPct}%` }}
     >
-      {count}
+      {caption && (
+        <span className={`text-[9px] uppercase tracking-wider font-semibold ${a.caption}`}>
+          {caption}
+        </span>
+      )}
+      <span className="text-foreground">{count}</span>
     </div>
   );
 }
@@ -487,15 +537,28 @@ function YouTubeToNurturingConnector({
   const xSkool = nurtOffset + 940 * (1 / 6);  // 100 + 156.7 = 256.7
   const xWebsite = nurtOffset + 940 * (3 / 6); // 100 + 470   = 570
 
-  // Quadratic Bezier curves swooping from YT down to each destination
-  const skoolPath = `M ${xYouTube} 4 C ${xYouTube} ${H * 0.6} ${xSkool} ${H * 0.4} ${xSkool} ${H - 6}`;
-  const websitePath = `M ${xYouTube} 4 C ${xYouTube} ${H * 0.65} ${xWebsite} ${H * 0.35} ${xWebsite} ${H - 6}`;
+  // Cubic Bezier control points for each line, kept in variables so we can both
+  // build the SVG path AND evaluate the curve at a parameter t to position labels
+  // exactly ON the line.
+  type Pt = [number, number];
+  const skoolP0: Pt = [xYouTube, 4],   skoolP1: Pt = [xYouTube, H * 0.6],   skoolP2: Pt = [xSkool, H * 0.4],   skoolP3: Pt = [xSkool, H - 6];
+  const webP0:   Pt = [xYouTube, 4],   webP1:   Pt = [xYouTube, H * 0.65],  webP2:   Pt = [xWebsite, H * 0.35], webP3:   Pt = [xWebsite, H - 6];
+  const skoolPath = `M ${skoolP0[0]} ${skoolP0[1]} C ${skoolP1[0]} ${skoolP1[1]} ${skoolP2[0]} ${skoolP2[1]} ${skoolP3[0]} ${skoolP3[1]}`;
+  const websitePath = `M ${webP0[0]} ${webP0[1]} C ${webP1[0]} ${webP1[1]} ${webP2[0]} ${webP2[1]} ${webP3[0]} ${webP3[1]}`;
 
-  // Label positions: roughly midway along each curve. Stack blue label slightly
-  // above the grey label when both are visible.
-  const labelY = H * 0.5;
-  const skoolLabelX = (xYouTube + xSkool) / 2;
-  const websiteLabelX = (xYouTube + xWebsite) / 2;
+  /** Evaluate a cubic Bezier at parameter t (0 = start, 1 = end). */
+  const bezier = (t: number, p0: Pt, p1: Pt, p2: Pt, p3: Pt): Pt => {
+    const u = 1 - t;
+    return [
+      u * u * u * p0[0] + 3 * u * u * t * p1[0] + 3 * u * t * t * p2[0] + t * t * t * p3[0],
+      u * u * u * p0[1] + 3 * u * u * t * p1[1] + 3 * u * t * t * p2[1] + t * t * t * p3[1],
+    ];
+  };
+
+  // Place each label exactly on its own curve at t = 0.7 (just past the midpoint,
+  // where the two curves have visibly fanned apart and labels can't collide).
+  const [skoolLabelX, skoolLabelY] = bezier(0.7, skoolP0, skoolP1, skoolP2, skoolP3);
+  const [websiteLabelX, websiteLabelY] = bezier(0.7, webP0, webP1, webP2, webP3);
 
   // Stroke width to use for the base line when we don't yet have data (loading) or
   // when no clicks were attributed — keeps the path visible as a thin guide rail.
@@ -509,10 +572,15 @@ function YouTubeToNurturingConnector({
 
   return (
     <div className="relative w-full max-w-[1100px] mx-auto py-1">
+      {/* Tiny caption anchoring the connector area */}
+      <div className="absolute left-2 top-0 text-[9px] font-bold uppercase tracking-widest text-muted-foreground/50 pointer-events-none">
+        Bitly Clicks
+      </div>
+
       <svg viewBox={`0 0 ${W} ${H}`} className="w-full h-12 overflow-visible" preserveAspectRatio="none">
-        {/* Grey base lines — always rendered (we always have YT→Skool/Website traffic) */}
-        <path d={skoolPath} stroke="currentColor" strokeWidth={baseSw(ytToSkool)} fill="none" className="text-muted-foreground/40" />
-        <path d={websitePath} stroke="currentColor" strokeWidth={baseSw(ytToWebsite)} fill="none" className="text-muted-foreground/40" />
+        {/* Color-coded lines by destination: amber = → Skool, emerald = → Website */}
+        <path d={skoolPath} stroke="rgb(251 191 36)" strokeWidth={baseSw(ytToSkool)} fill="none" opacity={0.55} />
+        <path d={websitePath} stroke="rgb(52 211 153)" strokeWidth={baseSw(ytToWebsite)} fill="none" opacity={0.55} />
 
         {/* Loading shimmer: a small bright segment scans along each line while data is loading */}
         {loadingBase && (
@@ -586,27 +654,41 @@ function YouTubeToNurturingConnector({
         )}
       </svg>
 
-      {/* Grey labels (cumulative) — only show once data has loaded */}
+      {/* Cumulative labels — sit exactly on each curve at t=0.7 */}
       {!loadingBase && ytToSkool > 0 && (
-        <FlowLabel leftPct={(skoolLabelX / W) * 100} topPct={(labelY / H) * 100} count={ytToSkool} />
+        <FlowLabel
+          leftPct={(skoolLabelX / W) * 100}
+          topPct={(skoolLabelY / H) * 100}
+          count={ytToSkool}
+          caption="→ Skool"
+          accent="amber"
+        />
       )}
       {!loadingBase && ytToWebsite > 0 && (
-        <FlowLabel leftPct={(websiteLabelX / W) * 100} topPct={(labelY / H) * 100} count={ytToWebsite} />
+        <FlowLabel
+          leftPct={(websiteLabelX / W) * 100}
+          topPct={(websiteLabelY / H) * 100}
+          count={ytToWebsite}
+          caption="→ Web"
+          accent="emerald"
+        />
       )}
-      {/* Blue labels (from this range's videos) — sit slightly below the grey label */}
+      {/* Blue "from new" labels — small offset below their primary label */}
       {!loadingFromNew && ytToSkoolFromNew > 0 && (
         <FlowLabel
           leftPct={(skoolLabelX / W) * 100}
-          topPct={(labelY / H) * 100 + 50}
+          topPct={(skoolLabelY / H) * 100 + 28}
           count={ytToSkoolFromNew}
+          caption="from new"
           accent="blue"
         />
       )}
       {!loadingFromNew && ytToWebsiteFromNew > 0 && (
         <FlowLabel
           leftPct={(websiteLabelX / W) * 100}
-          topPct={(labelY / H) * 100 + 50}
+          topPct={(websiteLabelY / H) * 100 + 28}
           count={ytToWebsiteFromNew}
+          caption="from new"
           accent="blue"
         />
       )}
