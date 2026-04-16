@@ -317,8 +317,6 @@ export function FunnelSankey({
           <GaugeSlot label="Total Bookings" gauge={bookingsGauge} fallbackStage={data.totalBookings} />
         </div>
 
-        <FlowArrow tight />
-
         {/* ── Show Rate + Close Rate — paired instruments side by side (no card chrome) ─── */}
         <div className="w-full max-w-[760px]">
           <div className="grid grid-cols-2 gap-3 items-center">
@@ -326,8 +324,6 @@ export function FunnelSankey({
             <GaugeSlot label="Close Rate" gauge={closeRateGauge} fallbackStage={data.closeRate} />
           </div>
         </div>
-
-        <FlowArrow tight />
 
         {/* ── Cash Collected — final gauge, narrowest spout (no card chrome) ─────── */}
         <div className="w-full max-w-[420px]">
