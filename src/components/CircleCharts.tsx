@@ -1,7 +1,7 @@
 import { useCircleCharts } from "@/hooks/use-circle-charts";
 import { Card, CardContent } from "@/components/ui/card";
 import { Loader2, AlertCircle } from "lucide-react";
-import { LoadingDots } from "@/components/LoadingDots";
+import { LoadingIndicator } from "@/components/LoadingIndicator";
 import { formatDay } from "@/lib/dates";
 import {
   AreaChart,
@@ -35,7 +35,7 @@ function ChartCard({ title, sub, children }: { title: string; sub?: string; chil
 function LoadingState() {
   return (
     <div className="flex items-center justify-center" style={{ height: 220 }}>
-      <LoadingDots />
+      <LoadingIndicator />
     </div>
   );
 }

@@ -28,7 +28,7 @@ import {
 
 import { GRID, TICK } from "@/lib/chart-theme";
 import { StatCard } from "@/components/StatCard";
-import { LoadingDots } from "@/components/LoadingDots";
+import { LoadingIndicator } from "@/components/LoadingIndicator";
 import { fmtDuration, elapsed } from "@/lib/dates";
 
 // ── Helpers ───────────────────────────────────────────────────
@@ -114,7 +114,7 @@ export default function SupportDashboard() {
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
         <StatCard
           label="Support Tickets"
-          value={loading ? <LoadingDots /> : totalTickets}
+          value={loading ? <LoadingIndicator /> : totalTickets}
           sub={loading ? "" : `${resolvedCount} resolved · ${openCount} open`}
           icon={MessageSquare}
           accent="text-indigo-600"
@@ -122,7 +122,7 @@ export default function SupportDashboard() {
         />
         <StatCard
           label="Resolution Rate"
-          value={loading ? <LoadingDots /> : resolutionRate !== null ? `${resolutionRate}%` : "—"}
+          value={loading ? <LoadingIndicator /> : resolutionRate !== null ? `${resolutionRate}%` : "—"}
           sub="Resolved ÷ Total"
           icon={CheckCircle2}
           accent={
@@ -140,7 +140,7 @@ export default function SupportDashboard() {
         />
         <StatCard
           label="Tracker Tickets"
-          value={loading ? <LoadingDots /> : totalTrackerTickets}
+          value={loading ? <LoadingIndicator /> : totalTrackerTickets}
           sub="Billing · Cancel · General · Refund"
           icon={Clock}
           accent="text-blue-600"
@@ -151,7 +151,7 @@ export default function SupportDashboard() {
         <Card className="border-border/50">
           <CardContent className="p-4 flex items-center gap-3">
             {loading ? (
-              <div className="flex items-center justify-center w-full py-4"><LoadingDots /></div>
+              <div className="flex items-center justify-center w-full py-4"><LoadingIndicator /></div>
             ) : donutData.length > 0 ? (
               <>
                 <ResponsiveContainer width={80} height={80}>
@@ -191,7 +191,7 @@ export default function SupportDashboard() {
             </span>
           </div>
           {loading ? (
-            <div className="flex items-center justify-center py-16"><LoadingDots /></div>
+            <div className="flex items-center justify-center py-16"><LoadingIndicator /></div>
           ) : dailyVolume.length > 0 ? (
             <ResponsiveContainer width="100%" height={200}>
               <AreaChart data={dailyVolume} margin={{ top: 5, right: 10, left: -10, bottom: 0 }}>
@@ -233,7 +233,7 @@ export default function SupportDashboard() {
           </div>
 
           {loading ? (
-            <div className="flex items-center justify-center py-16"><LoadingDots /></div>
+            <div className="flex items-center justify-center py-16"><LoadingIndicator /></div>
           ) : sortedOpenTickets.length === 0 ? (
             <div className="text-center py-10 text-muted-foreground">
               <CheckCircle2 className="h-8 w-8 mx-auto mb-2 opacity-30 text-emerald-500" />

@@ -30,7 +30,7 @@ import {
 } from "recharts";
 
 import { GRID, TICK, TOOLTIP_STYLE } from "@/lib/chart-theme";
-import { LoadingDots } from "@/components/LoadingDots";
+import { LoadingIndicator } from "@/components/LoadingIndicator";
 
 const NPS_COLORS: Record<string, string> = {
   "2 months": "#a855f7",  // purple-500
@@ -297,7 +297,7 @@ export function ProductDashboard() {
               </span>
             )}
             {npsLoading && npsResults.length === 0 && (
-              <LoadingDots className="ml-auto" />
+              <LoadingIndicator className="ml-auto" />
             )}
           </div>
 
@@ -309,20 +309,20 @@ export function ProductDashboard() {
                   <div key={i} className={`space-y-4 ${i > 0 ? "md:pl-6 md:border-l border-border" : ""}`}>
                     <div>
                       <p className="text-lg font-semibold text-foreground">NPS - {i === 0 ? "6" : "2"} Months</p>
-                      <p className="text-[11px] text-muted-foreground"><LoadingDots /></p>
+                      <p className="text-[11px] text-muted-foreground"><LoadingIndicator /></p>
                     </div>
                     <NpsGauge score={0} />
                     <div className="grid grid-cols-3 gap-2 pt-3 border-t border-border">
                       <div className="text-center">
-                        <p className="text-lg font-bold text-status-red"><LoadingDots /></p>
+                        <p className="text-lg font-bold text-status-red"><LoadingIndicator /></p>
                         <p className="text-[10px] text-muted-foreground">Detractors</p>
                       </div>
                       <div className="text-center">
-                        <p className="text-lg font-bold text-status-yellow"><LoadingDots /></p>
+                        <p className="text-lg font-bold text-status-yellow"><LoadingIndicator /></p>
                         <p className="text-[10px] text-muted-foreground">Passives</p>
                       </div>
                       <div className="text-center">
-                        <p className="text-lg font-bold text-status-green"><LoadingDots /></p>
+                        <p className="text-lg font-bold text-status-green"><LoadingIndicator /></p>
                         <p className="text-[10px] text-muted-foreground">Promoters</p>
                       </div>
                     </div>
@@ -335,7 +335,7 @@ export function ProductDashboard() {
                   <div className="flex items-center justify-between">
                     <div>
                       <p className="text-lg font-semibold text-foreground">{r.formName.replace(/NPS Score Tracking\s*-?\s*/i, "").replace(/(\d+)\s*months?/i, (_, n) => `${n} Months`)}</p>
-                      <p className="text-[11px] text-muted-foreground">{npsLoading ? <LoadingDots /> : `${r.totalResponses} responses`}</p>
+                      <p className="text-[11px] text-muted-foreground">{npsLoading ? <LoadingIndicator /> : `${r.totalResponses} responses`}</p>
                     </div>
                   </div>
                   {r.error ? (
@@ -345,17 +345,17 @@ export function ProductDashboard() {
                       <NpsGauge score={r.score} />
                       <div className="grid grid-cols-3 gap-2 pt-3 border-t border-border">
                         <div className="text-center">
-                          <p className="text-lg font-bold text-status-red">{npsLoading ? <LoadingDots /> : r.detractors}</p>
+                          <p className="text-lg font-bold text-status-red">{npsLoading ? <LoadingIndicator /> : r.detractors}</p>
                           <p className="text-[10px] text-muted-foreground">Detractors</p>
                           <p className="text-[10px] text-muted-foreground/60">0–6</p>
                         </div>
                         <div className="text-center">
-                          <p className="text-lg font-bold text-status-yellow">{npsLoading ? <LoadingDots /> : r.passives}</p>
+                          <p className="text-lg font-bold text-status-yellow">{npsLoading ? <LoadingIndicator /> : r.passives}</p>
                           <p className="text-[10px] text-muted-foreground">Passives</p>
                           <p className="text-[10px] text-muted-foreground/60">7–8</p>
                         </div>
                         <div className="text-center">
-                          <p className="text-lg font-bold text-status-green">{npsLoading ? <LoadingDots /> : r.promoters}</p>
+                          <p className="text-lg font-bold text-status-green">{npsLoading ? <LoadingIndicator /> : r.promoters}</p>
                           <p className="text-[10px] text-muted-foreground">Promoters</p>
                           <p className="text-[10px] text-muted-foreground/60">9–10</p>
                         </div>
@@ -440,7 +440,7 @@ export function ProductDashboard() {
               </div>
               <p className="text-3xl font-bold text-foreground">
                 {circleLoading && totalMembers === null
-                  ? <LoadingDots />
+                  ? <LoadingIndicator />
                   : (totalMembers ?? "—").toLocaleString()}
               </p>
               <p className="text-[11px] text-muted-foreground mt-1">All time</p>
@@ -453,12 +453,12 @@ export function ProductDashboard() {
                 <span className="text-xs font-medium text-muted-foreground">New Members</span>
                 <span className="text-lg font-bold text-foreground ml-auto">
                   {circleLoading && newMembersThisMonth === null
-                    ? <LoadingDots />
+                    ? <LoadingIndicator />
                     : (filteredNewMembers ?? "—").toLocaleString()}
                 </span>
               </div>
               {chartsLoading ? (
-                <div className="h-[100px] flex items-center justify-center"><LoadingDots /></div>
+                <div className="h-[100px] flex items-center justify-center"><LoadingIndicator /></div>
               ) : (
                 <ResponsiveContainer width="100%" height={100}>
                   <AreaChart data={filteredMemberGrowth}>
@@ -509,7 +509,7 @@ export function ProductDashboard() {
               <div>
                 <p className="text-xs font-semibold text-muted-foreground mb-3">Most Active Spaces</p>
                 {chartsLoading ? (
-                  <div className="flex items-center justify-center h-32"><LoadingDots /></div>
+                  <div className="flex items-center justify-center h-32"><LoadingIndicator /></div>
                 ) : filteredSpaceActivity.length === 0 ? (
                   <p className="text-xs text-muted-foreground text-center py-4">No data</p>
                 ) : (
@@ -537,7 +537,7 @@ export function ProductDashboard() {
               <div>
                 <p className="text-xs font-semibold text-muted-foreground mb-3">Top Posts by Engagement</p>
                 {chartsLoading ? (
-                  <div className="flex items-center justify-center h-32"><LoadingDots /></div>
+                  <div className="flex items-center justify-center h-32"><LoadingIndicator /></div>
                 ) : filteredTopPosts.length === 0 ? (
                   <p className="text-xs text-muted-foreground text-center py-4">No data</p>
                 ) : (

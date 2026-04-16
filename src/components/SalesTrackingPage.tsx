@@ -10,7 +10,7 @@ import { formatDay } from "@/lib/dates";
 import { fetchSalesTrackingRange, type SalesTrackingRow } from "@/lib/supabase-sales";
 import { ChevronDown } from "lucide-react";
 import { GRID, TICK, TOOLTIP_STYLE } from "@/lib/chart-theme";
-import { LoadingDots } from "@/components/LoadingDots";
+import { LoadingIndicator } from "@/components/LoadingIndicator";
 import {
   AreaChart, Area, XAxis, YAxis, CartesianGrid,
   Tooltip, ResponsiveContainer,
@@ -240,7 +240,7 @@ function KPIStat({
     <div className="p-5">
       <p className="text-[10px] font-semibold text-muted-foreground uppercase tracking-widest mb-2">{label}</p>
       <p className={`text-3xl font-bold ${accent ?? "text-foreground"}`}>
-        {loading ? <LoadingDots /> : value}
+        {loading ? <LoadingIndicator /> : value}
       </p>
       <p className="text-[11px] text-muted-foreground mt-1">{sub}</p>
     </div>

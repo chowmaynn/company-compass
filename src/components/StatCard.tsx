@@ -1,6 +1,6 @@
 import { Card, CardContent } from "@/components/ui/card";
 import { ArrowUpRight, ArrowDownRight } from "lucide-react";
-import { LoadingDots } from "@/components/LoadingDots";
+import { LoadingIndicator } from "@/components/LoadingIndicator";
 
 export interface StatCardProps {
   label: string;
@@ -45,7 +45,7 @@ export function StatCard({
               {label}
             </p>
             <p className={`text-3xl font-bold tracking-tight ${textColor}`}>
-              {loading ? <LoadingDots /> : value}
+              {loading ? <LoadingIndicator /> : value}
             </p>
             {sub && (
               <p

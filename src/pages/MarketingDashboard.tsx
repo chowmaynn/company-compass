@@ -11,7 +11,7 @@ import { useGoogleAnalytics } from "@/hooks/use-google-analytics";
 import { useSkoolScorecard } from "@/hooks/use-skool-scorecard";
 import { useSkoolJoinsByDate, sumJoinsInRange } from "@/hooks/use-skool-joins";
 import { WebsiteChannelCard } from "@/components/WebsiteChannelCard";
-import { LoadingDots } from "@/components/LoadingDots";
+import { LoadingIndicator } from "@/components/LoadingIndicator";
 import { useCalendly } from "@/hooks/use-calendly";
 import { DateRangePicker as SharedDateRangePicker, type DateRangeValue } from "@/components/DateRangePicker";
 
@@ -195,7 +195,7 @@ export default function MarketingDashboard() {
               {/* Qualified */}
               <div className="px-6 py-5">
                 <p className="text-[10px] text-muted-foreground uppercase tracking-wider font-semibold mb-1">Qualified Bookings</p>
-                <p className="text-3xl font-bold text-foreground">{supabase.isLoading ? <LoadingDots /> : fmt(supabase.totalBookings)}</p>
+                <p className="text-3xl font-bold text-foreground">{supabase.isLoading ? <LoadingIndicator /> : fmt(supabase.totalBookings)}</p>
                 <p className="text-xs text-muted-foreground mt-1">Passed country qualification</p>
                 <div className="mt-3 h-1 bg-muted rounded-full overflow-hidden">
                   <div className="h-full bg-primary rounded-full w-full" />
@@ -205,7 +205,7 @@ export default function MarketingDashboard() {
               {/* Country disqualified */}
               <div className="px-6 py-5">
                 <p className="text-[10px] text-muted-foreground uppercase tracking-wider font-semibold mb-1">Country Disqualified</p>
-                <p className="text-3xl font-bold text-status-red">{supabase.isLoading ? <LoadingDots /> : fmt(supabase.caseyCancel)}</p>
+                <p className="text-3xl font-bold text-status-red">{supabase.isLoading ? <LoadingIndicator /> : fmt(supabase.caseyCancel)}</p>
                 <p className="text-xs text-muted-foreground mt-1">
                   {supabase.isLoading ? "" : totalBooked > 0
                     ? `${Math.round((supabase.caseyCancel / totalBooked) * 100)}% of total booked`
@@ -222,7 +222,7 @@ export default function MarketingDashboard() {
               {/* Invitee cancellations */}
               <div className="px-6 py-5">
                 <p className="text-[10px] text-muted-foreground uppercase tracking-wider font-semibold mb-1">Invitee Cancellations</p>
-                <p className="text-3xl font-bold text-status-yellow">{supabase.isLoading ? <LoadingDots /> : fmt(supabase.inviteeCancel)}</p>
+                <p className="text-3xl font-bold text-status-yellow">{supabase.isLoading ? <LoadingIndicator /> : fmt(supabase.inviteeCancel)}</p>
                 <p className="text-xs text-muted-foreground mt-1">
                   {supabase.isLoading ? "" : `${pct(supabase.cancellationRate)} cancellation rate`}
                 </p>
@@ -243,7 +243,7 @@ export default function MarketingDashboard() {
                 <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wider mb-4">Bookings by Source</p>
                 <div style={{ height: 220 }}>
                   {supabase.isLoading ? (
-                    <div className="flex items-center justify-center h-full"><LoadingDots /></div>
+                    <div className="flex items-center justify-center h-full"><LoadingIndicator /></div>
                   ) : supabase.salesEventBreakdown.length === 0 ? (
                     <p className="text-sm text-muted-foreground py-8 text-center">No bookings in this period</p>
                   ) : (
@@ -278,7 +278,7 @@ export default function MarketingDashboard() {
                 <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wider mb-4">Daily Booking Trend</p>
                 <div style={{ height: 220 }}>
                   {supabase.isLoading ? (
-                    <div className="flex items-center justify-center h-full"><LoadingDots /></div>
+                    <div className="flex items-center justify-center h-full"><LoadingIndicator /></div>
                   ) : supabase.dailyBookings.length === 0 ? (
                     <p className="text-sm text-muted-foreground py-8 text-center">No bookings in this period</p>
                   ) : (
@@ -338,7 +338,7 @@ export default function MarketingDashboard() {
               <div className="bg-muted/30 rounded-lg p-3 flex items-center justify-between">
                 <div>
                   <p className="text-xs text-muted-foreground uppercase tracking-wider font-medium">Total Skool Bookings</p>
-                  <p className="text-xl font-bold text-foreground mt-0.5">{skoolSupabase.isLoading ? <LoadingDots /> : fmt(skoolBookings.total)}</p>
+                  <p className="text-xl font-bold text-foreground mt-0.5">{skoolSupabase.isLoading ? <LoadingIndicator /> : fmt(skoolBookings.total)}</p>
                 </div>
                 <p className="text-xs text-muted-foreground">
                   {!skoolSupabase.isLoading && skoolSupabase.totalBookings > 0
@@ -356,7 +356,7 @@ export default function MarketingDashboard() {
                 <div key={label} className="flex items-center gap-3">
                   <span className="inline-block rounded-sm shrink-0" style={{ width: 10, height: 10, background: color }} />
                   <span className="text-sm text-foreground flex-1">{label}</span>
-                  <span className="text-sm font-semibold font-mono text-foreground">{skoolSupabase.isLoading ? <LoadingDots /> : fmt(value)}</span>
+                  <span className="text-sm font-semibold font-mono text-foreground">{skoolSupabase.isLoading ? <LoadingIndicator /> : fmt(value)}</span>
                   <div className="w-24 bg-muted rounded-full h-1.5 overflow-hidden">
                     <div className="h-full rounded-full transition-all" style={{ width: skoolBookings.total > 0 ? `${(value / skoolBookings.total) * 100}%` : "0%", background: color }} />
                   </div>
@@ -368,7 +368,7 @@ export default function MarketingDashboard() {
                 <div className="bg-muted/30 rounded-lg p-3">
                   <p className="text-xs text-muted-foreground uppercase tracking-wider font-medium mb-1">Booking Rate</p>
                   <p className="text-xl font-bold text-foreground">
-                    {skoolScorecard.loading ? <LoadingDots /> : skoolScorecard.bookingRate ?? "—"}
+                    {skoolScorecard.loading ? <LoadingIndicator /> : skoolScorecard.bookingRate ?? "—"}
                   </p>
                   {skoolScorecard.bookingRateMonth && (
                     <p className="text-[10px] text-muted-foreground mt-0.5">{skoolScorecard.bookingRateMonth}</p>
@@ -377,13 +377,13 @@ export default function MarketingDashboard() {
                 <div className="bg-muted/30 rounded-lg p-3">
                   <p className="text-xs text-muted-foreground uppercase tracking-wider font-medium mb-1">Skool Joins</p>
                   <p className="text-xl font-bold text-foreground">
-                    {skoolJoinsDaily.loading ? <LoadingDots /> : skoolJoinsTotal != null ? fmt(skoolJoinsTotal) : "—"}
+                    {skoolJoinsDaily.loading ? <LoadingIndicator /> : skoolJoinsTotal != null ? fmt(skoolJoinsTotal) : "—"}
                   </p>
                 </div>
                 <div className="bg-muted/30 rounded-lg p-3">
                   <p className="text-xs text-muted-foreground uppercase tracking-wider font-medium mb-1">AAA Bitly Clicks</p>
                   <p className="text-xl font-bold text-foreground">
-                    {skoolScorecard.loading ? <LoadingDots /> : skoolScorecard.skoolClicks ?? "—"}
+                    {skoolScorecard.loading ? <LoadingIndicator /> : skoolScorecard.skoolClicks ?? "—"}
                   </p>
                   {skoolScorecard.skoolClicksMonth && (
                     <p className="text-[10px] text-muted-foreground mt-0.5">{skoolScorecard.skoolClicksMonth}</p>
@@ -416,7 +416,7 @@ export default function MarketingDashboard() {
               {/* True Active */}
               <div className="px-6 py-6 flex flex-col justify-center">
                 <p className="text-[10px] text-muted-foreground uppercase tracking-wider font-semibold mb-3">True Active Subscribers</p>
-                <p className="text-6xl font-bold text-foreground leading-none">{kit.loading ? <LoadingDots /> : fmt(kit.trueActiveSubscribers)}</p>
+                <p className="text-6xl font-bold text-foreground leading-none">{kit.loading ? <LoadingIndicator /> : fmt(kit.trueActiveSubscribers)}</p>
                 <p className="text-xs text-muted-foreground mt-3">Engaged subscribers (excl. cold)</p>
               </div>
 
@@ -486,24 +486,24 @@ export default function MarketingDashboard() {
             <div className="grid grid-cols-2 lg:grid-cols-4 divide-x divide-border border-b border-border">
               <div className="px-5 py-4">
                 <p className="text-[10px] text-muted-foreground uppercase tracking-wider font-semibold mb-1">Cold Subscribers</p>
-                <p className="text-2xl font-bold text-blue-500">{kit.loading ? <LoadingDots /> : fmt(kit.coldSubscribers)}</p>
+                <p className="text-2xl font-bold text-blue-500">{kit.loading ? <LoadingIndicator /> : fmt(kit.coldSubscribers)}</p>
                 <p className="text-xs text-muted-foreground mt-1">~1–2% est. accuracy</p>
               </div>
               <div className="px-5 py-4">
                 <p className="text-[10px] text-muted-foreground uppercase tracking-wider font-semibold mb-1">Total List</p>
-                <p className="text-2xl font-bold text-foreground">{kit.loading ? <LoadingDots /> : fmt(kit.activeSubscribers)}</p>
+                <p className="text-2xl font-bold text-foreground">{kit.loading ? <LoadingIndicator /> : fmt(kit.activeSubscribers)}</p>
                 <p className="text-xs text-muted-foreground mt-1">
                   {kit.newSubscribers != null ? `+${fmt(kit.newSubscribers)} new this period` : "All subscribers"}
                 </p>
               </div>
               <div className="px-5 py-4">
                 <p className="text-[10px] text-muted-foreground uppercase tracking-wider font-semibold mb-1">Avg Open Rate</p>
-                <p className="text-2xl font-bold text-foreground">{kit.loading ? <LoadingDots /> : fmtRate(kit.avgOpenRate)}</p>
+                <p className="text-2xl font-bold text-foreground">{kit.loading ? <LoadingIndicator /> : fmtRate(kit.avgOpenRate)}</p>
                 <p className="text-xs text-muted-foreground mt-1">{kit.broadcasts.length} broadcasts</p>
               </div>
               <div className="px-5 py-4">
                 <p className="text-[10px] text-muted-foreground uppercase tracking-wider font-semibold mb-1">Avg Click Rate</p>
-                <p className="text-2xl font-bold text-foreground">{kit.loading ? <LoadingDots /> : fmtRate(kit.avgClickRate)}</p>
+                <p className="text-2xl font-bold text-foreground">{kit.loading ? <LoadingIndicator /> : fmtRate(kit.avgClickRate)}</p>
                 <p className="text-xs text-muted-foreground mt-1">{fmt(kit.totalRecipients)} total recipients</p>
               </div>
             </div>

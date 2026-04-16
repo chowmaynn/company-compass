@@ -2,13 +2,13 @@
 // giving a smooth, continuous loading feel. Uses `currentColor` so it inherits
 // whatever text color the parent has.
 
-interface LoadingDotsProps {
+interface LoadingIndicatorProps {
   className?: string;
   /** Size in px of the SVG (width+height). Defaults to 24. */
   size?: number;
 }
 
-export function LoadingDots({ className = "", size = 24 }: LoadingDotsProps) {
+export function LoadingIndicator({ className = "", size = 24 }: LoadingIndicatorProps) {
   return (
     <>
       <style>{`

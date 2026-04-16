@@ -7,7 +7,7 @@ import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { Target, RotateCcw, Plus, Trash2, Pencil, X, Star, CirclePlus, ChevronLeft, ChevronRight, ListChecks } from "lucide-react";
 import { getCurrentWeekStart } from "@/hooks/use-focus-board";
-import { LoadingDots } from "@/components/LoadingDots";
+import { LoadingIndicator } from "@/components/LoadingIndicator";
 import { MicroExpander } from "@/components/ui/micro-expander";
 import type { FocusItem, QuarterlyInitiative, NorthStarMetric, InitiativeStatus } from "@/lib/supabase-focus";
 
@@ -659,7 +659,7 @@ export function FocusBoardSection({ excludeCurrentUser = false }: { excludeCurre
 
         {/* ── Focus Items ──────────────────────────────── */}
         {loading ? (
-          <div className="flex items-center justify-center py-12"><LoadingDots /></div>
+          <div className="flex items-center justify-center py-12"><LoadingIndicator /></div>
         ) : (
           <div className="space-y-6">
             {/* Focus items header + add button */}

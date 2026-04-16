@@ -11,7 +11,7 @@ import {
 } from "lucide-react";
 import { Card, CardContent } from "@/components/ui/card";
 import { StatCard } from "@/components/StatCard";
-import { LoadingDots } from "@/components/LoadingDots";
+import { LoadingIndicator } from "@/components/LoadingIndicator";
 import { DashboardShell } from "@/components/DashboardShell";
 import { DateRangePicker, presetToRange, type DateRangeValue } from "@/components/DateRangePicker";
 import { useCurrency } from "@/components/AppLayout";
@@ -153,7 +153,7 @@ export default function SubscriptionDashboard() {
           <div className="flex-1 p-5 lg:border-r border-white/[0.06]">
             <p className="text-xs text-muted-foreground font-medium mb-1">Gross Volume</p>
             <p className="text-2xl font-bold text-foreground">
-              {s ? `${cfmt(s.grossVolume)}` : stripeLoading ? <LoadingDots /> : "—"}
+              {s ? `${cfmt(s.grossVolume)}` : stripeLoading ? <LoadingIndicator /> : "—"}
             </p>
             <p className="text-xs text-muted-foreground mt-1">via Stripe / Payfunnels</p>
             {s && s.dailyVolume.length > 1 && (
@@ -178,7 +178,7 @@ export default function SubscriptionDashboard() {
           <div className="flex-1 p-5 border-t lg:border-t-0 lg:border-r border-white/[0.06]">
             <p className="text-xs text-muted-foreground font-medium mb-1">Net Volume</p>
             <p className="text-2xl font-bold text-foreground">
-              {s ? `${cfmt(s.netVolume)}` : stripeLoading ? <LoadingDots /> : "—"}
+              {s ? `${cfmt(s.netVolume)}` : stripeLoading ? <LoadingIndicator /> : "—"}
             </p>
             <p className="text-xs text-muted-foreground mt-1">after Stripe fees</p>
             {s && s.dailyVolume.length > 1 && (
@@ -234,7 +234,7 @@ export default function SubscriptionDashboard() {
               </div>
             </>
           ) : (
-            <p className="text-2xl font-bold"><LoadingDots /></p>
+            <p className="text-2xl font-bold"><LoadingIndicator /></p>
           )}
         </div>
 
@@ -247,7 +247,7 @@ export default function SubscriptionDashboard() {
           <p className="text-xs text-muted-foreground mb-4">Gross vs Net ({currencyLabel})</p>
           <div style={{ height: 220 }}>
             {!s || stripeLoading ? (
-              <div className="flex items-center justify-center h-full"><LoadingDots /></div>
+              <div className="flex items-center justify-center h-full"><LoadingIndicator /></div>
             ) : s.dailyVolume.length === 0 ? (
               <p className="text-sm text-muted-foreground text-center py-8">No data for this period</p>
             ) : (
@@ -438,7 +438,7 @@ function FinancialOverview({ convert, symbol }: { convert: (v: number) => number
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
         <StatCard
           label="Revenue"
-          value={loading ? <LoadingDots /> : selected?.revenue != null ? `${symbol}${compact(convert(selected.revenue))}` : "—"}
+          value={loading ? <LoadingIndicator /> : selected?.revenue != null ? `${symbol}${compact(convert(selected.revenue))}` : "—"}
           sub={selected ? fmtMonth(selected.month) : ""}
           icon={DollarSign}
           accent="text-emerald-600"
@@ -446,7 +446,7 @@ function FinancialOverview({ convert, symbol }: { convert: (v: number) => number
         />
         <StatCard
           label="Cost of Goods"
-          value={loading ? <LoadingDots /> : selected?.cogs != null ? `${symbol}${compact(convert(selected.cogs))}` : "—"}
+          value={loading ? <LoadingIndicator /> : selected?.cogs != null ? `${symbol}${compact(convert(selected.cogs))}` : "—"}
           sub={selected?.cogs != null && selected?.revenue ? `${((selected.cogs / selected.revenue) * 100).toFixed(1)}% of revenue` : ""}
           icon={BarChart3}
           accent="text-amber-600"
@@ -454,7 +454,7 @@ function FinancialOverview({ convert, symbol }: { convert: (v: number) => number
         />
         <StatCard
           label="Gross Margin"
-          value={loading ? <LoadingDots /> : selected?.gross_margin_pct != null ? `${selected.gross_margin_pct.toFixed(1)}%` : "—"}
+          value={loading ? <LoadingIndicator /> : selected?.gross_margin_pct != null ? `${selected.gross_margin_pct.toFixed(1)}%` : "—"}
           sub={selected?.gross_margin_pct != null && selected.gross_margin_pct >= 85 ? "Healthy" : selected?.gross_margin_pct != null && selected.gross_margin_pct >= 70 ? "Moderate" : "Low"}
           icon={TrendingUp}
           accent={selected?.gross_margin_pct != null && selected.gross_margin_pct >= 85 ? "text-emerald-600" : selected?.gross_margin_pct != null && selected.gross_margin_pct >= 70 ? "text-amber-600" : "text-red-600"}
@@ -462,7 +462,7 @@ function FinancialOverview({ convert, symbol }: { convert: (v: number) => number
         />
         <StatCard
           label="Revenue / Employee"
-          value={loading ? <LoadingDots /> : selected?.revenue_per_employee != null ? `${symbol}${compact(convert(selected.revenue_per_employee))}` : "—"}
+          value={loading ? <LoadingIndicator /> : selected?.revenue_per_employee != null ? `${symbol}${compact(convert(selected.revenue_per_employee))}` : "—"}
           sub={selected?.headcount != null ? `${selected.headcount} employees` : ""}
           icon={Users}
           accent="text-blue-600"
@@ -476,7 +476,7 @@ function FinancialOverview({ convert, symbol }: { convert: (v: number) => number
           <h3 className="text-sm font-semibold text-foreground mb-1">Revenue & Cost of Goods</h3>
           <p className="text-xs text-muted-foreground mb-4">Monthly trend</p>
           {loading ? (
-            <div className="flex items-center justify-center py-16"><LoadingDots /></div>
+            <div className="flex items-center justify-center py-16"><LoadingIndicator /></div>
           ) : (
             <ResponsiveContainer width="100%" height={240}>
               <ComposedChart data={chartData} margin={{ top: 5, right: 10, left: -10, bottom: 0 }}>
@@ -505,7 +505,7 @@ function FinancialOverview({ convert, symbol }: { convert: (v: number) => number
           <h3 className="text-sm font-semibold text-foreground mb-1">Revenue per Employee</h3>
           <p className="text-xs text-muted-foreground mb-4">Monthly trend</p>
           {loading ? (
-            <div className="flex items-center justify-center py-12"><LoadingDots /></div>
+            <div className="flex items-center justify-center py-12"><LoadingIndicator /></div>
           ) : (
             <ResponsiveContainer width="100%" height={160}>
               <AreaChart data={chartData} margin={{ top: 5, right: 10, left: -10, bottom: 0 }}>
@@ -532,7 +532,7 @@ function FinancialOverview({ convert, symbol }: { convert: (v: number) => number
           <h3 className="text-sm font-semibold text-foreground mb-1">Gross Margin %</h3>
           <p className="text-xs text-muted-foreground mb-4">Monthly trend</p>
           {loading ? (
-            <div className="flex items-center justify-center py-12"><LoadingDots /></div>
+            <div className="flex items-center justify-center py-12"><LoadingIndicator /></div>
           ) : (
             <ResponsiveContainer width="100%" height={160}>
               <AreaChart data={chartData} margin={{ top: 5, right: 10, left: -10, bottom: 0 }}>
@@ -558,7 +558,7 @@ function FinancialOverview({ convert, symbol }: { convert: (v: number) => number
         <CardContent className="p-5">
           <h3 className="text-sm font-semibold text-foreground mb-4">Monthly Breakdown</h3>
           {loading ? (
-            <div className="flex items-center justify-center py-12"><LoadingDots /></div>
+            <div className="flex items-center justify-center py-12"><LoadingIndicator /></div>
           ) : (
             <div className="overflow-x-auto">
               <table className="w-full text-sm">

@@ -1,5 +1,6 @@
 import { useMemo, type ReactNode } from "react";
-import { ChevronDown, Loader2 } from "lucide-react";
+import { ChevronDown } from "lucide-react";
+import { LoadingIndicator } from "@/components/LoadingIndicator";
 import type { Metric, StatusColor } from "@/data/scorecardData";
 
 // ── Types ────────────────────────────────────────────────────
@@ -14,11 +15,13 @@ interface Props {
   emailBroadcastsValue?: number | null;
   skoolJoinsValue?: number | null;
   websiteViewsValue?: number | null;
+  webinarJoinsValue?: number | null;
   /** Per-card loading flags — when true, the card renders a spinner */
   youtubeVideosLoading?: boolean;
   emailBroadcastsLoading?: boolean;
   skoolJoinsLoading?: boolean;
   websiteViewsLoading?: boolean;
+  webinarJoinsLoading?: boolean;
   /** Optional speedometer gauges that replace the corresponding funnel cards */
   bookingsGauge?: ReactNode;
   showRateGauge?: ReactNode;
@@ -109,10 +112,12 @@ export function FunnelSankey({
   emailBroadcastsValue,
   skoolJoinsValue,
   websiteViewsValue,
+  webinarJoinsValue,
   youtubeVideosLoading,
   emailBroadcastsLoading,
   skoolJoinsLoading,
   websiteViewsLoading,
+  webinarJoinsLoading,
   bookingsGauge,
   showRateGauge,
   closeRateGauge,
@@ -194,10 +199,11 @@ export function FunnelSankey({
       placeholder("ads", "Ads"),
     ];
 
-    // Row 2 — Nurturing: Skool joins (Supabase) + Website views (GA4)
+    // Row 2 — Nurturing: Skool joins (Supabase) + Website views (GA4) + Webinar joins (Kit)
     const nurturing: Stage[] = [
       liveStage("skool-joins", "Skool Joins", skoolJoinsValue ?? null, "Skool Joins", false, !!skoolJoinsLoading),
       liveStage("website-views", "Website Views", websiteViewsValue ?? null, "Website Views", false, !!websiteViewsLoading),
+      liveStage("webinar-joins", "Webinar Joins", webinarJoinsValue ?? null, undefined, false, !!webinarJoinsLoading),
     ];
 
     // Row 3 — Total Bookings
@@ -220,8 +226,8 @@ export function FunnelSankey({
     return { distribution, nurturing, totalBookings, showRate, closeRate, cashCollected, showPct };
   }, [
     metrics, fmtCur, rangeDays,
-    youtubeVideosValue, emailBroadcastsValue, skoolJoinsValue, websiteViewsValue,
-    youtubeVideosLoading, emailBroadcastsLoading, skoolJoinsLoading, websiteViewsLoading,
+    youtubeVideosValue, emailBroadcastsValue, skoolJoinsValue, websiteViewsValue, webinarJoinsValue,
+    youtubeVideosLoading, emailBroadcastsLoading, skoolJoinsLoading, websiteViewsLoading, webinarJoinsLoading,
   ]);
 
   // Cockpit funnel: outer width narrows row-by-row from top (widest) to bottom (narrowest).
@@ -243,11 +249,11 @@ export function FunnelSankey({
         <FlowArrow />
 
         {/* ── Nurturing ─────────────────── */}
-        <FunnelLevel widthClass="w-full max-w-[820px]">
+        <FunnelLevel widthClass="w-full max-w-[940px]">
           <FunnelRow
             stageLabel="Nurturing"
             stages={data.nurturing}
-            gridCols="grid-cols-2"
+            gridCols="grid-cols-3"
           />
         </FunnelLevel>
 
@@ -355,7 +361,7 @@ function FunnelCard({ stage, emphasized }: { stage: Stage; emphasized?: boolean 
         </p>
         <p className="text-[10px] font-mono tabular-nums text-muted-foreground/70 shrink-0 flex items-center gap-1">
           {isLoading ? (
-            <Loader2 className="h-3 w-3 animate-spin text-muted-foreground/60" />
+            <LoadingIndicator size={14} className="text-muted-foreground/70" />
           ) : isPlaceholder ? "—" : (
             <>
               <span className="text-foreground font-semibold text-xs">{stage.formatted}</span>

@@ -16,6 +16,7 @@ import { useSkoolJoinsByDate, sumJoinsInRange } from "@/hooks/use-skool-joins";
 import { fetchVideoCountInRange } from "@/hooks/use-channel-videos";
 import { useWhosOut } from "@/hooks/use-whos-out";
 import { fetchPageSessions } from "@/lib/google-analytics";
+import { fetchWebinarJoins } from "@/lib/kit";
 import { FunnelSankey } from "@/components/FunnelSankey";
 import { Checkbox } from "@/components/ui/checkbox";
 import { useFocusBoard, getCurrentWeekStart, getCurrentQuarter } from "@/hooks/use-focus-board";
@@ -318,6 +319,15 @@ export default function Dashboard() {
   });
   const youtubeVideosValue = typeof youtubeVideosQuery.data === "number" ? youtubeVideosQuery.data : null;
 
+  // Webinar joins → Kit (count of subscribers tagged with any "webinar" tag in range)
+  const webinarJoinsQuery = useQuery({
+    queryKey: ["kit-webinar-joins", range.startDate, range.endDate],
+    queryFn: () => fetchWebinarJoins(range.startDate, range.endDate),
+    enabled: !!range.startDate && !!range.endDate,
+    staleTime: 5 * 60 * 1000,
+  });
+  const webinarJoinsValue = typeof webinarJoinsQuery.data === "number" ? webinarJoinsQuery.data : null;
+
   // Sales tracking — sum closes, calls_booked, calls_taken, cc across all reps for the range
   const [dailyCloseRate, setDailyCloseRate] = useState<number | null>(null);
   const [dailyShowRate, setDailyShowRate] = useState<number | null>(null);
@@ -449,10 +459,12 @@ export default function Dashboard() {
         emailBroadcastsValue={emailBroadcastsValue}
         skoolJoinsValue={skoolJoinsValue}
         websiteViewsValue={websiteViewsValue}
+        webinarJoinsValue={webinarJoinsValue}
         youtubeVideosLoading={youtubeVideosQuery.isLoading}
         emailBroadcastsLoading={kit.loading}
         skoolJoinsLoading={skoolJoinsDaily.loading}
         websiteViewsLoading={websiteViewsQuery.isLoading}
+        webinarJoinsLoading={webinarJoinsQuery.isLoading}
         bookingsGauge={
           <SpeedometerCard
             label="Qualified Bookings"

@@ -1,7 +1,7 @@
 import { useState, useMemo } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { Loader2, Globe, AlertTriangle } from "lucide-react";
-import { LoadingDots } from "@/components/LoadingDots";
+import { LoadingIndicator } from "@/components/LoadingIndicator";
 import { useWebsiteABTest } from "@/hooks/use-website-ab-test";
 import { fetchPageSessions } from "@/lib/google-analytics";
 import { DateRangePicker as SharedDateRangePicker, type DateRangeValue } from "@/components/DateRangePicker";
@@ -76,15 +76,15 @@ export function WebsiteChannelCard({ gaAuthed }: { gaAuthed: boolean }) {
           <div className="grid grid-cols-3 gap-3">
             <div className="bg-muted/30 rounded-lg p-3">
               <p className="text-xs text-muted-foreground uppercase tracking-wider font-medium mb-1">Website Views</p>
-              <p className="text-xl font-bold text-foreground">{gaLoading ? <LoadingDots /> : fmt(totalWebViews)}</p>
+              <p className="text-xl font-bold text-foreground">{gaLoading ? <LoadingIndicator /> : fmt(totalWebViews)}</p>
             </div>
             <div className="bg-muted/30 rounded-lg p-3">
               <p className="text-xs text-muted-foreground uppercase tracking-wider font-medium mb-1">Website Bookings</p>
-              <p className="text-xl font-bold text-foreground">{abTest.loading ? <LoadingDots /> : fmt(websiteBookings)}</p>
+              <p className="text-xl font-bold text-foreground">{abTest.loading ? <LoadingIndicator /> : fmt(websiteBookings)}</p>
             </div>
             <div className="bg-muted/30 rounded-lg p-3">
               <p className="text-xs text-muted-foreground uppercase tracking-wider font-medium mb-1">Booking Rate</p>
-              <p className="text-xl font-bold text-foreground">{gaLoading || abTest.loading ? <LoadingDots /> : bookingRate}</p>
+              <p className="text-xl font-bold text-foreground">{gaLoading || abTest.loading ? <LoadingIndicator /> : bookingRate}</p>
             </div>
           </div>
 
@@ -127,17 +127,17 @@ export function WebsiteChannelCard({ gaAuthed }: { gaAuthed: boolean }) {
                         </div>
                         <div>
                           <p className="text-2xl font-bold text-foreground">
-                            {abTest.loading ? <LoadingDots /> : `${v.conversionRate.toFixed(2)}%`}
+                            {abTest.loading ? <LoadingIndicator /> : `${v.conversionRate.toFixed(2)}%`}
                           </p>
                           <p className="text-[10px] text-muted-foreground">conversion rate</p>
                         </div>
                         <div className="grid grid-cols-2 gap-2 pt-1 border-t border-border/50">
                           <div>
-                            <p className="text-sm font-semibold text-foreground">{abTest.loading ? <LoadingDots /> : fmt(v.visitors)}</p>
+                            <p className="text-sm font-semibold text-foreground">{abTest.loading ? <LoadingIndicator /> : fmt(v.visitors)}</p>
                             <p className="text-[10px] text-muted-foreground">visitors</p>
                           </div>
                           <div>
-                            <p className="text-sm font-semibold text-foreground">{abTest.loading ? <LoadingDots /> : fmt(v.bookings)}</p>
+                            <p className="text-sm font-semibold text-foreground">{abTest.loading ? <LoadingIndicator /> : fmt(v.bookings)}</p>
                             <p className="text-[10px] text-muted-foreground">bookings</p>
                           </div>
                         </div>

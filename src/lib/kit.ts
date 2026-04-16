@@ -125,6 +125,55 @@ export async function fetchCalendlyClicksForBroadcast(
 }
 
 /**
+ * Count subscribers who were assigned any tag whose name contains "webinar"
+ * within the date range. Sum of per-tag totals — a person registered for
+ * multiple webinars in the same window will count once per registration,
+ * which is the desired "webinar joins" semantic.
+ */
+export async function fetchWebinarJoins(
+  startDate: string,
+  endDate: string
+): Promise<number | null> {
+  if (!startDate || !endDate) return null;
+
+  // Step 1: list all tags, filter to ones whose name contains "webinar"
+  const tagsData = await kitFetch<{ tags: { id: number; name: string }[] }>(
+    "/v4/tags",
+    { per_page: "500" }
+  );
+  if (!tagsData?.tags) return null;
+
+  const webinarTags = tagsData.tags.filter((t) =>
+    t.name.toLowerCase().includes("webinar")
+  );
+  if (webinarTags.length === 0) return 0;
+
+  // Step 2: for each webinar tag, count subscribers tagged within the range.
+  // We use per_page=1 + include_total_count=true and only read pagination.total_count.
+  // NOTE: Kit v4 param names are `tagged_after` / `tagged_before` (NOT `tagged_at_*`).
+  // Wrong names are silently ignored and you get the all-time tag total back.
+  const taggedAfter = `${startDate}T00:00:00Z`;
+  const taggedBefore = `${endDate}T23:59:59Z`;
+
+  const counts = await Promise.all(
+    webinarTags.map(async (tag) => {
+      const data = await kitFetch<{
+        subscribers: unknown[];
+        pagination?: { total_count?: number };
+      }>(`/v4/tags/${tag.id}/subscribers`, {
+        per_page: "1",
+        include_total_count: "true",
+        tagged_after: taggedAfter,
+        tagged_before: taggedBefore,
+      });
+      return data?.pagination?.total_count ?? 0;
+    })
+  );
+
+  return counts.reduce((s, n) => s + n, 0);
+}
+
+/**
  * Fetch all broadcast stats in bulk (single API call) and the broadcast list,
  * then bucket by week ranges.
  */

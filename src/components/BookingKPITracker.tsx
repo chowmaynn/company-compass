@@ -5,7 +5,7 @@ import { fetchBroadcastsInRange, type BroadcastItem } from "@/lib/kit";
 import { fetchDailyActiveUsers } from "@/lib/google-analytics";
 import { useSupabaseMetrics } from "@/hooks/use-supabase-metrics";
 import { useSkoolJoinsByDate } from "@/hooks/use-skool-joins";
-import { LoadingDots } from "@/components/LoadingDots";
+import { LoadingIndicator } from "@/components/LoadingIndicator";
 
 // ─── Note Popover ─────────────────────────────────────────────────────────────
 
@@ -859,7 +859,7 @@ export function BookingKPITracker() {
                           return (
                             <td key={iso} style={{ width: W_DAY, minWidth: W_DAY, borderRight: B_ROW, borderBottom: rowBorderBottom, padding: 2, backgroundColor: isToday ? todayBg : section.rowTint }}>
                               <span style={{ display: "flex", justifyContent: "center", alignItems: "center", height: 24 }}>
-                                <LoadingDots className="scale-50" />
+                                <LoadingIndicator className="scale-50" />
                               </span>
                             </td>
                           );
