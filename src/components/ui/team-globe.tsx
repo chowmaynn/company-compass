@@ -164,28 +164,51 @@ export default function TeamGlobe({
           }
         }
 
-        // ── Team member pins ─────────────────────────────
+        // ── Team member pins — clustered by city ──────────
+        // Group pins by their rounded base coordinates (before offset) so each
+        // city renders ONE cluster label instead of overlapping names.
         const currentOut = outRef.current;
-        for (const pin of pinsRef.current) {
-          const projected = projection([pin.lng, pin.lat]);
+        const currentPins = pinsRef.current;
+
+        // Build clusters: round lat/lng to ~0.5° to bucket same-city pins together
+        const clusters = new Map<string, { pins: typeof currentPins; centerLat: number; centerLng: number }>();
+        for (const pin of currentPins) {
+          const key = `${Math.round(pin.lat * 2) / 2},${Math.round(pin.lng * 2) / 2}`;
+          if (!clusters.has(key)) {
+            clusters.set(key, { pins: [], centerLat: 0, centerLng: 0 });
+          }
+          const c = clusters.get(key)!;
+          c.pins.push(pin);
+          c.centerLat += pin.lat;
+          c.centerLng += pin.lng;
+        }
+
+        for (const [, cluster] of clusters) {
+          const count = cluster.pins.length;
+          const avgLat = cluster.centerLat / count;
+          const avgLng = cluster.centerLng / count;
+
+          // How many in this cluster are on vacation?
+          const outCount = cluster.pins.filter((p) => currentOut.has(p.firstName.toLowerCase())).length;
+          const allOut = outCount === count;
+          const someOut = outCount > 0 && !allOut;
+
+          // Project the cluster center
+          const projected = projection([avgLng, avgLat]);
           if (!projected) continue;
 
-          const isOut = currentOut.has(pin.firstName.toLowerCase());
-          const pinRadius = 4 * scaleFactor;
-          const glowRadius = 8 * scaleFactor;
+          // Scale pin size with cluster count
+          const pinRadius = Math.min(6 + count * 0.8, 14) * scaleFactor;
+          const glowRadius = pinRadius * 2;
 
           // Glow halo
+          const glowColor = allOut ? "rgba(239,68,68," : "rgba(52,211,153,";
           const gradient = context.createRadialGradient(
             projected[0], projected[1], 0,
             projected[0], projected[1], glowRadius
           );
-          if (isOut) {
-            gradient.addColorStop(0, "rgba(239,68,68,0.5)");
-            gradient.addColorStop(1, "rgba(239,68,68,0)");
-          } else {
-            gradient.addColorStop(0, "rgba(52,211,153,0.5)");
-            gradient.addColorStop(1, "rgba(52,211,153,0)");
-          }
+          gradient.addColorStop(0, glowColor + "0.4)");
+          gradient.addColorStop(1, glowColor + "0)");
           context.beginPath();
           context.arc(projected[0], projected[1], glowRadius, 0, 2 * Math.PI);
           context.fillStyle = gradient;
@@ -194,19 +217,37 @@ export default function TeamGlobe({
           // Pin dot
           context.beginPath();
           context.arc(projected[0], projected[1], pinRadius, 0, 2 * Math.PI);
-          context.fillStyle = isOut ? "#ef4444" : "#34d399";
+          context.fillStyle = allOut ? "#ef4444" : "#34d399";
           context.fill();
-          context.strokeStyle = "rgba(0,0,0,0.4)";
-          context.lineWidth = 1 * scaleFactor;
+          context.strokeStyle = "rgba(0,0,0,0.5)";
+          context.lineWidth = 1.5 * scaleFactor;
           context.stroke();
 
-          // Name label
-          context.font = `${Math.round(9 * scaleFactor)}px ui-sans-serif, system-ui, sans-serif`;
-          context.fillStyle = isOut ? "rgba(239,68,68,0.9)" : "rgba(255,255,255,0.75)";
+          // Count inside the pin (if more than 1 person)
+          if (count > 1) {
+            context.font = `bold ${Math.round(9 * scaleFactor)}px ui-sans-serif, system-ui, sans-serif`;
+            context.fillStyle = "rgba(0,0,0,0.8)";
+            context.textAlign = "center";
+            context.textBaseline = "middle";
+            context.fillText(String(count), projected[0], projected[1] + 0.5);
+          }
+
+          // City label + names summary
+          // Pick a representative city name (or first pin's firstName if solo)
+          const cityName = cluster.pins[0].department
+            ? (count === 1 ? cluster.pins[0].firstName : cluster.pins[0].displayName.split(" ").pop()?.slice(0, 0) || "")
+            : "";
+          const label = count === 1
+            ? (currentOut.has(cluster.pins[0].firstName.toLowerCase()) ? `🌴 ${cluster.pins[0].firstName}` : cluster.pins[0].firstName)
+            : `${count} team${someOut ? ` · ${outCount} off` : ""}`;
+
+          context.font = `${Math.round(10 * scaleFactor)}px ui-sans-serif, system-ui, sans-serif`;
+          context.fillStyle = allOut ? "rgba(239,68,68,0.9)" : "rgba(255,255,255,0.8)";
+          context.textAlign = "left";
           context.textBaseline = "middle";
           context.fillText(
-            isOut ? `🌴 ${pin.firstName}` : pin.firstName,
-            projected[0] + pinRadius + 3 * scaleFactor,
+            label,
+            projected[0] + pinRadius + 4 * scaleFactor,
             projected[1]
           );
         }

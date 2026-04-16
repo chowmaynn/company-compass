@@ -25,36 +25,61 @@ export interface TeamMemberPin extends TeamMember {
 // Add entries here as new offices/locations appear in BambooHR.
 
 const CITY_COORDS: Record<string, [number, number]> = {
+  // Oceania
   "auckland":       [-36.8485, 174.7633],
   "new zealand":    [-36.8485, 174.7633],
   "nz":             [-36.8485, 174.7633],
-  "orlando":        [28.5383, -81.3792],
-  "florida":        [28.5383, -81.3792],
-  "bali":           [-8.3405, 115.0920],
-  "denpasar":       [-8.6500, 115.2167],
-  "indonesia":      [-8.3405, 115.0920],
-  "manila":         [14.5995, 120.9842],
-  "philippines":    [14.5995, 120.9842],
-  "london":         [51.5074, -0.1278],
-  "uk":             [51.5074, -0.1278],
   "sydney":         [-33.8688, 151.2093],
   "australia":      [-33.8688, 151.2093],
+  // North America
+  "usa":            [28.5383, -81.3792],   // defaults to Orlando (company HQ)
+  "orlando":        [28.5383, -81.3792],
+  "florida":        [28.5383, -81.3792],
   "new york":       [40.7128, -74.0060],
   "los angeles":    [34.0522, -118.2437],
   "san francisco":  [37.7749, -122.4194],
   "toronto":        [43.6532, -79.3832],
   "canada":         [43.6532, -79.3832],
+  // South America
+  "colombia":       [4.7110, -74.0721],    // Bogotá
+  // Southeast Asia
+  "bali":           [-8.3405, 115.0920],
+  "denpasar":       [-8.6500, 115.2167],
+  "indonesia":      [-8.3405, 115.0920],
+  "manila":         [14.5995, 120.9842],
+  "philippines":    [14.5995, 120.9842],
   "singapore":      [1.3521, 103.8198],
-  "tokyo":          [35.6762, 139.6503],
-  "berlin":         [52.5200, 13.4050],
-  "paris":          [48.8566, 2.3522],
-  "dubai":          [25.2048, 55.2708],
-  "mumbai":         [19.0760, 72.8777],
-  "india":          [19.0760, 72.8777],
   "bangkok":        [13.7563, 100.5018],
   "thailand":       [13.7563, 100.5018],
+  // South Asia
+  "pakistan":        [24.8607, 67.0011],    // Karachi
+  "mumbai":         [19.0760, 72.8777],
+  "india":          [19.0760, 72.8777],
+  // Middle East
+  "uae":            [25.2048, 55.2708],    // Dubai
+  "dubai":          [25.2048, 55.2708],
+  // Europe
+  "london":         [51.5074, -0.1278],
+  "uk":             [51.5074, -0.1278],
+  "berlin":         [52.5200, 13.4050],
+  "germany":        [52.5200, 13.4050],
+  "paris":          [48.8566, 2.3522],
+  "france":         [48.8566, 2.3522],
+  "spain":          [40.4168, -3.7038],    // Madrid
+  "romania":        [44.4268, 26.1025],    // Bucharest
+  "serbia":         [44.7866, 20.4489],    // Belgrade
+  "slovenia":       [46.0569, 14.5058],    // Ljubljana
+  "poland":         [52.2297, 21.0122],    // Warsaw
+  "austria":        [48.2082, 16.3738],    // Vienna
+  "finland":        [60.1699, 24.9384],    // Helsinki
+  "georgia":        [41.7151, 44.8271],    // Tbilisi (country)
+  // Africa
+  "ghana":          [5.6037, -0.1870],     // Accra
   "cape town":      [-33.9249, 18.4241],
   "south africa":   [-33.9249, 18.4241],
+  // East Asia
+  "tokyo":          [35.6762, 139.6503],
+  "japan":          [35.6762, 139.6503],
 };
 
 /** Try to resolve a BambooHR location string to lat/lng. */
