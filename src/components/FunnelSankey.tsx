@@ -1,10 +1,32 @@
-import { useState, useMemo } from "react";
-import { Card } from "@/components/ui/card";
+import { useMemo, type ReactNode } from "react";
+import { ChevronDown, Loader2 } from "lucide-react";
 import type { Metric, StatusColor } from "@/data/scorecardData";
 
 // ── Types ────────────────────────────────────────────────────
 
-interface FunnelNode {
+interface Props {
+  metrics: Metric[];
+  formatCurrency?: (val: number | string | undefined) => string;
+  /** Number of days in the selected range — used to pro-rate monthly scorecard targets */
+  rangeDays?: number;
+  /** Live overrides for distribution / nurturing cards (Kit, GA4, Skool, liam_videos) */
+  youtubeVideosValue?: number | null;
+  emailBroadcastsValue?: number | null;
+  skoolJoinsValue?: number | null;
+  websiteViewsValue?: number | null;
+  /** Per-card loading flags — when true, the card renders a spinner */
+  youtubeVideosLoading?: boolean;
+  emailBroadcastsLoading?: boolean;
+  skoolJoinsLoading?: boolean;
+  websiteViewsLoading?: boolean;
+  /** Optional speedometer gauges that replace the corresponding funnel cards */
+  bookingsGauge?: ReactNode;
+  showRateGauge?: ReactNode;
+  closeRateGauge?: ReactNode;
+  cashGauge?: ReactNode;
+}
+
+interface Stage {
   id: string;
   label: string;
   value: number | null;
@@ -12,29 +34,8 @@ interface FunnelNode {
   formatted: string;
   targetFormatted: string;
   status: StatusColor;
-  x: number;
-  y: number;
-  w: number;
-  h: number;
-}
-
-interface FunnelFlow {
-  from: string;
-  to: string;
-  colorVar: string;
-  opacity: number;
-  bandW?: number;
-}
-
-interface Conversion {
-  from: string;
-  to: string;
-  label: string | null;
-}
-
-interface Props {
-  metrics: Metric[];
-  formatCurrency?: (val: number | string | undefined) => string;
+  isPlaceholder?: boolean;
+  isLoading?: boolean;
 }
 
 // ── Helpers ──────────────────────────────────────────────────
@@ -62,34 +63,23 @@ function pctLabel(from: number | null, to: number | null): string | null {
   return pct >= 1 ? `${pct.toFixed(1)}%` : `${pct.toFixed(2)}%`;
 }
 
-function statusColor(status: StatusColor): string {
-  if (status === "green" || status === "light-green") return "var(--status-green)";
-  if (status === "yellow") return "var(--status-yellow)";
-  return "var(--status-red)";
+function statusDot(status: StatusColor): string {
+  if (status === "green" || status === "light-green") return "bg-status-green";
+  if (status === "yellow") return "bg-status-yellow";
+  return "bg-status-red";
 }
 
-// ── Bezier band path (filled shape) ─────────────────────────
-
-function bandPath(x1: number, y1: number, x2: number, y2: number, bw: number): string {
-  const cx = (x1 + x2) / 2;
-  return [
-    `M ${x1},${y1 - bw}`,
-    `C ${cx},${y1 - bw} ${cx},${y2 - bw} ${x2},${y2 - bw}`,
-    `L ${x2},${y2 + bw}`,
-    `C ${cx},${y2 + bw} ${cx},${y1 + bw} ${x1},${y1 + bw}`,
-    `Z`,
-  ].join(" ");
+function statusRing(status: StatusColor): string {
+  if (status === "green" || status === "light-green") return "ring-status-green/30";
+  if (status === "yellow") return "ring-status-yellow/30";
+  return "ring-status-red/30";
 }
-
-// ── Get best available value: monthlyActual, or sum of weekly actuals ──
 
 function metricValue(m: Metric | undefined): number | null {
   if (!m) return null;
   const monthly = parseNum(m.monthlyActual);
   if (monthly != null) return monthly;
-  // Fall back to sum of weekly actuals
-  let sum = 0;
-  let hasAny = false;
+  let sum = 0; let hasAny = false;
   for (const w of m.weeks) {
     const v = parseNum(w.actual);
     if (v != null) { sum += v; hasAny = true; }
@@ -101,8 +91,7 @@ function metricTarget(m: Metric | undefined): number | null {
   if (!m) return null;
   const monthly = parseNum(m.monthlyTarget);
   if (monthly != null) return monthly;
-  let sum = 0;
-  let hasAny = false;
+  let sum = 0; let hasAny = false;
   for (const w of m.weeks) {
     const v = parseNum(w.projection);
     if (v != null) { sum += v; hasAny = true; }
@@ -110,271 +99,343 @@ function metricTarget(m: Metric | undefined): number | null {
   return hasAny ? sum : null;
 }
 
-// ── Data extraction ─────────────────────────────────────────
-
-function useFunnelData(metrics: Metric[], formatCurrency?: (val: number | string | undefined) => string) {
-  return useMemo(() => {
-    const find = (name: string) => metrics.find((m) => m.name === name);
-
-    const ytViews = find("YouTube views");
-    const websiteViews = find("Website Views");
-    const skoolJoins = find("Skool Joins");
-
-    const totalBookings = find("Total Bookings");
-    const emailBookings = find("Email Bookings");
-    const closingCallsTaken = find("Closing Calls Taken");
-    const closeRate = find("Closing Call Close Rate");
-    const revenue = find("Revenue");
-
-    // Derive booking values
-    const totalBookingsVal = metricValue(totalBookings);
-    const emailBookingsVal = metricValue(emailBookings);
-    const otherBookingsVal = totalBookingsVal != null && emailBookingsVal != null
-      ? totalBookingsVal - emailBookingsVal : null;
-
-    // Sales
-    const callsTaken = metricValue(closingCallsTaken);
-    const rate = closeRate ? parseNum(closeRate.monthlyActual) : null; // rate is already a %
-    const salesVal = callsTaken != null && rate != null ? Math.round(callsTaken * (rate / 100)) : null;
-
-    const fmt = (m: Metric | undefined) => {
-      const v = metricValue(m);
-      return v != null ? compact(v) : "—";
-    };
-    const fmtTarget = (m: Metric | undefined) => {
-      const v = metricTarget(m);
-      return v != null ? compact(v) : "—";
-    };
-    const fmtCur = formatCurrency ?? ((v: number | string | undefined) => {
-      const n = v != null ? parseNum(String(v)) : null;
-      return n != null ? `$${compact(n)}` : "—";
-    });
-
-    // ── Layout: viewBox 960 x 280 (tighter) ──
-
-    // Column 1: Sources (x=0)
-    const srcX = 5;
-    const srcW = 115;
-    const srcH = 48;
-    const srcGap = 10;
-    const srcStartY = 10;
-
-    // Column 2: Bookings by source (x=220)
-    const bkX = 230;
-    const bkW = 115;
-    const bkH = 48;
-
-    // Column 3: Total Bookings (x=440)
-    const totX = 440;
-    const totW = 120;
-    const totH = 60;
-    const totY = 95;
-
-    // Column 4: Sales (x=640)
-    const salX = 630;
-    const salW = 120;
-
-    // Column 5: Revenue (x=820)
-    const revX = 810;
-    const revW = 140;
-
-    const nodes: FunnelNode[] = [
-      // Sources
-      { id: "yt-views", label: "YouTube Views", value: metricValue(ytViews), target: metricTarget(ytViews), formatted: fmt(ytViews), targetFormatted: fmtTarget(ytViews), status: ytViews?.status ?? "green", x: srcX, y: srcStartY, w: srcW, h: srcH },
-      { id: "website", label: "Website Views", value: metricValue(websiteViews), target: metricTarget(websiteViews), formatted: fmt(websiteViews), targetFormatted: fmtTarget(websiteViews), status: websiteViews?.status ?? "green", x: srcX, y: srcStartY + srcH + srcGap, w: srcW, h: srcH },
-      { id: "skool", label: "Skool Joins", value: metricValue(skoolJoins), target: metricTarget(skoolJoins), formatted: fmt(skoolJoins), targetFormatted: fmtTarget(skoolJoins), status: skoolJoins?.status ?? "green", x: srcX, y: srcStartY + 2 * (srcH + srcGap), w: srcW, h: srcH },
-
-      // Booking types (middle)
-      { id: "email-bookings", label: "Email Bookings", value: emailBookingsVal, target: metricTarget(emailBookings), formatted: emailBookingsVal != null ? compact(emailBookingsVal) : "—", targetFormatted: fmtTarget(emailBookings), status: emailBookings?.status ?? "green", x: bkX, y: srcStartY + srcH + srcGap, w: bkW, h: bkH },
-      { id: "other-bookings", label: "Web + Skool Bookings", value: otherBookingsVal, target: null, formatted: otherBookingsVal != null ? compact(otherBookingsVal) : "—", targetFormatted: "—", status: "green", x: bkX, y: srcStartY + 2 * (srcH + srcGap) + 5, w: bkW, h: bkH },
-
-      // Aggregates
-      { id: "bookings", label: "Total Bookings", value: totalBookingsVal, target: metricTarget(totalBookings), formatted: fmt(totalBookings), targetFormatted: fmtTarget(totalBookings), status: totalBookings?.status ?? "green", x: totX, y: totY, w: totW, h: totH },
-      { id: "sales", label: "Sales", value: salesVal, target: null, formatted: salesVal != null ? compact(salesVal) : "—", targetFormatted: "—", status: closeRate?.status ?? "green", x: salX, y: totY, w: salW, h: totH },
-      { id: "revenue", label: "Revenue", value: metricValue(revenue), target: metricTarget(revenue), formatted: fmtCur(metricValue(revenue)), targetFormatted: fmtCur(metricTarget(revenue)), status: revenue?.status ?? "green", x: revX, y: totY, w: revW, h: totH },
-    ];
-
-    const flows: FunnelFlow[] = [
-      // Sources → Booking types
-      { from: "yt-views", to: "bookings", colorVar: "--chart-1", opacity: 0.2, bandW: 8 },
-      { from: "email", to: "email-bookings", colorVar: "--chart-2", opacity: 0.25, bandW: 10 },
-      { from: "website", to: "other-bookings", colorVar: "--chart-3", opacity: 0.25, bandW: 8 },
-      { from: "skool", to: "other-bookings", colorVar: "--chart-5", opacity: 0.25, bandW: 8 },
-      // Booking types → Total
-      { from: "email-bookings", to: "bookings", colorVar: "--chart-2", opacity: 0.2, bandW: 10 },
-      { from: "other-bookings", to: "bookings", colorVar: "--chart-3", opacity: 0.2, bandW: 8 },
-      // Pipeline
-      { from: "bookings", to: "sales", colorVar: "--primary", opacity: 0.18, bandW: 14 },
-      { from: "sales", to: "revenue", colorVar: "--primary", opacity: 0.15, bandW: 14 },
-    ];
-
-    const revenueVal = metricValue(revenue);
-
-    const conversions: Conversion[] = [
-      { from: "bookings", to: "sales", label: pctLabel(totalBookingsVal, salesVal) },
-      { from: "sales", to: "revenue", label: revenueVal != null && salesVal ? fmtCur(Math.round(revenueVal / salesVal)) + "/sale" : null },
-    ];
-
-    return { nodes, flows, conversions };
-  }, [metrics, formatCurrency]);
-}
-
 // ── Component ───────────────────────────────────────────────
 
-export function FunnelSankey({ metrics, formatCurrency }: Props) {
-  const { nodes, flows, conversions } = useFunnelData(metrics, formatCurrency);
-  const [hovered, setHovered] = useState<string | null>(null);
+export function FunnelSankey({
+  metrics,
+  formatCurrency,
+  rangeDays = 30,
+  youtubeVideosValue,
+  emailBroadcastsValue,
+  skoolJoinsValue,
+  websiteViewsValue,
+  youtubeVideosLoading,
+  emailBroadcastsLoading,
+  skoolJoinsLoading,
+  websiteViewsLoading,
+  bookingsGauge,
+  showRateGauge,
+  closeRateGauge,
+  cashGauge,
+}: Props) {
+  const fmtCur = formatCurrency ?? ((v: number | string | undefined) => {
+    const n = v != null ? parseNum(String(v)) : null;
+    return n != null ? `$${compact(n)}` : "—";
+  });
 
-  const nodeMap = useMemo(() => {
-    const map: Record<string, FunnelNode> = {};
-    for (const n of nodes) map[n.id] = n;
-    return map;
-  }, [nodes]);
+  const data = useMemo(() => {
+    const find = (name: string) => metrics.find((m) => m.name === name);
 
-  // All nodes connected to a hovered node
-  const connectedIds = useMemo(() => {
-    if (!hovered) return new Set<string>();
-    const ids = new Set<string>([hovered]);
-    for (const f of flows) {
-      if (f.from === hovered) ids.add(f.to);
-      if (f.to === hovered) ids.add(f.from);
-    }
-    return ids;
-  }, [hovered, flows]);
+    /** Scale a monthly scorecard target down to the actual range (≈ days_in_range / 30). */
+    const prorate = (monthlyTarget: number | null): number | null => {
+      if (monthlyTarget == null) return null;
+      return monthlyTarget * (rangeDays / 30);
+    };
 
+    const stage = (m: Metric | undefined, label: string, isPercent = false, isCurrency = false): Stage => {
+      const v = metricValue(m);
+      const t = metricTarget(m);
+      const fmtVal = (n: number | null) => {
+        if (n == null) return "—";
+        if (isPercent) return `${n.toFixed(1)}%`;
+        if (isCurrency) return fmtCur(n);
+        return compact(n);
+      };
+      return {
+        id: m?.name ?? label,
+        label, // Always use the display label override, not the underlying metric name
+        value: v,
+        target: t,
+        formatted: fmtVal(v),
+        targetFormatted: fmtVal(t),
+        status: m?.status ?? "green",
+      };
+    };
+
+    const placeholder = (id: string, label: string): Stage => ({
+      id, label, value: null, target: null,
+      formatted: "—", targetFormatted: "—", status: "green",
+      isPlaceholder: true,
+    });
+
+    /** Build a stage from explicit live values + a scorecard metric for the target/status hint. */
+    const liveStage = (
+      id: string,
+      label: string,
+      value: number | null,
+      scorecardMetricName?: string,
+      isPercent = false,
+      isLoading = false,
+    ): Stage => {
+      if (isLoading && value == null) {
+        // Loading state — keep card visible but show spinner / placeholder values
+        return { id, label, value: null, target: null, formatted: "—", targetFormatted: "—", status: "green", isLoading: true };
+      }
+      if (value == null) return placeholder(id, label);
+      const m = scorecardMetricName ? find(scorecardMetricName) : undefined;
+      const target = prorate(metricTarget(m));
+      const fmtVal = (n: number | null) => n == null ? "—" : isPercent ? `${n.toFixed(1)}%` : compact(n);
+      return {
+        id, label, value, target,
+        formatted: fmtVal(value),
+        targetFormatted: fmtVal(target),
+        // Re-derive status against pro-rated target
+        status: target != null && target > 0
+          ? (value >= target ? "green" : value >= target * 0.7 ? "yellow" : "red")
+          : (m?.status ?? "green"),
+      };
+    };
+
+    // Row 1 — Distribution: videos posted (liam_videos), email broadcasts (Kit), social posts, ads
+    const distribution: Stage[] = [
+      liveStage("youtube-videos", "YouTube videos", youtubeVideosValue ?? null, "Videos posted last week", false, !!youtubeVideosLoading),
+      liveStage("email-broadcasts", "Email broadcasts", emailBroadcastsValue ?? null, undefined, false, !!emailBroadcastsLoading),
+      placeholder("social-posts", "Social posts"),
+      placeholder("ads", "Ads"),
+    ];
+
+    // Row 2 — Nurturing: Skool joins (Supabase) + Website views (GA4)
+    const nurturing: Stage[] = [
+      liveStage("skool-joins", "Skool Joins", skoolJoinsValue ?? null, "Skool Joins", false, !!skoolJoinsLoading),
+      liveStage("website-views", "Website Views", websiteViewsValue ?? null, "Website Views", false, !!websiteViewsLoading),
+    ];
+
+    // Row 3 — Total Bookings
+    const totalBookings = stage(find("Total Bookings"), "Total Bookings");
+
+    // Row 4 — Show Rate
+    const showRate = stage(find("Closing Call Show Rate"), "Show Rate", true);
+
+    // Row 5 — Close Rate
+    const closeRate = stage(find("Closing Call Close Rate"), "Close Rate", true);
+
+    // Row 6 — Cash Collected
+    const cashCollected = stage(find("Cash Collected"), "Cash Collected", false, true);
+
+    // Conversion rate hints between consecutive stages (where it makes sense)
+    const callsTaken = metricValue(find("Closing Calls Taken"));
+    const callsBooked = metricValue(find("Closing Calls Booked"));
+    const showPct = pctLabel(callsBooked, callsTaken);
+
+    return { distribution, nurturing, totalBookings, showRate, closeRate, cashCollected, showPct };
+  }, [
+    metrics, fmtCur, rangeDays,
+    youtubeVideosValue, emailBroadcastsValue, skoolJoinsValue, websiteViewsValue,
+    youtubeVideosLoading, emailBroadcastsLoading, skoolJoinsLoading, websiteViewsLoading,
+  ]);
+
+  // Cockpit funnel: outer width narrows row-by-row from top (widest) to bottom (narrowest).
+  // Each row is rendered inside a max-width container that physically shrinks down the page,
+  // creating a literal funnel silhouette while the gauges sit as the climactic instruments.
   return (
     <div>
-      <div className="flex items-center gap-2 mb-3">
-        <svg className="h-4 w-4 text-accent" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M22 12h-4l-3 9L9 3l-3 9H2" /></svg>
-        <h2 className="text-sm font-semibold text-foreground uppercase tracking-wider">Conversion Funnel</h2>
-      </div>
+      {/* Funnel silhouette: each row is wrapped in a narrowing width container */}
+      <div className="mx-auto py-0 flex flex-col items-center">
+        {/* ── Distribution (widest mouth of the funnel) ─────── */}
+        <FunnelLevel widthClass="w-full max-w-[1100px]">
+          <FunnelRow
+            stageLabel="Distribution"
+            stages={data.distribution}
+            gridCols="grid-cols-2 sm:grid-cols-4"
+          />
+        </FunnelLevel>
 
-      <div className="p-3 overflow-hidden">
-        <svg viewBox="0 0 960 270" className="w-full" preserveAspectRatio="xMidYMid meet">
-          {/* Flows */}
-          {flows.map((flow) => {
-            const fromNode = nodeMap[flow.from];
-            const toNode = nodeMap[flow.to];
-            if (!fromNode || !toNode) return null;
+        <FlowArrow />
 
-            const x1 = fromNode.x + fromNode.w;
-            const y1 = fromNode.y + fromNode.h / 2;
-            const x2 = toNode.x;
-            const y2 = toNode.y + toNode.h / 2;
-            const bw = flow.bandW ?? 10;
+        {/* ── Nurturing ─────────────────── */}
+        <FunnelLevel widthClass="w-full max-w-[820px]">
+          <FunnelRow
+            stageLabel="Nurturing"
+            stages={data.nurturing}
+            gridCols="grid-cols-2"
+          />
+        </FunnelLevel>
 
-            const isConnected = hovered && (connectedIds.has(flow.from) && connectedIds.has(flow.to));
-            const dimmed = hovered && !isConnected;
-            const finalOpacity = dimmed ? flow.opacity * 0.15 : isConnected ? flow.opacity * 2.5 : flow.opacity;
+        <FlowArrow />
 
-            return (
-              <path
-                key={`${flow.from}-${flow.to}`}
-                d={bandPath(x1, y1, x2, y2, bw)}
-                fill={`hsl(var(${flow.colorVar}))`}
-                opacity={finalOpacity}
-                style={{ transition: "opacity 200ms" }}
-              />
-            );
-          })}
+        {/* ── Bookings — gauge instrument (no card chrome) ─────── */}
+        <div className="w-full max-w-[600px]">
+          <GaugeSlot label="Total Bookings" gauge={bookingsGauge} fallbackStage={data.totalBookings} />
+        </div>
 
-          {/* Conversion rate labels */}
-          {conversions.map((conv) => {
-            if (!conv.label) return null;
-            const from = nodeMap[conv.from];
-            const to = nodeMap[conv.to];
-            if (!from || !to) return null;
+        <FlowArrow tight />
 
-            const cx = (from.x + from.w + to.x) / 2;
-            const cy = from.y - 4;
+        {/* ── Show Rate + Close Rate — paired instruments side by side (no card chrome) ─── */}
+        <div className="w-full max-w-[760px]">
+          <div className="grid grid-cols-2 gap-3 items-center">
+            <GaugeSlot label="Show Rate" gauge={showRateGauge} fallbackStage={data.showRate} />
+            <GaugeSlot label="Close Rate" gauge={closeRateGauge} fallbackStage={data.closeRate} />
+          </div>
+        </div>
 
-            return (
-              <g key={`conv-${conv.from}-${conv.to}`}>
-                <rect x={cx - 32} y={cy - 10} width={64} height={17} rx={8} fill="hsl(var(--muted))" opacity={0.9} />
-                <text x={cx} y={cy + 1} textAnchor="middle" fontSize={9} fontWeight={500} fill="hsl(var(--muted-foreground))">
-                  {conv.label}
-                </text>
-              </g>
-            );
-          })}
+        <FlowArrow tight />
 
-          {/* Nodes */}
-          {nodes.map((node) => {
-            const isHovered = hovered === node.id;
-            const dimmed = hovered && !connectedIds.has(node.id);
-            const isPipeline = node.h >= 60;
-
-            return (
-              <g
-                key={node.id}
-                onMouseEnter={() => setHovered(node.id)}
-                onMouseLeave={() => setHovered(null)}
-                style={{ cursor: "default", transition: "opacity 200ms" }}
-                opacity={dimmed ? 0.3 : 1}
-              >
-                <rect
-                  x={node.x} y={node.y} width={node.w} height={node.h} rx={8}
-                  fill="hsl(var(--card))"
-                  stroke={isHovered ? "hsl(var(--primary))" : "hsl(var(--border))"}
-                  strokeWidth={isHovered ? 1.5 : 0.8}
-                />
-                <circle cx={node.x + node.w - 10} cy={node.y + 10} r={3} fill={statusColor(node.status)} />
-
-                <text
-                  x={node.x + node.w / 2}
-                  y={node.y + (isPipeline ? node.h / 2 - 6 : node.h / 2 - 3)}
-                  textAnchor="middle"
-                  fontSize={isPipeline ? 16 : 12}
-                  fontWeight={700}
-                  fill="hsl(var(--foreground))"
-                >
-                  {node.formatted}
-                </text>
-
-                <text
-                  x={node.x + node.w / 2}
-                  y={node.y + (isPipeline ? node.h / 2 + 10 : node.h / 2 + 11)}
-                  textAnchor="middle"
-                  fontSize={isPipeline ? 9 : 8}
-                  fill="hsl(var(--muted-foreground))"
-                >
-                  {node.label}
-                </text>
-
-                {isPipeline && node.targetFormatted !== "—" && (
-                  <text
-                    x={node.x + node.w / 2}
-                    y={node.y + node.h / 2 + 23}
-                    textAnchor="middle"
-                    fontSize={8}
-                    fill="hsl(var(--muted-foreground))"
-                    opacity={0.6}
-                  >
-                    Target: {node.targetFormatted}
-                  </text>
-                )}
-
-                {isHovered && node.value != null && node.target != null && (
-                  <g>
-                    <rect
-                      x={node.x + node.w / 2 - 45} y={node.y + node.h + 4}
-                      width={90} height={18} rx={6}
-                      fill="hsl(var(--popover))" stroke="hsl(var(--border))" strokeWidth={0.5}
-                    />
-                    <text
-                      x={node.x + node.w / 2} y={node.y + node.h + 16}
-                      textAnchor="middle" fontSize={9}
-                      fill="hsl(var(--popover-foreground))"
-                    >
-                      {Math.round((node.value / node.target) * 100)}% of target
-                    </text>
-                  </g>
-                )}
-              </g>
-            );
-          })}
-        </svg>
+        {/* ── Cash Collected — final gauge, narrowest spout (no card chrome) ─────── */}
+        <div className="w-full max-w-[420px]">
+          <GaugeSlot label="Cash Collected" gauge={cashGauge} fallbackStage={data.cashCollected} />
+        </div>
       </div>
     </div>
   );
+}
+
+function FlowArrow({ tight = false }: { tight?: boolean }) {
+  return (
+    <div className={`flex justify-center ${tight ? "-my-3" : "py-1"}`}>
+      <ChevronDown className="h-3.5 w-3.5 text-muted-foreground/30" strokeWidth={2.5} />
+    </div>
+  );
+}
+
+// ── Sub-components ──────────────────────────────────────────
+
+function FunnelRow({
+  stageLabel,
+  stages,
+  gridCols,
+  emphasized = false,
+}: {
+  stageLabel: string;
+  stages: Stage[];
+  gridCols: string;
+  emphasized?: boolean;
+}) {
+  return (
+    <div>
+      <p className="text-[9px] font-bold text-muted-foreground uppercase tracking-widest text-center pb-3">
+        {stageLabel}
+      </p>
+      <div className={`grid ${gridCols} gap-1.5`}>
+        {stages.map((s) => (
+          <FunnelCard key={s.id} stage={s} emphasized={emphasized} />
+        ))}
+      </div>
+    </div>
+  );
+}
+
+/** Cockpit level-meter: a horizontal progress bar measuring actual against target,
+ *  with a glowing knob/indicator at the actual position. Inspired by HUD instrument sliders. */
+function FunnelCard({ stage, emphasized }: { stage: Stage; emphasized?: boolean }) {
+  const isLoading = !!stage.isLoading;
+  const isPlaceholder = !isLoading && (stage.isPlaceholder || stage.value == null);
+  const hasTarget = !isLoading && stage.value != null && stage.target != null && stage.target > 0;
+  const pct = hasTarget ? Math.min((stage.value! / stage.target!) * 100, 100) : 0;
+
+  // Status-driven gradient + glow colors for the fill bar and indicator knob
+  const fillGradient =
+    stage.status === "green" || stage.status === "light-green" ? "from-emerald-500/80 via-emerald-400 to-emerald-300"
+    : stage.status === "yellow" ? "from-amber-500/80 via-amber-400 to-yellow-300"
+    : "from-red-500/80 via-red-400 to-orange-300";
+
+  const knobGlow =
+    stage.status === "green" || stage.status === "light-green" ? "rgba(34,197,94,0.7)"
+    : stage.status === "yellow" ? "rgba(250,204,21,0.7)"
+    : "rgba(239,68,68,0.7)";
+
+  const knobBg =
+    stage.status === "green" || stage.status === "light-green" ? "bg-emerald-400"
+    : stage.status === "yellow" ? "bg-amber-300"
+    : "bg-red-400";
+
+  return (
+    <div
+      className={[
+        "relative rounded-lg px-4 py-5 transition-all",
+        "bg-gradient-to-b from-black/40 to-black/60",
+        "ring-1 ring-white/10",
+        "shadow-[inset_0_1px_0_0_rgba(255,255,255,0.05),0_2px_12px_-4px_rgba(0,0,0,0.4)]",
+        isPlaceholder && "opacity-50",
+      ].filter(Boolean).join(" ")}
+    >
+      {/* Top row: label (left), actual / target readout (right) */}
+      <div className="flex items-baseline justify-between gap-3 mb-4">
+        <p className="text-[10px] uppercase tracking-[0.14em] text-muted-foreground font-semibold truncate">
+          {stage.label}
+        </p>
+        <p className="text-[10px] font-mono tabular-nums text-muted-foreground/70 shrink-0 flex items-center gap-1">
+          {isLoading ? (
+            <Loader2 className="h-3 w-3 animate-spin text-muted-foreground/60" />
+          ) : isPlaceholder ? "—" : (
+            <>
+              <span className="text-foreground font-semibold text-xs">{stage.formatted}</span>
+              {stage.targetFormatted !== "—" && (
+                <span className="text-muted-foreground/50"> / {stage.targetFormatted}</span>
+              )}
+            </>
+          )}
+        </p>
+      </div>
+
+      {/* Level meter — horizontal track + gradient fill + glowing knob (or shimmer when loading) */}
+      <div className={`relative h-2 rounded-full bg-white/5 ring-1 ring-black/40 ${isLoading ? "overflow-hidden" : "overflow-visible"}`}>
+        {/* Loading shimmer */}
+        {isLoading && (
+          <div
+            className="absolute inset-0 -translate-x-full bg-gradient-to-r from-transparent via-white/15 to-transparent animate-[shimmer_1.4s_ease-in-out_infinite]"
+            style={{ animation: "shimmer 1.4s ease-in-out infinite" }}
+          />
+        )}
+        {/* Filled portion */}
+        {!isPlaceholder && !isLoading && hasTarget && (
+          <div
+            className={`absolute inset-y-0 left-0 rounded-full bg-gradient-to-r ${fillGradient}`}
+            style={{
+              width: `${pct}%`,
+              boxShadow: `0 0 10px 0 ${knobGlow}`,
+              transition: "width 600ms cubic-bezier(0.22, 1, 0.36, 1)",
+            }}
+          />
+        )}
+        {/* Knob at the actual position */}
+        {!isPlaceholder && !isLoading && hasTarget && (
+          <div
+            className={`absolute top-1/2 -translate-y-1/2 -translate-x-1/2 h-3 w-3 rounded-full ${knobBg} ring-2 ring-black/40`}
+            style={{
+              left: `${pct}%`,
+              boxShadow: `0 0 0 2px rgba(255,255,255,0.15)`,
+              transition: "left 600ms cubic-bezier(0.22, 1, 0.36, 1)",
+            }}
+          />
+        )}
+        {/* No-target fallback: a centered dim dot so the meter isn't blank */}
+        {!isPlaceholder && !isLoading && !hasTarget && stage.value != null && (
+          <div className="absolute inset-y-0 left-0 right-0 flex items-center justify-center">
+            <span className="text-[9px] font-mono text-muted-foreground/40 uppercase tracking-wider">no target</span>
+          </div>
+        )}
+      </div>
+    </div>
+  );
+}
+
+/** A horizontal "level" of the cockpit funnel — a frosted instrument-panel container
+ *  that visually narrows as the funnel descends. */
+function FunnelLevel({ widthClass, children }: { widthClass: string; children: ReactNode }) {
+  return (
+    <div className={widthClass}>
+      <div
+        className={[
+          "rounded-xl px-3 py-3",
+          "bg-gradient-to-b from-white/[0.03] to-white/[0.01] dark:from-white/[0.025] dark:to-white/[0.005]",
+          "backdrop-blur-xl ring-1 ring-white/5",
+          "shadow-[inset_0_1px_0_0_rgba(255,255,255,0.05)]",
+        ].join(" ")}
+      >
+        {children}
+      </div>
+    </div>
+  );
+}
+
+/** Render a SpeedometerCard gauge as a funnel stage; falls back to a regular FunnelCard
+ *  if no gauge node was provided. The gauge has its own internal label, so we don't
+ *  add an outer one here. */
+function GaugeSlot({ label, gauge, fallbackStage }: { label: string; gauge: ReactNode; fallbackStage: Stage }) {
+  if (!gauge) {
+    return (
+      <FunnelRow stageLabel={label} stages={[fallbackStage]} gridCols="grid-cols-1" emphasized />
+    );
+  }
+  return <div className="flex justify-center">{gauge}</div>;
 }

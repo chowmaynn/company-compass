@@ -63,6 +63,27 @@ async function fetchVideosForMonth(month: string): Promise<LiamVideo[]> {
   return res.json();
 }
 
+/** Count Liam videos published within an arbitrary date range (inclusive).
+ *  Same source the Content page uses — queries the `liam_videos` table via PostgREST's
+ *  Prefer: count=exact header so we get the row count without pulling all rows. */
+export async function fetchVideoCountInRange(startDate: string, endDate: string): Promise<number> {
+  if (!startDate || !endDate) return 0;
+  const headers = await getSupabaseHeaders();
+  // Make end-date inclusive (the column is a date or timestamp; lt of next day captures it)
+  const endNext = new Date(Date.parse(endDate + "T00:00:00Z") + 86400000).toISOString().slice(0, 10);
+  const url = `${SUPABASE_URL}/rest/v1/liam_videos?published_at=gte.${startDate}&published_at=lt.${endNext}&select=id`;
+  const res = await fetch(url, { headers: { ...headers, Prefer: "count=exact" } });
+  if (!res.ok) return 0;
+  // The row count is in the Content-Range header (e.g. "0-9/42"); fall back to JSON length.
+  const range = res.headers.get("content-range");
+  if (range) {
+    const total = range.split("/").pop();
+    if (total && total !== "*") return parseInt(total, 10);
+  }
+  const rows = await res.json();
+  return Array.isArray(rows) ? rows.length : 0;
+}
+
 async function fetchChannelSummary(month: string): Promise<ChannelSummary | null> {
   const headers = await getSupabaseHeaders();
   const url = `${SUPABASE_URL}/rest/v1/channel_summaries?month=eq.${month}&limit=1`;

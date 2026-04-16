@@ -11,6 +11,10 @@ import { fetchQuarterlySettings, upsertQuarterlySettings, fetchAllQuarters, type
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { useAuth } from "@/hooks/use-auth";
 import { useFinanceOverview } from "@/hooks/use-finance-overview";
+import { useKitMarketing } from "@/hooks/use-kit-marketing";
+import { useSkoolJoinsByDate, sumJoinsInRange } from "@/hooks/use-skool-joins";
+import { fetchVideoCountInRange } from "@/hooks/use-channel-videos";
+import { fetchPageSessions } from "@/lib/google-analytics";
 import { FunnelSankey } from "@/components/FunnelSankey";
 import { Checkbox } from "@/components/ui/checkbox";
 import { useFocusBoard, getCurrentWeekStart, getCurrentQuarter } from "@/hooks/use-focus-board";
@@ -76,7 +80,7 @@ function SpeedometerCard({
     : "stroke-red-400";
 
   return (
-    <div className="p-5 flex flex-col items-center">
+    <div className="px-5 py-0 flex flex-col items-center">
       <span className="text-sm font-semibold text-foreground/90">{label}</span>
       {subtitle && (
         <span className="text-[10px] text-foreground/60 mb-1">{subtitle}</span>
@@ -245,38 +249,93 @@ export default function Dashboard() {
     return () => { cancelled = true; };
   }, []);
 
-  // Daily gauge date (Today by default, can switch to Yesterday)
-  const [gaugePeriod, setGaugePeriod] = useState<"today" | "yesterday">("today");
   const [filterInitId, setFilterInitId] = useState<string | null>(null);
-  const gaugeDate = useMemo(() => {
-    const today = toNZDate(new Date());
-    if (gaugePeriod === "today") return today;
-    // Yesterday: subtract one day from today's NZ date string
-    const ms = Date.parse(today + "T00:00:00Z") - 86400000;
-    return new Date(ms).toISOString().slice(0, 10);
-  }, [gaugePeriod]);
 
-  // Bookings (qualified) for the selected gauge date
+  // Number of days in the picked range (for scaling per-day targets)
+  const rangeDays = useMemo(() => {
+    if (!range.startDate || !range.endDate) return 1;
+    return Math.max(1, Math.round(
+      (Date.parse(range.endDate + "T00:00:00Z") - Date.parse(range.startDate + "T00:00:00Z")) / 86400000 + 1
+    ));
+  }, [range.startDate, range.endDate]);
+
+  // Friendly label for the gauge subtitle
+  const rangeSubtitle = useMemo(() => {
+    if (!range.startDate || !range.endDate) return "";
+    const today = toNZDate(new Date());
+    const yesterday = (() => {
+      const ms = Date.parse(today + "T00:00:00Z") - 86400000;
+      return new Date(ms).toISOString().slice(0, 10);
+    })();
+    if (range.startDate === range.endDate) {
+      if (range.startDate === today) return "Today";
+      if (range.startDate === yesterday) return "Yesterday";
+      return new Date(range.startDate + "T12:00:00Z").toLocaleDateString("en-NZ", { month: "short", day: "numeric" });
+    }
+    const fmt = (d: string) => new Date(d + "T12:00:00Z").toLocaleDateString("en-NZ", { month: "short", day: "numeric" });
+    return `${fmt(range.startDate)} – ${fmt(range.endDate)}`;
+  }, [range.startDate, range.endDate]);
+
+  // Bookings (qualified) for the selected range
   const dailyBookings = useSupabaseMetrics(
-    gaugeDate + "T00:00:00Z",
-    gaugeDate + "T23:59:59Z",
+    range.start || (toNZDate(new Date()) + "T00:00:00Z"),
+    range.end   || (toNZDate(new Date()) + "T23:59:59Z"),
   );
 
-  // Sales tracking — sum closes, calls_taken, cc across all reps for the date
+  // ── Cockpit funnel data sources ───────────────────────────────────────
+  // Email broadcasts → Kit
+  const kit = useKitMarketing(range.startDate, range.endDate);
+  const emailBroadcastsValue = useMemo(
+    () => (kit.loading || !range.startDate ? null : kit.broadcasts.length),
+    [kit.broadcasts.length, kit.loading, range.startDate]
+  );
+
+  // Skool joins → Supabase (same shared data the marketing page uses)
+  const skoolMonth = useMemo(() => {
+    const d = range.startDate ? new Date(range.startDate + "T12:00:00") : new Date();
+    return { year: d.getFullYear(), month: d.getMonth() };
+  }, [range.startDate]);
+  const skoolJoinsDaily = useSkoolJoinsByDate(skoolMonth.year, skoolMonth.month);
+  const skoolJoinsValue = useMemo(() => {
+    if (skoolJoinsDaily.loading || !range.startDate || !range.endDate) return null;
+    return sumJoinsInRange(skoolJoinsDaily.joinsByDate, range.startDate, range.endDate);
+  }, [skoolJoinsDaily.joinsByDate, skoolJoinsDaily.loading, range.startDate, range.endDate]);
+
+  // Website views → GA4 (page sessions over the range)
+  const websiteViewsQuery = useQuery({
+    queryKey: ["ga4-page-sessions", range.startDate, range.endDate],
+    queryFn: () => fetchPageSessions(range.startDate, range.endDate),
+    enabled: !!range.startDate && !!range.endDate,
+  });
+  const websiteViewsValue = typeof websiteViewsQuery.data === "number" ? websiteViewsQuery.data : null;
+
+  // YouTube videos → liam_videos table in Supabase (same source the Content page uses)
+  const youtubeVideosQuery = useQuery({
+    queryKey: ["liam-videos-count", range.startDate, range.endDate],
+    queryFn: () => fetchVideoCountInRange(range.startDate, range.endDate),
+    enabled: !!range.startDate && !!range.endDate,
+  });
+  const youtubeVideosValue = typeof youtubeVideosQuery.data === "number" ? youtubeVideosQuery.data : null;
+
+  // Sales tracking — sum closes, calls_booked, calls_taken, cc across all reps for the range
   const [dailyCloseRate, setDailyCloseRate] = useState<number | null>(null);
+  const [dailyShowRate, setDailyShowRate] = useState<number | null>(null);
   const [dailyCashCollected, setDailyCashCollected] = useState<number | null>(null);
   useEffect(() => {
+    if (!range.startDate || !range.endDate) return;
     let cancelled = false;
-    fetchSalesTrackingRange(gaugeDate, gaugeDate).then((rows) => {
+    fetchSalesTrackingRange(range.startDate, range.endDate).then((rows) => {
       if (cancelled) return;
       const closes = rows.reduce((s, r) => s + (r.closes ?? 0), 0);
+      const booked = rows.reduce((s, r) => s + (r.calls_booked ?? 0), 0);
       const taken = rows.reduce((s, r) => s + (r.calls_taken ?? 0), 0);
       const cc = rows.reduce((s, r) => s + (r.cc ?? 0), 0);
       setDailyCloseRate(taken > 0 ? Math.round((closes / taken) * 100) : null);
+      setDailyShowRate(booked > 0 ? Math.round((taken / booked) * 100) : null);
       setDailyCashCollected(cc);
     });
     return () => { cancelled = true; };
-  }, [gaugeDate]);
+  }, [range.startDate, range.endDate]);
 
   // Finance data from Supabase (for gauges)
   const financeOverview = useFinanceOverview();
@@ -356,65 +415,79 @@ export default function Dashboard() {
           <WelcomeHeader />
           <MyFocusItems filterInitId={filterInitId} />
         </div>
-        <div className="space-y-6">
+        <div className="space-y-3">
           <RallyingCryBanner />
           <NorthStarsCard />
           <QuarterlyInitiativesCard activeId={filterInitId} onToggle={(id) => setFilterInitId((curr) => curr === id ? null : id)} />
           <TeamFocusCard filterInitId={filterInitId} />
+          <TeamClocks />
         </div>
       </div>
 
-      {/* ── Daily Gauges (centered, above Focus Board) ─────── */}
-      <div className="space-y-3">
-        <DividerLine />
-        <div className="flex justify-center">
-          <div className="inline-flex items-stretch bg-muted/30 backdrop-blur-sm rounded-full p-0.5 ring-1 ring-white/5">
-            {(["today", "yesterday"] as const).map((p) => (
-              <button
-                key={p}
-                onClick={() => setGaugePeriod(p)}
-                className={`px-4 py-1.5 rounded-full text-[11px] font-medium transition-colors ${
-                  gaugePeriod === p
-                    ? "bg-white/15 text-foreground"
-                    : "text-muted-foreground hover:text-foreground"
-                }`}
-              >
-                {p === "today" ? "Today" : "Yesterday"}
-              </button>
-            ))}
-          </div>
-        </div>
-        <div className="flex justify-center">
-          <div className="grid grid-cols-1 sm:grid-cols-3 gap-6 w-full max-w-3xl">
-            <SpeedometerCard
-              label="Qualified Bookings"
-              value={dailyBookings.totalQualified ?? null}
-              target={dailyTargets.bookings}
-              symbol=""
-              formatValue={(v) => String(v)}
-              subtitle={gaugePeriod === "today" ? "Today" : "Yesterday"}
-            />
-            <SpeedometerCard
-              label="Close Rate"
-              value={dailyCloseRate}
-              target={dailyTargets.closeRate}
-              symbol=""
-              formatValue={(v) => `${v}%`}
-              subtitle={gaugePeriod === "today" ? "Today" : "Yesterday"}
-            />
-            <SpeedometerCard
-              label="Cash Collected"
-              value={dailyCashCollected != null ? convert(dailyCashCollected) : null}
-              target={dailyTargets.cash != null ? convert(dailyTargets.cash) : null}
-              symbol={symbol}
-              subtitle={gaugePeriod === "today" ? "Today" : "Yesterday"}
-            />
-          </div>
-        </div>
+      <DividerLine />
+
+      {/* ── Conversion Cockpit Heading ─────────────────────── */}
+      <div className="flex items-center gap-2.5 justify-center">
+        <svg className="h-[18px] w-[18px] text-accent" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+          <path d="M22 12h-4l-3 9L9 3l-3 9H2" />
+        </svg>
+        <h2 className="text-[18px] font-semibold text-foreground uppercase tracking-wider">Conversion Cockpit</h2>
       </div>
 
-      {/* ── Conversion Funnel ─────────────────────────────── */}
-      <FunnelSankey metrics={scorecardData} formatCurrency={formatCurrency} />
+      {/* ── Shared Time Selector — drives the entire cockpit funnel below ─── */}
+      <div className="flex justify-center">
+        <DateRangePicker defaultPreset="today" onChange={setRange} />
+      </div>
+
+      {/* ── Cockpit Funnel: distribution → nurturing → gauges (bookings, show rate, close rate, cash) ─ */}
+      <FunnelSankey
+        metrics={scorecardData}
+        formatCurrency={formatCurrency}
+        rangeDays={rangeDays}
+        youtubeVideosValue={youtubeVideosValue}
+        emailBroadcastsValue={emailBroadcastsValue}
+        skoolJoinsValue={skoolJoinsValue}
+        websiteViewsValue={websiteViewsValue}
+        youtubeVideosLoading={youtubeVideosQuery.isLoading}
+        emailBroadcastsLoading={kit.loading}
+        skoolJoinsLoading={skoolJoinsDaily.loading}
+        websiteViewsLoading={websiteViewsQuery.isLoading}
+        bookingsGauge={
+          <SpeedometerCard
+            label="Qualified Bookings"
+            value={dailyBookings.totalQualified ?? null}
+            target={dailyTargets.bookings != null ? dailyTargets.bookings * rangeDays : null}
+            symbol=""
+            formatValue={(v) => String(v)}
+          />
+        }
+        showRateGauge={
+          <SpeedometerCard
+            label="Show Rate"
+            value={dailyShowRate}
+            target={parseNum(scorecardData.find((m) => m.name === "Closing Call Show Rate")?.monthlyTarget ?? "—")}
+            symbol=""
+            formatValue={(v) => `${v}%`}
+          />
+        }
+        closeRateGauge={
+          <SpeedometerCard
+            label="Close Rate"
+            value={dailyCloseRate}
+            target={dailyTargets.closeRate}
+            symbol=""
+            formatValue={(v) => `${v}%`}
+          />
+        }
+        cashGauge={
+          <SpeedometerCard
+            label="Cash Collected"
+            value={dailyCashCollected != null ? convert(dailyCashCollected) : null}
+            target={dailyTargets.cash != null ? convert(dailyTargets.cash * rangeDays) : null}
+            symbol={symbol}
+          />
+        }
+      />
 
     </div>
   );
@@ -593,7 +666,7 @@ function QuarterPicker({ value, onChange }: { value: string; onChange: (q: strin
       <button
         type="button"
         onClick={() => setOpen((o) => !o)}
-        className="inline-flex items-center gap-1 text-[10px] font-semibold uppercase tracking-widest bg-muted text-muted-foreground hover:text-foreground rounded-full px-2.5 py-1 transition-colors"
+        className="inline-flex items-center gap-1.5 text-sm text-muted-foreground hover:text-foreground transition-colors"
       >
         {label}
         <ChevronDown className={`h-3 w-3 transition-transform ${open ? "rotate-180" : ""}`} />
@@ -1352,6 +1425,72 @@ function shiftWeek(weekStart: string, delta: number): string {
   const d = new Date(weekStart + "T12:00:00");
   d.setDate(d.getDate() + delta * 7);
   return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
+}
+
+// Local-time clocks for each teammate. Updates every minute.
+const TEAM_LOCATIONS = [
+  { name: "Adam",     city: "Orlando",  tz: "America/New_York" },
+  { name: "Nicholay", city: "Bali",     tz: "Asia/Makassar" },
+  { name: "Casey",    city: "Auckland", tz: "Pacific/Auckland" },
+  { name: "Josh",     city: "Auckland", tz: "Pacific/Auckland" },
+  { name: "Lana",     city: "Auckland", tz: "Pacific/Auckland" },
+  { name: "Matt",     city: "Auckland", tz: "Pacific/Auckland" },
+];
+
+function TeamClocks() {
+  const [now, setNow] = useState(() => new Date());
+  useEffect(() => {
+    // Tick at the top of every minute so all clocks roll over together
+    const next = 60_000 - (Date.now() % 60_000);
+    const timeout = setTimeout(() => {
+      setNow(new Date());
+      const id = setInterval(() => setNow(new Date()), 60_000);
+      // Stash the interval id on the timeout so the cleanup below can clear it
+      (timeout as unknown as { _intervalId: ReturnType<typeof setInterval> })._intervalId = id;
+    }, next);
+    return () => {
+      clearTimeout(timeout);
+      const id = (timeout as unknown as { _intervalId?: ReturnType<typeof setInterval> })._intervalId;
+      if (id) clearInterval(id);
+    };
+  }, []);
+
+  return (
+    <div className="grid grid-cols-2 sm:grid-cols-3 gap-1.5">
+      {TEAM_LOCATIONS.map((m) => {
+        const parts = new Intl.DateTimeFormat("en-US", {
+          hour: "numeric",
+          minute: "2-digit",
+          hour12: true,
+          timeZone: m.tz,
+        }).formatToParts(now);
+        const clock = parts
+          .filter((p) => p.type !== "dayPeriod" && p.type !== "literal" || (p.type === "literal" && p.value === ":"))
+          .map((p) => p.value)
+          .join("");
+        const dayPeriod = parts.find((p) => p.type === "dayPeriod")?.value ?? "";
+        const isAM = dayPeriod.toUpperCase() === "AM";
+        const tintBg = isAM ? "bg-amber-500/[0.06]" : "bg-sky-500/[0.06]";
+        const tintRing = isAM ? "ring-amber-500/20" : "ring-sky-500/15";
+        return (
+          <div
+            key={m.name}
+            className={`flex items-center justify-between gap-2 px-3 py-1.5 rounded-full ${tintBg} ring-1 ${tintRing} backdrop-blur-sm`}
+            title={`${m.city} (${m.tz})`}
+          >
+            <div className="min-w-0">
+              <p className="text-[11px] font-semibold text-foreground leading-tight truncate">{m.name}</p>
+              <p className="text-[9px] text-muted-foreground/70 leading-tight truncate">{m.city}</p>
+            </div>
+            <p className="text-[12px] font-mono tabular-nums shrink-0 text-foreground/90">
+              {clock}
+              <span className="ml-1 text-muted-foreground">{dayPeriod}</span>
+            </p>
+          </div>
+        );
+      })}
+    </div>
+  );
 }
 
 function TeamFocusCard({ filterInitId }: { filterInitId: string | null }) {

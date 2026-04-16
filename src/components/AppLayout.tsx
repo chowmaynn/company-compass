@@ -183,9 +183,11 @@ interface StatusCounts {
 
 // Three discrete nav widths so the bar animates smoothly between 3 stable sizes
 // rather than growing/shrinking unpredictably based on which pill is hovered.
-const NAV_WIDTH_COLLAPSED = 292;   // All icons, no text
-const NAV_WIDTH_HOVERED = 410;     // One pill expanded to show its label
-const NAV_WIDTH_WITH_METRICS = 660; // One pill expanded with its status counts + chevron inline
+const NAV_WIDTH_COLLAPSED = 292;            // All icons, no text
+const NAV_WIDTH_HOVERED = 470;              // One pill expanded to show its label
+const NAV_WIDTH_TWO_EXPANDED = 560;         // Active label pill + a different hovered label pill
+const NAV_WIDTH_WITH_METRICS = 660;         // One pill expanded with its status counts + chevron inline
+const NAV_WIDTH_WITH_METRICS_AND_HOVER = 780; // Metrics pill active + a different label pill hovered
 
 function NavLinks() {
   const location = useLocation();
@@ -236,13 +238,17 @@ function NavLinks() {
   );
   const hasActiveWithCounts = activeIdx >= 0 && pills[activeIdx].counts !== null;
   const someonesExpanded = activeIdx >= 0 || hoveredIdx !== null;
+  const hasOtherHovered = hoveredIdx !== null && hoveredIdx !== activeIdx;
 
-  // Pick the target width based on state
+  // Pick the target width based on state.
+  // Account for both an active pill AND a different hovered pill being expanded simultaneously.
   const targetWidth = hasActiveWithCounts
-    ? NAV_WIDTH_WITH_METRICS
-    : someonesExpanded
-      ? NAV_WIDTH_HOVERED
-      : NAV_WIDTH_COLLAPSED;
+    ? (hasOtherHovered ? NAV_WIDTH_WITH_METRICS_AND_HOVER : NAV_WIDTH_WITH_METRICS)
+    : (activeIdx >= 0 && hasOtherHovered)
+      ? NAV_WIDTH_TWO_EXPANDED
+      : someonesExpanded
+        ? NAV_WIDTH_HOVERED
+        : NAV_WIDTH_COLLAPSED;
 
   return (
     <motion.nav
