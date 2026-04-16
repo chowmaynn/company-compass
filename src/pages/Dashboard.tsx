@@ -1567,12 +1567,10 @@ function TeamClocks() {
                   : m.city}
               </p>
             </div>
-            {!isOut && (
-              <p className="text-[12px] font-mono tabular-nums shrink-0 text-foreground/90">
-                {clock}
-                <span className="ml-1 text-muted-foreground">{dayPeriod}</span>
-              </p>
-            )}
+            <p className={`text-[12px] font-mono tabular-nums shrink-0 ${isOut ? "text-muted-foreground/60 line-through" : "text-foreground/90"}`}>
+              {clock}
+              <span className={`ml-1 ${isOut ? "text-muted-foreground/60" : "text-muted-foreground"}`}>{dayPeriod}</span>
+            </p>
           </div>
         );
       })}
