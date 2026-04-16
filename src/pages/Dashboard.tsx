@@ -1497,9 +1497,13 @@ function TeamClocks() {
   const { outFirstNames, outByName } = useWhosOut(); // BambooHR — who's on time off today
 
   function fmtRange(start: string, end: string): string {
-    const fmt = (d: string) => new Date(d + "T12:00:00Z").toLocaleDateString("en-US", { month: "short", day: "numeric" });
-    if (start === end) return `Off: ${fmt(start)}`;
-    return `Off: ${fmt(start)} – ${fmt(end)}`;
+    const s = new Date(start + "T12:00:00Z");
+    const e = new Date(end + "T12:00:00Z");
+    const sMonth = s.toLocaleDateString("en-US", { month: "short" });
+    const eMonth = e.toLocaleDateString("en-US", { month: "short" });
+    if (start === end) return `Off: ${sMonth} ${s.getUTCDate()}`;
+    if (sMonth === eMonth) return `Off: ${sMonth} ${s.getUTCDate()}–${e.getUTCDate()}`;
+    return `Off: ${sMonth} ${s.getUTCDate()} – ${eMonth} ${e.getUTCDate()}`;
   }
 
   useEffect(() => {
@@ -1554,7 +1558,7 @@ function TeamClocks() {
                 {isOut && <span className="shrink-0" aria-label="On vacation">🌴</span>}
                 {m.name}
               </p>
-              <p className="text-[9px] text-muted-foreground/70 leading-tight truncate">
+              <p className={`text-[9px] text-muted-foreground/70 leading-tight ${isOut ? "whitespace-nowrap" : "truncate"}`}>
                 {isOut
                   ? (() => {
                       const r = outByName.get(m.name.toLowerCase());
@@ -1563,10 +1567,12 @@ function TeamClocks() {
                   : m.city}
               </p>
             </div>
-            <p className={`text-[12px] font-mono tabular-nums shrink-0 ${isOut ? "text-muted-foreground/60 line-through" : "text-foreground/90"}`}>
-              {clock}
-              <span className="ml-1 text-muted-foreground">{dayPeriod}</span>
-            </p>
+            {!isOut && (
+              <p className="text-[12px] font-mono tabular-nums shrink-0 text-foreground/90">
+                {clock}
+                <span className="ml-1 text-muted-foreground">{dayPeriod}</span>
+              </p>
+            )}
           </div>
         );
       })}
