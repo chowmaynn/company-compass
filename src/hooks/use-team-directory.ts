@@ -82,21 +82,35 @@ const CITY_COORDS: Record<string, [number, number]> = {
   "japan":          [35.6762, 139.6503],
 };
 
-/** Try to resolve a BambooHR location string to lat/lng. */
-function geocodeLocation(location: string | null): [number, number] | null {
+// ── Name-based overrides ─────────────────────────────────────
+// For people whose BambooHR location is "Remote" or blank but whose physical
+// location is known. Keyed by lowercased displayName.
+const NAME_OVERRIDES: Record<string, [number, number]> = {
+  "adam jahr":        [28.5383, -81.3792],   // Orlando, FL
+  "nicholay voyvik":  [-8.3405, 115.0920],   // Bali, Indonesia
+};
+
+/** Try to resolve a BambooHR employee to lat/lng.
+ *  Priority: name override → location field → skip. */
+function geocodeEmployee(displayName: string, location: string | null): [number, number] | null {
+  // 1. Check name overrides first (handles "Remote" / blank people we know)
+  const nameKey = displayName.toLowerCase().trim();
+  if (NAME_OVERRIDES[nameKey]) return NAME_OVERRIDES[nameKey];
+
+  // 2. Try the location field
   if (!location) return null;
   const normalized = location.toLowerCase().trim();
   if (normalized === "remote" || normalized === "") return null;
 
-  // Exact match first
+  // Exact match
   if (CITY_COORDS[normalized]) return CITY_COORDS[normalized];
 
-  // Substring match: check if any key appears in the location string (or vice versa)
+  // Substring match
   for (const [key, coords] of Object.entries(CITY_COORDS)) {
     if (normalized.includes(key) || key.includes(normalized)) return coords;
   }
 
-  // Unknown location — log for debugging so we can add it to the table
+  // Unknown — log for debugging
   console.warn(`[use-team-directory] Unknown location: "${location}" — add it to CITY_COORDS in use-team-directory.ts`);
   return null;
 }
@@ -146,7 +160,7 @@ export function useTeamDirectory() {
     };
 
     for (const m of members) {
-      const coords = geocodeLocation(m.location);
+      const coords = geocodeEmployee(m.displayName, m.location);
       if (!coords) continue;
       result.push({
         ...m,
