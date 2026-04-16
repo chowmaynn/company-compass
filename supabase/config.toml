@@ -368,6 +368,20 @@ deno_version = 2
 # [edge_runtime.secrets]
 # secret_key = "env(SECRET_VALUE)"
 
+# Function-specific overrides
+[functions.chat-transcripts]
+# Disable JWT verification — Supabase auth tokens are ES256-signed (new format)
+# but the edge runtime's built-in verifier only supports HS256/RS256. The
+# function still enforces apikey and uses SUPABASE_SERVICE_ROLE_KEY internally.
+verify_jwt = false
+
+[functions.fireflies-webhook]
+# Disable JWT verification — Fireflies sends webhook POSTs with no apikey or
+# Authorization header. The function is idempotent (only upserts known meetings)
+# so an unauthenticated trigger is safe. Add a shared-secret check inside the
+# function later if Fireflies starts supporting webhook signing.
+verify_jwt = false
+
 [analytics]
 enabled = true
 port = 54327

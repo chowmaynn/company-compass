@@ -1,6 +1,5 @@
 import { useState, useRef, useEffect } from "react";
 import { Input } from "@/components/ui/input";
-import { Button } from "@/components/ui/button";
 import { Send, Loader2, Sparkles, X, MessageSquare } from "lucide-react";
 import ReactMarkdown from "react-markdown";
 import { SUPABASE_URL, SUPABASE_KEY, supabase } from "@/lib/supabase";
@@ -148,29 +147,45 @@ export function ChatWidget() {
 
   return (
     <>
-      {/* Floating button */}
+      {/* Floating button — glassy */}
       {!open && (
         <button
           onClick={() => setOpen(true)}
-          className="fixed bottom-6 right-6 z-40 h-14 w-14 rounded-full bg-primary text-primary-foreground shadow-lg hover:scale-105 transition-transform flex items-center justify-center"
+          className={[
+            "fixed bottom-6 right-6 z-40 h-14 w-14 rounded-full flex items-center justify-center",
+            "bg-gradient-to-b from-white/20 to-white/5 dark:from-white/[0.12] dark:to-white/[0.03]",
+            "backdrop-blur-2xl backdrop-saturate-150",
+            "ring-1 ring-black/10 dark:ring-white/15",
+            "shadow-[inset_0_1px_0_0_rgba(255,255,255,0.2),0_8px_32px_-8px_rgba(0,0,0,0.4),0_2px_8px_0_rgba(0,0,0,0.15)]",
+            "text-foreground hover:scale-105 transition-transform",
+          ].join(" ")}
           aria-label="Open chat"
         >
-          <MessageSquare className="h-6 w-6" />
+          <MessageSquare className="h-5 w-5" />
         </button>
       )}
 
-      {/* Chat panel */}
+      {/* Chat panel — glassy */}
       {open && (
-        <div className="fixed bottom-6 right-6 z-50 w-[420px] max-w-[calc(100vw-2rem)] h-[600px] max-h-[calc(100vh-3rem)] bg-card border border-border rounded-xl shadow-2xl flex flex-col overflow-hidden">
+        <div
+          className={[
+            "fixed bottom-6 right-6 z-50 w-[420px] max-w-[calc(100vw-2rem)] h-[600px] max-h-[calc(100vh-3rem)]",
+            "rounded-2xl flex flex-col overflow-hidden",
+            "bg-gradient-to-b from-card/80 to-card/60 dark:from-card/70 dark:to-card/50",
+            "backdrop-blur-2xl backdrop-saturate-150",
+            "ring-1 ring-black/5 dark:ring-white/10",
+            "shadow-[inset_0_1px_0_0_rgba(255,255,255,0.08),0_24px_48px_-12px_rgba(0,0,0,0.4)]",
+          ].join(" ")}
+        >
           {/* Header */}
-          <div className="flex items-center justify-between px-4 py-3 border-b border-border">
+          <div className="flex items-center justify-between px-4 py-3 border-b border-white/5">
             <div className="flex items-center gap-2">
-              <Sparkles className="h-4 w-4 text-primary" />
+              <Sparkles className="h-4 w-4 text-muted-foreground" />
               <h2 className="text-sm font-semibold text-foreground">Ask</h2>
               <select
                 value={meetingType ?? ""}
                 onChange={(e) => setMeetingType(e.target.value || null)}
-                className="text-[10px] bg-transparent border border-border rounded px-1.5 py-0.5 text-muted-foreground ml-1"
+                className="text-[10px] bg-transparent border border-white/10 rounded px-1.5 py-0.5 text-muted-foreground ml-1"
               >
                 <option value="">All</option>
                 <option value="standup">Standups</option>
@@ -207,7 +222,7 @@ export function ChatWidget() {
                     <button
                       key={q}
                       onClick={() => sendMessage(q)}
-                      className="text-xs px-3 py-2 rounded-md bg-muted/50 hover:bg-muted text-muted-foreground hover:text-foreground transition-colors text-left"
+                      className="text-xs px-3 py-2 rounded-md bg-white/[0.04] hover:bg-white/[0.08] ring-1 ring-white/5 text-muted-foreground hover:text-foreground transition-colors text-left"
                     >
                       {q}
                     </button>
@@ -236,13 +251,13 @@ export function ChatWidget() {
           </div>
 
           {/* Input */}
-          <div className="border-t border-border p-3 flex items-center gap-2">
+          <div className="border-t border-white/5 p-3 flex items-center gap-2">
             <Input
               value={input}
               onChange={(e) => setInput(e.target.value)}
               placeholder="Ask anything..."
               disabled={loading}
-              className="text-sm"
+              className="text-sm bg-white/[0.04] border-white/10 focus-visible:ring-white/20"
               onKeyDown={(e) => {
                 if (e.key === "Enter" && !e.shiftKey) {
                   e.preventDefault();
@@ -250,9 +265,18 @@ export function ChatWidget() {
                 }
               }}
             />
-            <Button size="sm" onClick={() => sendMessage(input)} disabled={loading || !input.trim()}>
+            <button
+              onClick={() => sendMessage(input)}
+              disabled={loading || !input.trim()}
+              className={[
+                "h-9 w-9 rounded-md flex items-center justify-center shrink-0 transition-colors",
+                "bg-white/[0.08] hover:bg-white/[0.15] ring-1 ring-white/10",
+                "text-foreground disabled:opacity-30 disabled:pointer-events-none",
+              ].join(" ")}
+              aria-label="Send"
+            >
               <Send className="h-3.5 w-3.5" />
-            </Button>
+            </button>
           </div>
         </div>
       )}
@@ -269,8 +293,8 @@ function MessageBubble({ message, streaming }: { message: ChatMessage; streaming
         <div
           className={`rounded-lg px-3 py-2 text-[16px] ${
             isUser
-              ? "bg-primary text-primary-foreground"
-              : "bg-muted/50 text-foreground"
+              ? "bg-white/[0.10] ring-1 ring-white/10 text-foreground"
+              : "bg-white/[0.04] ring-1 ring-white/5 text-foreground"
           }`}
         >
           {isUser ? (
@@ -280,9 +304,9 @@ function MessageBubble({ message, streaming }: { message: ChatMessage; streaming
               {message.content ? (
                 <ReactMarkdown
                   components={{
-                    h1: ({children}) => <h1 className="text-sm font-bold mt-3 mb-1.5 text-foreground">{children}</h1>,
-                    h2: ({children}) => <h2 className="text-xs font-bold uppercase tracking-wider mt-3 mb-1 text-primary">{children}</h2>,
-                    h3: ({children}) => <h3 className="text-xs font-bold mt-2 mb-1 text-foreground">{children}</h3>,
+                    h1: ({children}) => <h1 className="text-sm font-bold mt-3 mb-1.5 text-[#28C399]">{children}</h1>,
+                    h2: ({children}) => <h2 className="text-xs font-bold uppercase tracking-wider mt-3 mb-1 text-[#28C399]">{children}</h2>,
+                    h3: ({children}) => <h3 className="text-xs font-bold mt-2 mb-1 text-[#28C399]">{children}</h3>,
                     p: ({children}) => <p className="mb-2 last:mb-0">{children}</p>,
                     ul: ({children}) => <ul className="list-disc pl-4 mb-2 space-y-0.5">{children}</ul>,
                     ol: ({children}) => <ol className="list-decimal pl-4 mb-2 space-y-0.5">{children}</ol>,

@@ -1,14 +1,24 @@
-import { useState, useMemo, useEffect } from "react";
+import { useState, useMemo, useEffect, useRef } from "react";
 import { Card } from "@/components/ui/card";
 import { generateWeekConfigs } from "@/data/scorecardData";
 import { useScorecard } from "@/hooks/use-scorecard";
 import { useCurrency, useSelectedMonth } from "@/components/AppLayout";
 import { fetchRevenueHistory, fetchFinancialSummary, type ScorecardRow } from "@/lib/supabase-scorecard";
-import { fetchSalesTracking } from "@/lib/supabase-sales";
+import { fetchSalesTracking, fetchSalesTrackingRange } from "@/lib/supabase-sales";
+import { useSupabaseMetrics } from "@/hooks/use-supabase-metrics";
+import { toNZDate } from "@/lib/dates";
+import { fetchQuarterlySettings, upsertQuarterlySettings, fetchAllQuarters, type InitiativeStatus } from "@/lib/supabase-focus";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { useAuth } from "@/hooks/use-auth";
 import { useFinanceOverview } from "@/hooks/use-finance-overview";
 import { FunnelSankey } from "@/components/FunnelSankey";
-import { FocusBoardSection } from "@/components/FocusBoardSection";
+import { Checkbox } from "@/components/ui/checkbox";
+import { useFocusBoard, getCurrentWeekStart, getCurrentQuarter } from "@/hooks/use-focus-board";
+import { Target, RotateCcw, ChevronDown, ChevronLeft, ChevronRight, CirclePlus, Trash2, Plus, Star, Pencil, Users } from "lucide-react";
+import { Input } from "@/components/ui/input";
+import { Button } from "@/components/ui/button";
+import { MicroExpander } from "@/components/ui/micro-expander";
+import { DividerLine } from "@/components/ui/divider-line";
 import { DateRangePicker, type DateRangeValue } from "@/components/DateRangePicker";
 import {
   AreaChart,
@@ -60,58 +70,58 @@ function SpeedometerCard({
   const fillAngle = pct !== null ? startAngle + (sweep * Math.min(pct, 100)) / 100 : startAngle;
   const fillPath = pct !== null && pct > 0 ? arcPath(startAngle, fillAngle) : "";
 
-  const color = pct === null ? "stroke-muted-foreground"
-    : pct >= 80 ? "stroke-emerald-500"
-    : pct >= 50 ? "stroke-amber-400"
+  const color = pct === null ? "stroke-foreground/60"
+    : pct >= 80 ? "stroke-emerald-400"
+    : pct >= 50 ? "stroke-amber-300"
     : "stroke-red-400";
 
   return (
-    <Card className="overflow-hidden p-5 flex flex-col items-center">
-      <span className="text-sm font-medium text-muted-foreground">{label}</span>
+    <div className="p-5 flex flex-col items-center">
+      <span className="text-sm font-semibold text-foreground/90">{label}</span>
       {subtitle && (
-        <span className="text-[10px] text-muted-foreground mb-1">{subtitle}</span>
+        <span className="text-[10px] text-foreground/60 mb-1">{subtitle}</span>
       )}
-      <div className="relative w-[260px] h-[190px]">
-        <svg viewBox="0 0 260 210" className="w-full h-full">
-          {/* Background track */}
+      <div className="relative w-full max-w-[220px] aspect-[260/190]">
+        <svg viewBox="0 0 260 210" className="w-full h-full" preserveAspectRatio="xMidYMid meet">
+          {/* Background track — brighter for contrast against gradient bg */}
           <path d={bgPath} fill="none" strokeWidth={12} strokeLinecap="round"
-            className="stroke-muted/50" />
+            className="stroke-foreground/15" />
           {/* Fill arc */}
           {fillPath && (
             <path d={fillPath} fill="none" strokeWidth={12} strokeLinecap="round"
               className={color} style={{ transition: "stroke-dashoffset 0.6s ease" }} />
           )}
-          {/* Tick marks */}
+          {/* Tick marks — brighter */}
           {[0, 25, 50, 75, 100].map((tick) => {
             const angle = startAngle + (sweep * tick) / 100;
             const outer = polarToCart(angle);
             const inner = { x: cx + (r - 10) * Math.cos((angle * Math.PI) / 180), y: cy + (r - 10) * Math.sin((angle * Math.PI) / 180) };
             return (
               <line key={tick} x1={inner.x} y1={inner.y} x2={outer.x} y2={outer.y}
-                strokeWidth={1.5} className="stroke-muted-foreground/30" />
+                strokeWidth={1.5} className="stroke-foreground/40" />
             );
           })}
         </svg>
         {/* Center value */}
         <div className="absolute inset-0 flex flex-col items-center justify-center pt-4">
-          <span className="text-xl font-bold tracking-tight text-foreground">
+          <span className="text-2xl font-bold tracking-tight text-foreground">
             {value !== null ? fmt(value) : "—"}
           </span>
           {target !== null && (
-            <span className="text-[10px] text-muted-foreground">
+            <span className="text-[10px] text-foreground/60">
               Target: {fmt(target)}
             </span>
           )}
           {pct !== null && (
             <span className={`text-xs font-mono font-semibold mt-0.5 ${
-              pct >= 80 ? "text-emerald-500" : pct >= 50 ? "text-amber-400" : "text-red-400"
+              pct >= 80 ? "text-emerald-400" : pct >= 50 ? "text-amber-300" : "text-red-400"
             }`}>
               {Math.round(pct)}%
             </span>
           )}
         </div>
       </div>
-    </Card>
+    </div>
   );
 }
 
@@ -213,6 +223,61 @@ export default function Dashboard() {
     return () => { cancelled = true; };
   }, [activeMonth]);
 
+  // Quarterly daily targets (for today/yesterday gauges)
+  const [dailyTargets, setDailyTargets] = useState<{
+    bookings: number | null;
+    closeRate: number | null;
+    cash: number | null;
+  }>({ bookings: null, closeRate: null, cash: null });
+  useEffect(() => {
+    const now = new Date();
+    const q = Math.ceil((now.getMonth() + 1) / 3);
+    const quarter = `${now.getFullYear()}-Q${q}`;
+    let cancelled = false;
+    fetchQuarterlySettings(quarter).then((s) => {
+      if (cancelled || !s) return;
+      setDailyTargets({
+        bookings: s.daily_bookings_target,
+        closeRate: s.daily_close_rate_target,
+        cash: s.daily_cash_target,
+      });
+    });
+    return () => { cancelled = true; };
+  }, []);
+
+  // Daily gauge date (Today by default, can switch to Yesterday)
+  const [gaugePeriod, setGaugePeriod] = useState<"today" | "yesterday">("today");
+  const [filterInitId, setFilterInitId] = useState<string | null>(null);
+  const gaugeDate = useMemo(() => {
+    const today = toNZDate(new Date());
+    if (gaugePeriod === "today") return today;
+    // Yesterday: subtract one day from today's NZ date string
+    const ms = Date.parse(today + "T00:00:00Z") - 86400000;
+    return new Date(ms).toISOString().slice(0, 10);
+  }, [gaugePeriod]);
+
+  // Bookings (qualified) for the selected gauge date
+  const dailyBookings = useSupabaseMetrics(
+    gaugeDate + "T00:00:00Z",
+    gaugeDate + "T23:59:59Z",
+  );
+
+  // Sales tracking — sum closes, calls_taken, cc across all reps for the date
+  const [dailyCloseRate, setDailyCloseRate] = useState<number | null>(null);
+  const [dailyCashCollected, setDailyCashCollected] = useState<number | null>(null);
+  useEffect(() => {
+    let cancelled = false;
+    fetchSalesTrackingRange(gaugeDate, gaugeDate).then((rows) => {
+      if (cancelled) return;
+      const closes = rows.reduce((s, r) => s + (r.closes ?? 0), 0);
+      const taken = rows.reduce((s, r) => s + (r.calls_taken ?? 0), 0);
+      const cc = rows.reduce((s, r) => s + (r.cc ?? 0), 0);
+      setDailyCloseRate(taken > 0 ? Math.round((closes / taken) * 100) : null);
+      setDailyCashCollected(cc);
+    });
+    return () => { cancelled = true; };
+  }, [gaugeDate]);
+
   // Finance data from Supabase (for gauges)
   const financeOverview = useFinanceOverview();
   // Match finance data to the selected month, fall back to latest
@@ -284,42 +349,69 @@ export default function Dashboard() {
   const cashPct = cashActual !== null && cashTarget !== null && cashTarget !== 0 ? Math.round((cashActual / cashTarget) * 100) : null;
 
   return (
-    <div className="p-6 space-y-6 max-w-[1440px] mx-auto">
-      {/* ── Header row: Welcome + DateRangePicker ─────────── */}
-      <div className="flex items-center justify-between">
-        <WelcomeHeader />
-        <div className="flex justify-end">
-          <DateRangePicker defaultPreset="MTD" onChange={setRange} />
+    <div className="px-20 py-6 space-y-6 max-w-[1440px] mx-auto">
+      {/* ── Top Section: Personal Focus (left) + Team's Focus (right) ── */}
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
+        <div className="space-y-3">
+          <WelcomeHeader />
+          <MyFocusItems filterInitId={filterInitId} />
+        </div>
+        <div className="space-y-6">
+          <RallyingCryBanner />
+          <NorthStarsCard />
+          <QuarterlyInitiativesCard activeId={filterInitId} onToggle={(id) => setFilterInitId((curr) => curr === id ? null : id)} />
+          <TeamFocusCard filterInitId={filterInitId} />
         </div>
       </div>
 
-      {/* ── Financial Gauges ──────────────────────────────── */}
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-        <SpeedometerCard
-          label="Revenue"
-          value={selectedFinance?.revenue != null ? convert(selectedFinance.revenue) : null}
-          target={selectedFinance?.revenue_target != null ? convert(selectedFinance.revenue_target) : null}
-          symbol={symbol}
-        />
-        <SpeedometerCard
-          label="Revenue / Employee"
-          value={selectedFinance?.revenue_per_employee != null ? convert(selectedFinance.revenue_per_employee) : null}
-          target={selectedFinance?.revenue_per_employee_target != null ? convert(selectedFinance.revenue_per_employee_target) : null}
-          symbol={symbol}
-          subtitle={`${selectedFinance?.headcount ?? headcount ?? "—"} employees`}
-        />
-        <SpeedometerCard
-          label="Deals Closed"
-          value={monthlyCloses}
-          target={100}
-          symbol=""
-          formatValue={(v) => String(v)}
-          subtitle={activeMonth}
-        />
+      {/* ── Daily Gauges (centered, above Focus Board) ─────── */}
+      <div className="space-y-3">
+        <DividerLine />
+        <div className="flex justify-center">
+          <div className="inline-flex items-stretch bg-muted/30 backdrop-blur-sm rounded-full p-0.5 ring-1 ring-white/5">
+            {(["today", "yesterday"] as const).map((p) => (
+              <button
+                key={p}
+                onClick={() => setGaugePeriod(p)}
+                className={`px-4 py-1.5 rounded-full text-[11px] font-medium transition-colors ${
+                  gaugePeriod === p
+                    ? "bg-white/15 text-foreground"
+                    : "text-muted-foreground hover:text-foreground"
+                }`}
+              >
+                {p === "today" ? "Today" : "Yesterday"}
+              </button>
+            ))}
+          </div>
+        </div>
+        <div className="flex justify-center">
+          <div className="grid grid-cols-1 sm:grid-cols-3 gap-6 w-full max-w-3xl">
+            <SpeedometerCard
+              label="Qualified Bookings"
+              value={dailyBookings.totalQualified ?? null}
+              target={dailyTargets.bookings}
+              symbol=""
+              formatValue={(v) => String(v)}
+              subtitle={gaugePeriod === "today" ? "Today" : "Yesterday"}
+            />
+            <SpeedometerCard
+              label="Close Rate"
+              value={dailyCloseRate}
+              target={dailyTargets.closeRate}
+              symbol=""
+              formatValue={(v) => `${v}%`}
+              subtitle={gaugePeriod === "today" ? "Today" : "Yesterday"}
+            />
+            <SpeedometerCard
+              label="Cash Collected"
+              value={dailyCashCollected != null ? convert(dailyCashCollected) : null}
+              target={dailyTargets.cash != null ? convert(dailyTargets.cash) : null}
+              symbol={symbol}
+              subtitle={gaugePeriod === "today" ? "Today" : "Yesterday"}
+            />
+          </div>
+        </div>
       </div>
-
-      {/* ── Focus Board ─────────────────────────────────────── */}
-      <FocusBoardSection />
 
       {/* ── Conversion Funnel ─────────────────────────────── */}
       <FunnelSankey metrics={scorecardData} formatCurrency={formatCurrency} />
@@ -338,6 +430,1375 @@ function WelcomeHeader() {
     <h1 className="text-2xl font-bold text-foreground">
       Welcome{name ? `, ${name}` : ""}
     </h1>
+  );
+}
+
+// ── My Focus Items (for current user, current week) ──────────
+
+function InitiativeSelect({
+  value,
+  onChange,
+  initiatives,
+}: {
+  value: string;
+  onChange: (v: string) => void;
+  initiatives: { id: string; title: string }[];
+}) {
+  const [open, setOpen] = useState(false);
+  const ref = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    if (!open) return;
+    const handler = (e: MouseEvent) => {
+      if (ref.current && !ref.current.contains(e.target as Node)) setOpen(false);
+    };
+    document.addEventListener("mousedown", handler);
+    return () => document.removeEventListener("mousedown", handler);
+  }, [open]);
+
+  const selected = value ? initiatives.find((i) => i.id === value) : null;
+  const label = selected?.title ?? "No initiative";
+
+  return (
+    <div ref={ref} className="relative shrink-0">
+      <button
+        type="button"
+        onClick={() => setOpen(!open)}
+        className="text-xs text-muted-foreground hover:text-foreground transition-colors w-[140px] text-left truncate"
+      >
+        {label}
+      </button>
+      {open && (
+        <div className="absolute z-20 mt-2 right-0 bg-popover/95 backdrop-blur-xl border border-border/60 rounded-lg shadow-lg py-1 min-w-[200px] max-h-[240px] overflow-y-auto">
+          <button
+            type="button"
+            onClick={() => { onChange(""); setOpen(false); }}
+            className={`w-full text-left text-xs px-3 py-1.5 hover:bg-muted/50 transition-colors ${!value ? "text-foreground font-medium" : "text-muted-foreground"}`}
+          >
+            No initiative
+          </button>
+          {initiatives.map((i) => (
+            <button
+              key={i.id}
+              type="button"
+              onClick={() => { onChange(i.id); setOpen(false); }}
+              className={`w-full text-left text-xs px-3 py-1.5 hover:bg-muted/50 transition-colors truncate ${value === i.id ? "text-foreground font-medium" : "text-muted-foreground"}`}
+            >
+              {i.title}
+            </button>
+          ))}
+        </div>
+      )}
+    </div>
+  );
+}
+
+function ItemInitiativeChip({
+  currentId,
+  currentTitle,
+  initiatives,
+  onChange,
+}: {
+  currentId: string | null;
+  currentTitle: string | null | undefined;
+  initiatives: { id: string; title: string }[];
+  onChange: (newId: string | null) => void;
+}) {
+  const [open, setOpen] = useState(false);
+  const ref = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    if (!open) return;
+    const handler = (e: MouseEvent) => {
+      if (ref.current && !ref.current.contains(e.target as Node)) setOpen(false);
+    };
+    document.addEventListener("mousedown", handler);
+    return () => document.removeEventListener("mousedown", handler);
+  }, [open]);
+
+  return (
+    <div ref={ref} className="relative inline-block">
+      <button
+        type="button"
+        onMouseDown={(e) => e.preventDefault()}
+        onClick={() => setOpen(!open)}
+        className="inline-flex items-center gap-1 text-[12px] text-muted-foreground hover:text-foreground transition-colors"
+      >
+        <Target className="h-3 w-3" />
+        {currentTitle ?? "Add initiative"}
+      </button>
+      {open && (
+        <div className="absolute z-20 mt-1 left-0 bg-popover/95 backdrop-blur-xl border border-border/60 rounded-lg shadow-lg py-1 min-w-[200px] max-h-[240px] overflow-y-auto">
+          <button
+            type="button"
+            onMouseDown={(e) => e.preventDefault()}
+            onClick={() => { onChange(null); setOpen(false); }}
+            className={`w-full text-left text-xs px-3 py-1.5 hover:bg-muted/50 transition-colors ${!currentId ? "text-foreground font-medium" : "text-muted-foreground"}`}
+          >
+            No initiative
+          </button>
+          {initiatives.map((i) => (
+            <button
+              key={i.id}
+              type="button"
+              onMouseDown={(e) => e.preventDefault()}
+              onClick={() => { onChange(i.id); setOpen(false); }}
+              className={`w-full text-left text-xs px-3 py-1.5 hover:bg-muted/50 transition-colors truncate ${currentId === i.id ? "text-foreground font-medium" : "text-muted-foreground"}`}
+            >
+              {i.title}
+            </button>
+          ))}
+        </div>
+      )}
+    </div>
+  );
+}
+
+function QuarterPicker({ value, onChange }: { value: string; onChange: (q: string) => void }) {
+  const [open, setOpen] = useState(false);
+  const ref = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    if (!open) return;
+    const handler = (e: MouseEvent) => {
+      if (ref.current && !ref.current.contains(e.target as Node)) setOpen(false);
+    };
+    document.addEventListener("mousedown", handler);
+    return () => document.removeEventListener("mousedown", handler);
+  }, [open]);
+
+  // Fetch all quarters that have data in supabase
+  const { data: savedQuarters = [] } = useQuery({
+    queryKey: ["all-quarters"],
+    queryFn: fetchAllQuarters,
+    staleTime: 10 * 60 * 1000,
+  });
+
+  // Union current year's quarters + any saved quarters + the currently selected quarter
+  const options = useMemo(() => {
+    const thisYear = new Date().getFullYear();
+    const set = new Set<string>();
+    for (let qi = 1; qi <= 4; qi++) set.add(`${thisYear}-Q${qi}`);
+    for (const q of savedQuarters) set.add(q);
+    set.add(value); // ensure currently selected is always visible
+    // Sort descending (most recent first)
+    return [...set].sort((a, b) => b.localeCompare(a));
+  }, [savedQuarters, value]);
+
+  const [year, q] = value.split("-Q");
+  const label = `Q${q} · ${year}`;
+
+  return (
+    <div ref={ref} className="relative inline-block">
+      <button
+        type="button"
+        onClick={() => setOpen((o) => !o)}
+        className="inline-flex items-center gap-1 text-[10px] font-semibold uppercase tracking-widest bg-muted text-muted-foreground hover:text-foreground rounded-full px-2.5 py-1 transition-colors"
+      >
+        {label}
+        <ChevronDown className={`h-3 w-3 transition-transform ${open ? "rotate-180" : ""}`} />
+      </button>
+      {open && (
+        <div className="absolute z-20 top-full mt-1 left-1/2 -translate-x-1/2 bg-popover border border-border rounded-md shadow-lg py-1 min-w-[120px] max-h-[240px] overflow-y-auto">
+          {options.map((opt) => {
+            const [oy, oq] = opt.split("-Q");
+            const isSel = opt === value;
+            return (
+              <button
+                key={opt}
+                type="button"
+                onClick={() => { onChange(opt); setOpen(false); }}
+                className={`block w-full text-left px-3 py-1.5 text-xs font-medium transition-colors ${
+                  isSel ? "bg-muted text-foreground" : "text-muted-foreground hover:bg-muted hover:text-foreground"
+                }`}
+              >
+                Q{oq} · {oy}
+              </button>
+            );
+          })}
+        </div>
+      )}
+    </div>
+  );
+}
+
+function RallyingCryBanner() {
+  const { isAdmin } = useAuth();
+  const queryClient = useQueryClient();
+  const [selectedQuarter, setSelectedQuarter] = useState(getCurrentQuarter());
+  const [editing, setEditing] = useState(false);
+  const [draft, setDraft] = useState("");
+
+  const { data: settings } = useQuery({
+    queryKey: ["quarterly-settings", selectedQuarter],
+    queryFn: () => fetchQuarterlySettings(selectedQuarter),
+    staleTime: 10 * 60 * 1000,
+  });
+
+  const rallyingCry = settings?.rallying_cry ?? null;
+
+  async function handleSave() {
+    await upsertQuarterlySettings(selectedQuarter, draft);
+    queryClient.invalidateQueries({ queryKey: ["quarterly-settings", selectedQuarter] });
+    setEditing(false);
+  }
+
+  return (
+    <div className="flex flex-col items-center space-y-2 text-center">
+      {editing ? (
+        <>
+          <input
+            autoFocus
+            type="text"
+            value={draft}
+            onChange={(e) => setDraft(e.target.value)}
+            placeholder="What's the rallying cry this quarter?"
+            className="w-full bg-transparent text-lg font-semibold text-foreground italic text-center placeholder:text-muted-foreground/60 placeholder:font-normal placeholder:not-italic border-b border-border/50 focus:border-border outline-none py-1 transition-colors"
+            onKeyDown={(e) => {
+              if (e.key === "Enter") handleSave();
+              if (e.key === "Escape") setEditing(false);
+            }}
+          />
+          <div className="flex items-center justify-center gap-3">
+            <button onClick={handleSave} className="text-xs font-medium text-foreground hover:text-primary transition-colors">Save</button>
+            <button onClick={() => setEditing(false)} className="text-xs text-muted-foreground hover:text-foreground transition-colors">Cancel</button>
+          </div>
+        </>
+      ) : rallyingCry ? (
+        <button
+          onClick={() => { if (isAdmin) { setDraft(rallyingCry); setEditing(true); } }}
+          className={`text-lg font-semibold text-foreground italic ${isAdmin ? "hover:text-primary cursor-pointer" : "cursor-default"}`}
+        >
+          &ldquo;{rallyingCry}&rdquo;
+        </button>
+      ) : isAdmin ? (
+        <button
+          onClick={() => { setDraft(""); setEditing(true); }}
+          className="text-sm text-muted-foreground hover:text-foreground italic"
+        >
+          + Set a rallying cry
+        </button>
+      ) : (
+        <p className="text-sm text-muted-foreground italic">No rallying cry set</p>
+      )}
+
+      <QuarterPicker value={selectedQuarter} onChange={setSelectedQuarter} />
+    </div>
+  );
+}
+
+function NorthStarsCard() {
+  const { isAdmin } = useAuth();
+  const { northStars, addNorthStar, editNorthStar, removeNorthStar, loading } = useFocusBoard();
+  const [open, setOpen] = useState(false);
+  const [showAdd, setShowAdd] = useState(false);
+  const [newTitle, setNewTitle] = useState("");
+  const [newDesc, setNewDesc] = useState("");
+  const [editingId, setEditingId] = useState<string | null>(null);
+  const [editTitle, setEditTitle] = useState("");
+  const [editDesc, setEditDesc] = useState("");
+
+  if (loading) return null;
+
+  async function handleAdd() {
+    if (!newTitle.trim()) return;
+    await addNorthStar(newTitle.trim(), newDesc.trim() || null);
+    setNewTitle("");
+    setNewDesc("");
+    setShowAdd(false);
+    setOpen(true);
+  }
+
+  function startEdit(ns: typeof northStars[number]) {
+    setEditingId(ns.id);
+    setEditTitle(ns.title);
+    setEditDesc(ns.description ?? "");
+  }
+
+  async function saveEdit() {
+    if (!editingId || !editTitle.trim()) return;
+    await editNorthStar(editingId, editTitle.trim(), editDesc.trim() || null);
+    setEditingId(null);
+  }
+
+  return (
+    <div className="space-y-3">
+      {showAdd && (
+        <div className="space-y-2 p-3 rounded-lg bg-amber-500/[0.04] ring-1 ring-amber-500/15">
+          <input
+            autoFocus
+            type="text"
+            value={newTitle}
+            onChange={(e) => setNewTitle(e.target.value)}
+            placeholder="e.g. 10,000 paying customers by end of 2026"
+            className="w-full bg-transparent text-sm text-foreground placeholder:text-muted-foreground/60 border-b border-border/50 focus:border-amber-400/50 outline-none py-1.5 transition-colors"
+            onKeyDown={(e) => {
+              if (e.key === "Enter") handleAdd();
+              if (e.key === "Escape") setShowAdd(false);
+            }}
+          />
+          <input
+            type="text"
+            value={newDesc}
+            onChange={(e) => setNewDesc(e.target.value)}
+            placeholder="Why this matters (optional)"
+            className="w-full bg-transparent text-xs text-muted-foreground placeholder:text-muted-foreground/60 outline-none py-1"
+            onKeyDown={(e) => {
+              if (e.key === "Enter") handleAdd();
+              if (e.key === "Escape") setShowAdd(false);
+            }}
+          />
+          <div className="flex items-center gap-3 pt-1">
+            <button onClick={handleAdd} disabled={!newTitle.trim()} className="text-xs font-medium text-amber-400 hover:text-amber-300 disabled:opacity-30 disabled:pointer-events-none transition-colors">Add</button>
+            <button onClick={() => { setShowAdd(false); setNewTitle(""); setNewDesc(""); }} className="text-xs text-muted-foreground hover:text-foreground transition-colors">Cancel</button>
+          </div>
+        </div>
+      )}
+
+      <div
+        role="button"
+        tabIndex={0}
+        onClick={() => setOpen((o) => !o)}
+        onKeyDown={(e) => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); setOpen((o) => !o); } }}
+        className={[
+          "w-full flex items-center justify-between gap-3 p-4 rounded-xl text-left transition-all cursor-pointer",
+          "bg-gradient-to-b from-amber-500/[0.06] to-amber-500/[0.02]",
+          "backdrop-blur-xl ring-1 ring-amber-500/20",
+          "shadow-[inset_0_1px_0_0_rgba(255,255,255,0.08),0_2px_12px_-4px_rgba(0,0,0,0.2)]",
+          "hover:ring-amber-500/40",
+        ].join(" ")}
+      >
+        <div className="flex items-center gap-3 min-w-0">
+          <div className="flex items-center justify-center h-7 w-7 rounded-full bg-amber-500/15 text-amber-400 shrink-0">
+            <Star className="h-3.5 w-3.5" />
+          </div>
+          <div className="min-w-0">
+            <p className="text-sm font-medium text-foreground truncate">
+              North Stars
+            </p>
+            <p className="text-[11px] text-muted-foreground truncate">
+              {northStars.length} {northStars.length === 1 ? "north star" : "north stars"}
+            </p>
+          </div>
+        </div>
+        <div className="flex items-center gap-4 shrink-0">
+          {isAdmin && !showAdd && (
+            <div onClick={(e) => e.stopPropagation()}>
+              <MicroExpander
+                text="Add North Star"
+                icon={<Plus className="h-3.5 w-3.5" />}
+                variant="outline"
+                className="hover:border-input"
+                onClick={() => { setShowAdd(true); setOpen(true); }}
+              />
+            </div>
+          )}
+          <ChevronDown className={`h-4 w-4 text-muted-foreground transition-transform ${open ? "rotate-180" : ""}`} />
+        </div>
+      </div>
+
+      {open && (
+        <div className="space-y-2">
+          {northStars.length === 0 && !showAdd ? (
+            <p className="text-xs text-muted-foreground italic">No north stars set yet.</p>
+          ) : (
+            northStars.map((ns) => {
+              const isEditing = editingId === ns.id;
+              return (
+                <div
+                  key={ns.id}
+                  className="group/ns flex items-start gap-3 px-3 py-2.5 rounded-lg bg-amber-500/[0.04] ring-1 ring-amber-500/10"
+                >
+                  <Star className="h-3.5 w-3.5 text-amber-400 mt-0.5 shrink-0" />
+                  <div className="min-w-0 flex-1">
+                    {isEditing ? (
+                      <div className="space-y-1.5">
+                        <input
+                          autoFocus
+                          type="text"
+                          value={editTitle}
+                          onChange={(e) => setEditTitle(e.target.value)}
+                          className="w-full bg-transparent text-sm text-foreground border-b border-amber-400/40 outline-none py-0.5"
+                          onKeyDown={(e) => {
+                            if (e.key === "Enter") saveEdit();
+                            if (e.key === "Escape") setEditingId(null);
+                          }}
+                        />
+                        <input
+                          type="text"
+                          value={editDesc}
+                          onChange={(e) => setEditDesc(e.target.value)}
+                          placeholder="Description"
+                          className="w-full bg-transparent text-xs text-muted-foreground outline-none py-0.5"
+                          onKeyDown={(e) => {
+                            if (e.key === "Enter") saveEdit();
+                            if (e.key === "Escape") setEditingId(null);
+                          }}
+                        />
+                        <div className="flex gap-3 pt-0.5">
+                          <button onClick={saveEdit} className="text-[10px] font-medium text-amber-400 hover:text-amber-300">Save</button>
+                          <button onClick={() => setEditingId(null)} className="text-[10px] text-muted-foreground hover:text-foreground">Cancel</button>
+                        </div>
+                      </div>
+                    ) : (
+                      <>
+                        <p className="text-sm font-medium text-foreground">{ns.title}</p>
+                        {ns.description && (
+                          <p className="text-[11px] text-muted-foreground mt-0.5">{ns.description}</p>
+                        )}
+                      </>
+                    )}
+                  </div>
+                  {isAdmin && !isEditing && (
+                    <div className="flex items-center gap-3 opacity-0 group-hover/ns:opacity-100 transition-opacity shrink-0 mt-0.5">
+                      <button onClick={() => startEdit(ns)} className="text-muted-foreground hover:text-foreground" aria-label="Edit">
+                        <Pencil className="h-3 w-3" />
+                      </button>
+                      <button onClick={() => removeNorthStar(ns.id)} className="text-muted-foreground hover:text-red-500" aria-label="Delete">
+                        <Trash2 className="h-3 w-3" />
+                      </button>
+                    </div>
+                  )}
+                </div>
+              );
+            })
+          )}
+        </div>
+      )}
+    </div>
+  );
+}
+
+const DEPARTMENTS = ["Finance", "Content", "Marketing", "Sales", "Product"];
+
+function displayName(email: string): string {
+  const name = email.split("@")[0];
+  return name.charAt(0).toUpperCase() + name.slice(1);
+}
+
+// Lightweight multi-select dropdown for stakeholders
+function StakeholderSelect({
+  selected, onChange, users
+}: {
+  selected: string[];
+  onChange: (val: string[]) => void;
+  users: { user_id: string; user_email: string }[];
+}) {
+  const [open, setOpen] = useState(false);
+  const ref = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    if (!open) return;
+    const handler = (e: MouseEvent) => {
+      if (ref.current && !ref.current.contains(e.target as Node)) setOpen(false);
+    };
+    document.addEventListener("mousedown", handler);
+    return () => document.removeEventListener("mousedown", handler);
+  }, [open]);
+
+  const toggle = (email: string) => {
+    onChange(selected.includes(email) ? selected.filter(s => s !== email) : [...selected, email]);
+  };
+
+  return (
+    <div ref={ref} className="relative">
+      <button
+        type="button"
+        onClick={() => setOpen(!open)}
+        className="w-full text-xs bg-transparent border-b border-border/30 focus:border-primary/40 px-0 py-1 text-muted-foreground text-left truncate outline-none transition-colors"
+      >
+        {selected.length > 0 ? selected.map(s => displayName(s)).join(", ") : "Stakeholders"}
+      </button>
+      {open && (
+        <div className="absolute z-20 mt-1 bg-popover border border-border rounded-md shadow-lg py-1 min-w-[160px] max-h-[200px] overflow-y-auto">
+          {users.map((u) => (
+            <label key={u.user_id} className="flex items-center gap-2 px-3 py-1.5 hover:bg-muted cursor-pointer text-xs">
+              <input
+                type="checkbox"
+                checked={selected.includes(u.user_email)}
+                onChange={() => toggle(u.user_email)}
+                className="rounded"
+              />
+              {displayName(u.user_email)}
+            </label>
+          ))}
+        </div>
+      )}
+    </div>
+  );
+}
+
+function QuarterlyInitiativesCard({ activeId, onToggle }: { activeId: string | null; onToggle: (id: string) => void }) {
+  const { isAdmin } = useAuth();
+  const { initiatives, foci, northStars, teamUsers, addInitiative, editInitiative, removeInitiative, loading } = useFocusBoard();
+  const [open, setOpen] = useState(false);
+  const [showAdd, setShowAdd] = useState(false);
+
+  // Add form state
+  const [newTitle, setNewTitle] = useState("");
+  const [newDept, setNewDept] = useState("");
+  const [newNorthStarId, setNewNorthStarId] = useState("");
+  const [newDueDate, setNewDueDate] = useState("");
+  const [newOwner, setNewOwner] = useState("");
+  const [newStakeholders, setNewStakeholders] = useState<string[]>([]);
+
+  // Edit form state
+  const [editingId, setEditingId] = useState<string | null>(null);
+  const [editTitle, setEditTitle] = useState("");
+  const [editDept, setEditDept] = useState("");
+  const [editNorthStarId, setEditNorthStarId] = useState("");
+  const [editDueDate, setEditDueDate] = useState("");
+  const [editOwner, setEditOwner] = useState("");
+  const [editStakeholders, setEditStakeholders] = useState<string[]>([]);
+  const [editStatus, setEditStatus] = useState<"Not Started" | "On-Track" | "Behind" | "Accomplished">("Not Started");
+
+  // Open the card when filter is active
+  useEffect(() => {
+    if (activeId) setOpen(true);
+  }, [activeId]);
+
+  const counts = useMemo(() => {
+    const c = { offTrack: 0, behind: 0, onTrack: 0, accomplished: 0, notStarted: 0 };
+    for (const i of initiatives) {
+      if (i.status === "On-Track") c.onTrack++;
+      else if (i.status === "Behind") c.behind++;
+      else if (i.status === "Accomplished") c.accomplished++;
+      else c.notStarted++;
+    }
+    return c;
+  }, [initiatives]);
+
+  // Progress: how many focus items are tied to each initiative and how many are complete
+  const initiativeProgress = useMemo(() => {
+    const map = new Map<string, { total: number; completed: number }>();
+    for (const i of initiatives) map.set(i.id, { total: 0, completed: 0 });
+    for (const f of foci) {
+      if (f.quarterly_initiative_id && map.has(f.quarterly_initiative_id)) {
+        const p = map.get(f.quarterly_initiative_id)!;
+        p.total++;
+        if (f.completed) p.completed++;
+      }
+    }
+    return map;
+  }, [initiatives, foci]);
+
+  // Sort by due date (nulls last) — same as focus board
+  const sorted = useMemo(() => {
+    return [...initiatives].sort((a, b) => {
+      if (!a.due_date && !b.due_date) return 0;
+      if (!a.due_date) return 1;
+      if (!b.due_date) return -1;
+      return a.due_date.localeCompare(b.due_date);
+    });
+  }, [initiatives]);
+
+  if (loading) return null;
+
+  const statusStyle = (s: string) =>
+    s === "On-Track" ? "text-emerald-400 bg-emerald-500/10"
+      : s === "Behind" ? "text-amber-300 bg-amber-500/10"
+      : s === "Accomplished" ? "text-blue-400 bg-blue-500/10"
+      : "text-red-400 bg-red-500/10";
+
+  const statusDot = (s: string) =>
+    s === "On-Track" ? "bg-emerald-400"
+      : s === "Behind" ? "bg-amber-300"
+      : s === "Accomplished" ? "bg-blue-400"
+      : "bg-red-400";
+
+  async function handleAdd() {
+    if (!newTitle.trim() || !newDept) return;
+    await addInitiative({
+      title: newTitle.trim(),
+      department: newDept === "company" ? null : newDept,
+      northStarId: newNorthStarId || null,
+      dueDate: newDueDate || null,
+      owner: newOwner || null,
+      stakeholders: newStakeholders.length > 0 ? newStakeholders.join(",") : null,
+    });
+    setNewTitle("");
+    setNewDept("");
+    setNewNorthStarId("");
+    setNewDueDate("");
+    setNewOwner("");
+    setNewStakeholders([]);
+    setShowAdd(false);
+    setOpen(true);
+  }
+
+  function startEdit(i: typeof initiatives[number]) {
+    setEditingId(i.id);
+    setEditTitle(i.title);
+    setEditDept(i.department ?? "company");
+    setEditNorthStarId(i.north_star_id ?? "");
+    setEditDueDate(i.due_date ?? "");
+    setEditOwner(i.owner ?? "");
+    setEditStakeholders(i.stakeholders ? i.stakeholders.split(",").map((s) => s.trim()) : []);
+    setEditStatus(i.status);
+  }
+
+  async function saveEdit() {
+    if (!editingId || !editTitle.trim()) return;
+    await editInitiative(editingId, {
+      title: editTitle.trim(),
+      department: editDept === "company" ? null : editDept,
+      northStarId: editNorthStarId || null,
+      dueDate: editDueDate || null,
+      owner: editOwner || null,
+      stakeholders: editStakeholders.length > 0 ? editStakeholders.join(",") : null,
+      status: editStatus,
+    });
+    setEditingId(null);
+  }
+
+  return (
+    <div className="space-y-3">
+      {showAdd && (
+        <div className="space-y-2 p-3 rounded-lg bg-primary/[0.04] ring-1 ring-primary/15">
+          <input
+            autoFocus
+            type="text"
+            value={newTitle}
+            onChange={(e) => setNewTitle(e.target.value)}
+            placeholder="e.g. Launch new pricing page this quarter"
+            className="w-full bg-transparent text-sm text-foreground placeholder:text-muted-foreground/60 border-b border-border/50 focus:border-primary/50 outline-none py-1.5 transition-colors"
+            onKeyDown={(e) => {
+              if (e.key === "Enter") handleAdd();
+              if (e.key === "Escape") setShowAdd(false);
+            }}
+          />
+          <div className="grid grid-cols-2 gap-2">
+            <select
+              value={newDept}
+              onChange={(e) => setNewDept(e.target.value)}
+              className="w-full bg-transparent text-xs text-muted-foreground outline-none py-1 border-b border-border/30 focus:border-primary/40 transition-colors"
+            >
+              <option value="" disabled>Department *</option>
+              <option value="company">Company</option>
+              {DEPARTMENTS.map((d) => (
+                <option key={d} value={d}>{d}</option>
+              ))}
+            </select>
+            <input
+              type="date"
+              value={newDueDate}
+              onChange={(e) => setNewDueDate(e.target.value)}
+              className="w-full bg-transparent text-xs text-muted-foreground outline-none py-1 border-b border-border/30 focus:border-primary/40 transition-colors"
+            />
+          </div>
+          <div className="grid grid-cols-2 gap-2">
+            <select
+              value={newOwner}
+              onChange={(e) => setNewOwner(e.target.value)}
+              className="w-full bg-transparent text-xs text-muted-foreground outline-none py-1 border-b border-border/30 focus:border-primary/40 transition-colors"
+            >
+              <option value="">Owner</option>
+              {teamUsers.map((u) => (
+                <option key={u.user_id} value={u.user_email}>{displayName(u.user_email)}</option>
+              ))}
+            </select>
+            <StakeholderSelect
+              selected={newStakeholders}
+              onChange={setNewStakeholders}
+              users={teamUsers}
+            />
+          </div>
+          {northStars.length > 0 && (
+            <select
+              value={newNorthStarId}
+              onChange={(e) => setNewNorthStarId(e.target.value)}
+              className="w-full bg-transparent text-xs text-muted-foreground outline-none py-1 border-b border-border/30 focus:border-primary/40 transition-colors"
+            >
+              <option value="">No North Star</option>
+              {northStars.map((ns) => (
+                <option key={ns.id} value={ns.id}>{ns.title}</option>
+              ))}
+            </select>
+          )}
+          <div className="flex items-center gap-3 pt-1">
+            <button onClick={handleAdd} disabled={!newTitle.trim() || !newDept} className="text-xs font-medium text-primary hover:text-primary/80 disabled:opacity-30 disabled:pointer-events-none transition-colors">Add</button>
+            <button onClick={() => { setShowAdd(false); setNewTitle(""); setNewDept(""); setNewNorthStarId(""); setNewDueDate(""); setNewOwner(""); setNewStakeholders([]); }} className="text-xs text-muted-foreground hover:text-foreground transition-colors">Cancel</button>
+          </div>
+        </div>
+      )}
+
+      <div
+        role="button"
+        tabIndex={0}
+        onClick={() => setOpen((o) => !o)}
+        onKeyDown={(e) => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); setOpen((o) => !o); } }}
+        className={[
+          "w-full flex items-center justify-between gap-3 p-4 rounded-xl text-left transition-all cursor-pointer",
+          "bg-gradient-to-b from-white/[0.06] to-white/[0.02] dark:from-white/[0.05] dark:to-white/[0.01]",
+          "backdrop-blur-xl ring-1 ring-black/5 dark:ring-white/10",
+          "shadow-[inset_0_1px_0_0_rgba(255,255,255,0.08),0_2px_12px_-4px_rgba(0,0,0,0.2)]",
+          "hover:ring-white/20",
+        ].join(" ")}
+      >
+        <div className="flex items-center gap-3 min-w-0">
+          <div className="flex items-center justify-center h-7 w-7 rounded-full bg-muted text-muted-foreground shrink-0">
+            <Target className="h-3.5 w-3.5" />
+          </div>
+          <div className="min-w-0">
+            <p className="text-sm font-medium text-foreground truncate">
+              Initiatives
+            </p>
+            <p className="text-[11px] text-muted-foreground flex items-center gap-2">
+              {(() => {
+                const segments: React.ReactNode[] = [];
+                if (counts.offTrack > 0) segments.push(<span key="off" className="text-red-400">{counts.offTrack} Off Track</span>);
+                if (counts.behind > 0) segments.push(<span key="beh" className="text-amber-300">{counts.behind} Behind</span>);
+                if (counts.onTrack > 0) segments.push(<span key="on" className="text-emerald-400">{counts.onTrack} On Track</span>);
+                if (counts.accomplished > 0) segments.push(<span key="acc" className="text-blue-400">{counts.accomplished} Done</span>);
+                if (segments.length === 0) return <span>No initiatives yet</span>;
+                return segments.flatMap((seg, idx) =>
+                  idx === 0 ? [seg] : [<span key={`sep-${idx}`} className="text-muted-foreground/40">·</span>, seg]
+                );
+              })()}
+            </p>
+          </div>
+        </div>
+        <div className="flex items-center gap-4 shrink-0">
+          {isAdmin && !showAdd && (
+            <div onClick={(e) => e.stopPropagation()}>
+              <MicroExpander
+                text="Add Initiative"
+                icon={<Plus className="h-3.5 w-3.5" />}
+                variant="outline"
+                className="hover:border-input"
+                onClick={() => { setShowAdd(true); setOpen(true); }}
+              />
+            </div>
+          )}
+          <ChevronDown className={`h-4 w-4 text-muted-foreground transition-transform ${open ? "rotate-180" : ""}`} />
+        </div>
+      </div>
+
+      {open && (
+        <div className="space-y-2">
+          {sorted.length === 0 && !showAdd ? (
+            <p className="text-xs text-muted-foreground italic">No initiatives this quarter.</p>
+          ) : (
+            sorted.map((i) => {
+              const isActive = activeId === i.id;
+              const isEditing = editingId === i.id;
+              const progress = initiativeProgress.get(i.id);
+              const stakeholderList = i.stakeholders ? i.stakeholders.split(",").map((s) => s.trim()) : [];
+
+              if (isEditing) {
+                return (
+                  <div
+                    key={i.id}
+                    className="space-y-2 p-3 rounded-lg bg-primary/[0.04] ring-1 ring-primary/15"
+                    onClick={(e) => e.stopPropagation()}
+                  >
+                    <input
+                      autoFocus
+                      type="text"
+                      value={editTitle}
+                      onChange={(e) => setEditTitle(e.target.value)}
+                      className="w-full bg-transparent text-sm text-foreground border-b border-primary/40 outline-none py-0.5"
+                      onKeyDown={(e) => {
+                        if (e.key === "Enter") saveEdit();
+                        if (e.key === "Escape") setEditingId(null);
+                      }}
+                    />
+                    <div className="grid grid-cols-2 gap-2">
+                      <select
+                        value={editDept}
+                        onChange={(e) => setEditDept(e.target.value)}
+                        className="w-full bg-transparent text-xs text-muted-foreground outline-none py-1 border-b border-border/30 focus:border-primary/40 transition-colors"
+                      >
+                        <option value="company">Company</option>
+                        {DEPARTMENTS.map((d) => (
+                          <option key={d} value={d}>{d}</option>
+                        ))}
+                      </select>
+                      <input
+                        type="date"
+                        value={editDueDate}
+                        onChange={(e) => setEditDueDate(e.target.value)}
+                        className="w-full bg-transparent text-xs text-muted-foreground outline-none py-1 border-b border-border/30 focus:border-primary/40 transition-colors"
+                      />
+                    </div>
+                    <div className="grid grid-cols-2 gap-2">
+                      <select
+                        value={editOwner}
+                        onChange={(e) => setEditOwner(e.target.value)}
+                        className="w-full bg-transparent text-xs text-muted-foreground outline-none py-1 border-b border-border/30 focus:border-primary/40 transition-colors"
+                      >
+                        <option value="">No owner</option>
+                        {teamUsers.map((u) => (
+                          <option key={u.user_id} value={u.user_email}>{displayName(u.user_email)}</option>
+                        ))}
+                      </select>
+                      <StakeholderSelect
+                        selected={editStakeholders}
+                        onChange={setEditStakeholders}
+                        users={teamUsers}
+                      />
+                    </div>
+                    {northStars.length > 0 && (
+                      <select
+                        value={editNorthStarId}
+                        onChange={(e) => setEditNorthStarId(e.target.value)}
+                        className="w-full bg-transparent text-xs text-muted-foreground outline-none py-1 border-b border-border/30 focus:border-primary/40 transition-colors"
+                      >
+                        <option value="">No North Star</option>
+                        {northStars.map((ns) => (
+                          <option key={ns.id} value={ns.id}>{ns.title}</option>
+                        ))}
+                      </select>
+                    )}
+                    <select
+                      value={editStatus}
+                      onChange={(e) => setEditStatus(e.target.value as typeof editStatus)}
+                      className="w-full bg-transparent text-xs text-muted-foreground outline-none py-1 border-b border-border/30 focus:border-primary/40 transition-colors"
+                    >
+                      <option value="Not Started">Not Started</option>
+                      <option value="On-Track">On-Track</option>
+                      <option value="Behind">Behind</option>
+                      <option value="Accomplished">Accomplished</option>
+                    </select>
+                    <div className="flex gap-3 pt-0.5">
+                      <button onClick={saveEdit} className="text-[10px] font-medium text-primary hover:text-primary/80">Save</button>
+                      <button onClick={() => setEditingId(null)} className="text-[10px] text-muted-foreground hover:text-foreground">Cancel</button>
+                    </div>
+                  </div>
+                );
+              }
+
+              return (
+                <div
+                  key={i.id}
+                  className={`group/init w-full rounded-lg transition-colors ${
+                    isActive
+                      ? "bg-primary/15 ring-1 ring-primary/40"
+                      : "hover:bg-muted/30"
+                  }`}
+                >
+                  <div className="flex items-center gap-3 px-3 py-2">
+                    <button
+                      type="button"
+                      onClick={() => onToggle(i.id)}
+                      className="flex items-center gap-3 flex-1 min-w-0 text-left"
+                    >
+                      <span className={`h-2 w-2 rounded-full shrink-0 ${statusDot(i.status)}`} />
+                      <span className={`text-sm flex-1 truncate ${isActive ? "text-foreground font-medium" : "text-foreground"}`}>{i.title}</span>
+                      {progress && progress.total > 0 && (
+                        <span className="text-[10px] text-muted-foreground/70 shrink-0">{progress.completed}/{progress.total}</span>
+                      )}
+                      {i.due_date && (
+                        <span className="text-[10px] text-muted-foreground shrink-0">
+                          {new Date(i.due_date + "T12:00:00").toLocaleDateString("en-NZ", { month: "short", day: "numeric" })}
+                        </span>
+                      )}
+                    </button>
+                    {isAdmin ? (
+                      <select
+                        value={i.status}
+                        onChange={(e) => { e.stopPropagation(); editInitiative(i.id, { status: e.target.value as InitiativeStatus }); }}
+                        onClick={(e) => e.stopPropagation()}
+                        className={`text-[10px] font-medium rounded-full px-2 py-0.5 shrink-0 border-none outline-none cursor-pointer appearance-none ${statusStyle(i.status)}`}
+                      >
+                        <option value="Not Started">Not Started</option>
+                        <option value="On-Track">On-Track</option>
+                        <option value="Behind">Behind</option>
+                        <option value="Accomplished">Accomplished</option>
+                      </select>
+                    ) : (
+                      <span className={`text-[10px] font-medium rounded-full px-2 py-0.5 shrink-0 ${statusStyle(i.status)}`}>
+                        {i.status}
+                      </span>
+                    )}
+                    {isAdmin && (
+                      <div className="flex items-center gap-2 opacity-0 group-hover/init:opacity-100 transition-opacity shrink-0">
+                        <button
+                          onClick={(e) => { e.stopPropagation(); startEdit(i); }}
+                          className="text-muted-foreground hover:text-foreground"
+                          aria-label="Edit"
+                        >
+                          <Pencil className="h-3 w-3" />
+                        </button>
+                        <button
+                          onClick={(e) => { e.stopPropagation(); removeInitiative(i.id); }}
+                          className="text-muted-foreground hover:text-red-500"
+                          aria-label="Delete"
+                        >
+                          <Trash2 className="h-3 w-3" />
+                        </button>
+                      </div>
+                    )}
+                  </div>
+                  {/* Metadata row */}
+                  {(i.owner || stakeholderList.length > 0 || i.department) && (
+                    <div className="flex items-center gap-4 px-3 pb-2 ml-[14px] text-[10px] text-muted-foreground">
+                      {i.owner && <span><span className="text-muted-foreground/50">Owner</span> {displayName(i.owner)}</span>}
+                      {stakeholderList.length > 0 && <span className="truncate"><span className="text-muted-foreground/50">Stakeholders</span> {stakeholderList.map(displayName).join(", ")}</span>}
+                      <span><span className="text-muted-foreground/50">Dept</span> {i.department ?? "Company"}</span>
+                    </div>
+                  )}
+                </div>
+              );
+            })
+          )}
+        </div>
+      )}
+    </div>
+  );
+}
+
+function shiftWeek(weekStart: string, delta: number): string {
+  const d = new Date(weekStart + "T12:00:00");
+  d.setDate(d.getDate() + delta * 7);
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
+}
+
+function TeamFocusCard({ filterInitId }: { filterInitId: string | null }) {
+  const { user, isAdmin } = useAuth();
+  const [selectedWeek, setSelectedWeek] = useState(getCurrentWeekStart());
+  const { foci, initiatives, addFocus, loading, weekLabel, isCurrentWeek } = useFocusBoard(selectedWeek);
+  const userId = user?.id ?? "";
+  const [open, setOpen] = useState(false);
+
+  // Auto-open when a filter is active so the filtered results are visible
+  useEffect(() => {
+    if (filterInitId) setOpen(true);
+  }, [filterInitId]);
+
+  const others = useMemo(() => {
+    const o = foci.filter((f) => f.user_id !== userId);
+    return filterInitId ? o.filter((f) => f.quarterly_initiative_id === filterInitId) : o;
+  }, [foci, userId, filterInitId]);
+
+  const grouped = useMemo(() => {
+    const map = new Map<string, { userId: string; email: string; items: typeof others }>();
+    for (const f of others) {
+      if (!map.has(f.user_id)) map.set(f.user_id, { userId: f.user_id, email: f.user_email, items: [] });
+      map.get(f.user_id)!.items.push(f);
+    }
+    return [...map.values()].sort((a, b) => a.email.localeCompare(b.email));
+  }, [others]);
+
+  const initiativeMap = useMemo(() => {
+    const m = new Map<string, string>();
+    for (const i of initiatives) m.set(i.id, i.title);
+    return m;
+  }, [initiatives]);
+
+  const total = others.length;
+  const completed = others.filter((i) => i.completed).length;
+
+  if (loading) return null;
+
+  function displayName(email: string): string {
+    const name = email.split("@")[0];
+    return name.charAt(0).toUpperCase() + name.slice(1);
+  }
+
+  return (
+    <div className="space-y-3">
+      <div
+        role="button"
+        tabIndex={0}
+        onClick={() => setOpen((o) => !o)}
+        onKeyDown={(e) => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); setOpen((o) => !o); } }}
+        className={[
+          "w-full flex items-center justify-between gap-3 p-4 rounded-xl text-left transition-all cursor-pointer",
+          "bg-gradient-to-b from-white/[0.06] to-white/[0.02] dark:from-white/[0.05] dark:to-white/[0.01]",
+          "backdrop-blur-xl ring-1 ring-black/5 dark:ring-white/10",
+          "shadow-[inset_0_1px_0_0_rgba(255,255,255,0.08),0_2px_12px_-4px_rgba(0,0,0,0.2)]",
+          "hover:ring-white/20",
+        ].join(" ")}
+      >
+        <div className="flex items-center gap-3 min-w-0">
+          <div className="flex items-center justify-center h-7 w-7 rounded-full bg-muted text-muted-foreground shrink-0">
+            <Users className="h-3.5 w-3.5" />
+          </div>
+          <div className="min-w-0">
+            <p className="text-sm font-medium text-foreground truncate">
+              Team's Focus
+            </p>
+            <p className="text-[11px] text-muted-foreground truncate">
+              {completed}/{total} completed
+            </p>
+          </div>
+        </div>
+
+        {/* Week selector — inline in card header */}
+        <div className="flex items-center gap-0.5 shrink-0">
+          <button
+            type="button"
+            onClick={(e) => { e.stopPropagation(); setSelectedWeek(shiftWeek(selectedWeek, -1)); }}
+            className="p-0.5 rounded hover:bg-muted transition-colors text-muted-foreground hover:text-foreground"
+            aria-label="Previous week"
+          >
+            <ChevronLeft className="h-3.5 w-3.5" />
+          </button>
+          <button
+            type="button"
+            onClick={(e) => { e.stopPropagation(); if (!isCurrentWeek) setSelectedWeek(getCurrentWeekStart()); }}
+            className={`px-2 py-0.5 rounded text-[10px] font-medium transition-colors ${
+              isCurrentWeek
+                ? "bg-muted text-foreground"
+                : "bg-muted/30 text-muted-foreground hover:text-foreground"
+            }`}
+          >
+            {weekLabel}
+          </button>
+          <button
+            type="button"
+            onClick={(e) => { e.stopPropagation(); setSelectedWeek(shiftWeek(selectedWeek, 1)); }}
+            className="p-0.5 rounded hover:bg-muted transition-colors text-muted-foreground hover:text-foreground"
+            aria-label="Next week"
+          >
+            <ChevronRight className="h-3.5 w-3.5" />
+          </button>
+          <ChevronDown className={`h-4 w-4 text-muted-foreground transition-transform ml-[34px] ${open ? "rotate-180" : ""}`} />
+        </div>
+      </div>
+
+      {open && (
+        <div className="divide-y divide-border/40 pt-1">
+          {grouped.map((g) => (
+            <TeammateBlock
+              key={g.email}
+              userId={g.userId}
+              email={g.email}
+              items={g.items}
+              initiativeMap={initiativeMap}
+              initiatives={initiatives}
+              canAdd={isAdmin}
+              onAdd={(title, initId) => addFocus(title, initId, g.userId, g.email)}
+            />
+          ))}
+          {grouped.length === 0 && (
+            <p className="text-xs text-muted-foreground italic">No teammates have added focus items yet.</p>
+          )}
+        </div>
+      )}
+    </div>
+  );
+}
+
+function TeammateBlock({
+  userId: _teammateId,
+  email,
+  items,
+  initiativeMap,
+  initiatives,
+  canAdd,
+  onAdd,
+}: {
+  userId: string;
+  email: string;
+  items: ReturnType<typeof useFocusBoard>["foci"];
+  initiativeMap: Map<string, string>;
+  initiatives: ReturnType<typeof useFocusBoard>["initiatives"];
+  canAdd: boolean;
+  onAdd: (title: string, initiativeId: string | null) => Promise<void> | void;
+}) {
+  const [completedOpen, setCompletedOpen] = useState(false);
+  const [showAdd, setShowAdd] = useState(false);
+  const [newTitle, setNewTitle] = useState("");
+  const [newInitId, setNewInitId] = useState<string>("");
+  const active = items.filter((i) => !i.completed);
+  const completed = items.filter((i) => i.completed);
+
+  function displayName(em: string): string {
+    const name = em.split("@")[0];
+    return name.charAt(0).toUpperCase() + name.slice(1);
+  }
+
+  async function handleAdd() {
+    if (!newTitle.trim()) return;
+    await onAdd(newTitle.trim(), newInitId || null);
+    setNewTitle("");
+    setNewInitId("");
+    setShowAdd(false);
+  }
+
+  const renderItem = (item: typeof items[number]) => {
+    const initiativeTitle = item.quarterly_initiative_id ? initiativeMap.get(item.quarterly_initiative_id) : null;
+    return (
+      <div key={item.id} className={`flex items-start gap-2 ${item.completed ? "opacity-50" : ""}`}>
+        <span className={`h-1.5 w-1.5 rounded-full mt-1.5 shrink-0 ${item.completed ? "bg-emerald-500" : "bg-muted-foreground/40"}`} />
+        <div className="min-w-0">
+          <span className={`text-xs ${item.completed ? "line-through text-muted-foreground" : "text-foreground"}`}>
+            {item.title}
+          </span>
+          {initiativeTitle && (
+            <span className="ml-2 inline-flex items-center gap-1 text-[10px] text-muted-foreground">
+              <Target className="h-2.5 w-2.5" />
+              {initiativeTitle}
+            </span>
+          )}
+        </div>
+      </div>
+    );
+  };
+
+  return (
+    <div className="space-y-2 py-3 first:pt-1 group/block">
+      <div className="flex items-center gap-2.5">
+        <div className="h-7 w-7 rounded-full bg-muted text-muted-foreground flex items-center justify-center text-xs font-semibold">
+          {displayName(email).charAt(0)}
+        </div>
+        <span className="text-sm font-semibold text-foreground">{displayName(email)}</span>
+        <span className="text-[11px] text-muted-foreground/70">
+          {completed.length}/{items.length}
+        </span>
+        {canAdd && !showAdd && (
+          <button
+            type="button"
+            onClick={() => setShowAdd(true)}
+            className="ml-auto opacity-0 group-hover/block:opacity-100 transition-opacity text-muted-foreground hover:text-foreground"
+            aria-label={`Add focus for ${displayName(email)}`}
+            title={`Add focus for ${displayName(email)}`}
+          >
+            <Plus className="h-3.5 w-3.5" />
+          </button>
+        )}
+      </div>
+      {showAdd && (
+        <div className="ml-9 flex items-center gap-2">
+          <input
+            autoFocus
+            type="text"
+            value={newTitle}
+            onChange={(e) => setNewTitle(e.target.value)}
+            placeholder={`Add focus for ${displayName(email)}...`}
+            className="flex-1 min-w-0 bg-transparent text-xs text-foreground placeholder:text-muted-foreground/60 border-b border-border/50 focus:border-foreground/40 outline-none py-1 transition-colors"
+            onKeyDown={(e) => {
+              if (e.key === "Enter") handleAdd();
+              if (e.key === "Escape") { setShowAdd(false); setNewTitle(""); setNewInitId(""); }
+            }}
+          />
+          {initiatives.length > 0 && (
+            <InitiativeSelect value={newInitId} onChange={setNewInitId} initiatives={initiatives} />
+          )}
+          <button onClick={handleAdd} disabled={!newTitle.trim()} className="text-xs font-medium text-foreground/80 hover:text-foreground disabled:opacity-30 disabled:pointer-events-none transition-colors">Add</button>
+          <button onClick={() => { setShowAdd(false); setNewTitle(""); setNewInitId(""); }} className="text-xs text-muted-foreground hover:text-foreground transition-colors">Cancel</button>
+        </div>
+      )}
+      <div className="space-y-2 ml-9">
+        {active.length > 0 && (
+          <div className="space-y-0.5">
+            {active.map(renderItem)}
+          </div>
+        )}
+        {completed.length > 0 && (
+          <div>
+            <button
+              type="button"
+              onClick={() => setCompletedOpen((o) => !o)}
+              className="flex items-center gap-1 text-[9px] font-bold text-muted-foreground/60 uppercase tracking-widest hover:text-foreground transition-colors"
+            >
+              <ChevronDown className={`h-2.5 w-2.5 transition-transform ${completedOpen ? "" : "-rotate-90"}`} />
+              Completed <span className="font-medium normal-case tracking-normal">{completed.length}</span>
+            </button>
+            {completedOpen && (
+              <div className="space-y-0.5 mt-1.5">
+                {completed.map(renderItem)}
+              </div>
+            )}
+          </div>
+        )}
+      </div>
+    </div>
+  );
+}
+
+function MyFocusItems({ filterInitId }: { filterInitId: string | null }) {
+  const { user } = useAuth();
+  const { foci, initiatives, addFocus, editFocus, removeFocus, toggleComplete, loading } = useFocusBoard();
+  const userId = user?.id ?? "";
+  const [completedOpen, setCompletedOpen] = useState(false);
+  const [showAdd, setShowAdd] = useState(false);
+  const [newTitle, setNewTitle] = useState("");
+  const [newInitId, setNewInitId] = useState<string>("");
+  const [editingId, setEditingId] = useState<string | null>(null);
+  const [editingTitle, setEditingTitle] = useState("");
+
+  const myItems = useMemo(() => {
+    const mine = foci.filter((f) => f.user_id === userId);
+    return filterInitId ? mine.filter((f) => f.quarterly_initiative_id === filterInitId) : mine;
+  }, [foci, userId, filterInitId]);
+  const activeItems = useMemo(() => myItems.filter((i) => !i.completed), [myItems]);
+  const completedItems = useMemo(() => myItems.filter((i) => i.completed), [myItems]);
+
+  async function handleAdd() {
+    if (!newTitle.trim()) return;
+    await addFocus(newTitle, newInitId || null);
+    setNewTitle("");
+    setNewInitId("");
+    setShowAdd(false);
+  }
+
+  const initiativeMap = useMemo(() => {
+    const m = new Map<string, string>();
+    for (const i of initiatives) m.set(i.id, i.title);
+    return m;
+  }, [initiatives]);
+
+  if (loading) return null;
+
+  const renderItem = (item: typeof myItems[number]) => {
+    const initiativeTitle = item.quarterly_initiative_id ? initiativeMap.get(item.quarterly_initiative_id) : null;
+    return (
+      <div
+        key={item.id}
+        className={`flex items-start gap-2.5 py-1 group ${item.completed ? "opacity-50" : ""}`}
+      >
+        <Checkbox
+          checked={item.completed}
+          onCheckedChange={() => toggleComplete(item.id, item.completed)}
+          className="shrink-0 mt-0.5"
+        />
+        <div className="flex-1 min-w-0">
+          <div className="flex items-center gap-2">
+            {item.carried_over_from && (
+              <RotateCcw className="h-3 w-3 text-amber-500 shrink-0" />
+            )}
+            {editingId === item.id ? (
+              <input
+                autoFocus
+                type="text"
+                value={editingTitle}
+                onChange={(e) => setEditingTitle(e.target.value)}
+                onBlur={() => {
+                  if (editingTitle.trim() && editingTitle !== item.title) editFocus(item.id, { title: editingTitle.trim() });
+                  setEditingId(null);
+                }}
+                onKeyDown={(e) => {
+                  if (e.key === "Enter") {
+                    if (editingTitle.trim() && editingTitle !== item.title) editFocus(item.id, { title: editingTitle.trim() });
+                    setEditingId(null);
+                  }
+                  if (e.key === "Escape") setEditingId(null);
+                }}
+                className="flex-1 bg-transparent text-sm text-foreground border-b border-foreground/40 outline-none py-0"
+              />
+            ) : (
+              <button
+                type="button"
+                onClick={() => { setEditingId(item.id); setEditingTitle(item.title); }}
+                className={`text-sm text-left cursor-text hover:text-primary transition-colors ${item.completed ? "line-through text-muted-foreground" : "text-foreground"}`}
+                title="Click to edit"
+              >
+                {item.title}
+              </button>
+            )}
+          </div>
+          {(initiativeTitle || editingId === item.id) && (
+            <div className="mt-0.5">
+              <ItemInitiativeChip
+                currentId={item.quarterly_initiative_id}
+                currentTitle={initiativeTitle}
+                initiatives={initiatives}
+                onChange={(newId) => editFocus(item.id, { initiativeId: newId })}
+              />
+            </div>
+          )}
+        </div>
+        {editingId !== item.id && (
+          <button
+            onClick={() => removeFocus(item.id)}
+            className="opacity-0 group-hover:opacity-100 transition-opacity shrink-0 mt-1 text-muted-foreground hover:text-red-500"
+            aria-label="Delete"
+          >
+            <Trash2 className="h-3 w-3" />
+          </button>
+        )}
+      </div>
+    );
+  };
+
+  return (
+    <div className="space-y-3">
+      <p className="text-sm text-muted-foreground">Here's your focus for the week</p>
+
+      {myItems.length === 0 && !showAdd && (
+        <p className="text-xs text-muted-foreground italic">No focus items this week.</p>
+      )}
+
+      {/* Active items */}
+      {activeItems.length > 0 && (
+        <div className="space-y-2">
+          {activeItems.map(renderItem)}
+        </div>
+      )}
+
+      {/* Add Focus — sits between active items and the Completed section */}
+      {!showAdd && (
+        <MicroExpander
+          text="Add Focus"
+          icon={<CirclePlus className="h-3.5 w-3.5" />}
+          variant="outline"
+          className="-ml-[6px] hover:border-input"
+          onClick={() => setShowAdd(true)}
+        />
+      )}
+
+      {showAdd && (
+        <div className="flex items-center gap-2">
+          <input
+            autoFocus
+            type="text"
+            value={newTitle}
+            onChange={(e) => setNewTitle(e.target.value)}
+            placeholder="Add a focus for this week..."
+            className="flex-1 min-w-0 bg-transparent text-sm text-foreground placeholder:text-muted-foreground/60 border-b border-border/50 focus:border-foreground/40 outline-none py-1.5 transition-colors"
+            onKeyDown={(e) => {
+              if (e.key === "Enter") handleAdd();
+              if (e.key === "Escape") setShowAdd(false);
+            }}
+          />
+          {initiatives.length > 0 && (
+            <InitiativeSelect
+              value={newInitId}
+              onChange={setNewInitId}
+              initiatives={initiatives}
+            />
+          )}
+          <button
+            onClick={handleAdd}
+            disabled={!newTitle.trim()}
+            className="shrink-0 text-xs font-medium text-foreground/80 hover:text-foreground disabled:opacity-30 disabled:pointer-events-none transition-colors"
+          >
+            Add
+          </button>
+          <button
+            onClick={() => { setShowAdd(false); setNewTitle(""); setNewInitId(""); }}
+            className="shrink-0 text-xs text-muted-foreground hover:text-foreground transition-colors"
+          >
+            Cancel
+          </button>
+        </div>
+      )}
+
+      {/* Completed (collapsible) */}
+      {completedItems.length > 0 && (
+        <div className="pt-1">
+          <button
+            type="button"
+            onClick={() => setCompletedOpen((o) => !o)}
+            className="flex items-center gap-1.5 text-[12px] font-bold text-muted-foreground uppercase tracking-widest hover:text-foreground transition-colors"
+          >
+            <ChevronDown className={`h-3.5 w-3.5 transition-transform ${completedOpen ? "" : "-rotate-90"}`} />
+            Completed
+            <span className="font-medium normal-case tracking-normal text-muted-foreground/60">
+              {completedItems.length}
+            </span>
+          </button>
+          {completedOpen && (
+            <div className="space-y-2 mt-2">
+              {completedItems.map(renderItem)}
+            </div>
+          )}
+        </div>
+      )}
+    </div>
   );
 }
 

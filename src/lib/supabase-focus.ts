@@ -6,6 +6,9 @@ export interface QuarterlySettings {
   id: string;
   quarter: string;
   rallying_cry: string | null;
+  daily_bookings_target: number | null;
+  daily_close_rate_target: number | null;
+  daily_cash_target: number | null;
   updated_at: string;
 }
 
@@ -220,6 +223,18 @@ export async function upsertQuarterlySettings(quarter: string, rallyingCry: stri
     body: JSON.stringify({ quarter, rallying_cry: rallyingCry, updated_at: new Date().toISOString() }),
   });
   return res.ok;
+}
+
+/** Returns all distinct quarters that have rows in quarterly_settings. */
+export async function fetchAllQuarters(): Promise<string[]> {
+  const headers = await getSupabaseHeaders();
+  const res = await fetch(
+    `${SUPABASE_URL}/rest/v1/quarterly_settings?select=quarter&order=quarter.desc`,
+    { headers }
+  );
+  if (!res.ok) return [];
+  const rows: { quarter: string }[] = await res.json();
+  return rows.map((r) => r.quarter);
 }
 
 // ── Quarterly Initiatives (table: quarterly_initiatives) ──────────

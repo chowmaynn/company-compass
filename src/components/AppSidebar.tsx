@@ -1,25 +1,15 @@
 import { useState, useEffect, useRef, useMemo } from "react";
-import { useLocation, Link } from "react-router-dom";
+import { useLocation } from "react-router-dom";
+import { AnimatePresence, motion } from "motion/react";
 import {
-  ClipboardList,
   TrendingUp,
   CheckCircle2,
   AlertTriangle,
   XCircle,
 } from "lucide-react";
-import { useSelectedMonth } from "@/components/AppLayout";
+import { useSelectedMonth, useNavHover } from "@/components/AppLayout";
 import { useScorecard } from "@/hooks/use-scorecard";
 import type { StatusFilter } from "@/components/SummaryCards";
-
-const slugToDept: Record<string, string> = {
-  finance: "Finance",
-  content: "Content",
-  marketing: "Marketing",
-  sales: "Sales",
-  "community-management": "Product",
-  "evergreen-metrics": "Product",
-  product: "Product",
-};
 
 const statusCards = [
   { filter: "ahead" as StatusFilter, icon: TrendingUp, color: "text-status-light-green", bg: "bg-status-light-green/15", dot: "bg-status-light-green", label: "Ahead", statusKey: "light-green" },
@@ -31,16 +21,19 @@ const statusCards = [
 export function AppSidebar() {
   const { selectedMonth } = useSelectedMonth();
   const { metrics } = useScorecard(selectedMonth);
+  const { hoveredScope, hoveredRect, setHoveredScope } = useNavHover();
   const location = useLocation();
   const [openFilter, setOpenFilter] = useState<StatusFilter | null>(null);
   const railRef = useRef<HTMLDivElement>(null);
   const buttonRefs = useRef<Record<string, HTMLButtonElement | null>>({});
-  const [panelTop, setPanelTop] = useState(200);
+  const [panelLeft, setPanelLeft] = useState(0);
+  const [panelTop, setPanelTop] = useState(0);
+  const [pinned, setPinned] = useState(false); // Keep preview open when user hovers into it
 
   // Close on route change
   useEffect(() => { setOpenFilter(null); }, [location.pathname]);
 
-  // Close on outside click
+  // Close KPI drilldown on outside click
   useEffect(() => {
     if (!openFilter) return;
     const handler = (e: MouseEvent) => {
@@ -54,10 +47,11 @@ export function AppSidebar() {
     return () => document.removeEventListener("mousedown", handler);
   }, [openFilter]);
 
-  // Filter to department if on a department page
-  const deptMatch = location.pathname.match(/^\/departments\/(.+)/);
-  const dept = deptMatch ? slugToDept[deptMatch[1]] : null;
-  const filtered = dept ? metrics.filter((m) => m.department === dept) : metrics;
+  // Filter metrics by scope (department or global)
+  const filtered = useMemo(() => {
+    if (!hoveredScope || hoveredScope === "global") return metrics;
+    return metrics.filter((m) => m.department === hoveredScope);
+  }, [metrics, hoveredScope]);
 
   const counts = filtered.reduce(
     (acc, m) => {
@@ -80,97 +74,110 @@ export function AppSidebar() {
     return [];
   }, [openFilter, filtered]);
 
-  const isScorecard = location.pathname === "/scorecard";
+  // Show the rail when a nav pill is hovered, or when the user has moved their mouse into the rail
+  const show = (hoveredScope !== null || pinned);
+
+  // Position the rail just below the hovered nav pill
+  const railTop = hoveredRect ? hoveredRect.bottom + 8 : 60;
+  const railLeft = hoveredRect ? hoveredRect.left : 16;
 
   return (
     <>
-      {/* Floating glass rail */}
-      <div
-        ref={railRef}
-        className="fixed left-4 top-1/2 -translate-y-1/2 z-30 flex flex-col items-center gap-1 rounded-2xl p-2 bg-white/[0.04] backdrop-blur-2xl ring-1 ring-white/[0.15] shadow-[0_8px_40px_-4px_rgba(0,0,0,0.5),inset_0_1px_0_0_rgba(255,255,255,0.08)]"
-      >
-        {/* Scorecard */}
-        <Link
-          to="/scorecard"
-          className={`flex items-center justify-center h-10 w-10 rounded-xl transition-all ${
-            isScorecard ? "bg-primary text-white shadow-md" : "text-muted-foreground hover:text-foreground hover:bg-white/10"
-          }`}
-          title="Scorecard"
-        >
-          <ClipboardList className="h-5 w-5" />
-        </Link>
-
-        {/* Divider */}
-        <div className="w-6 h-px bg-white/10 my-1" />
-
-        {/* Status metric buttons */}
-        {statusCards.map((c) => {
-          const count = counts[c.filter === "onTrack" ? "onTrack" : c.filter === "offTrack" ? "offTrack" : c.filter];
-          const isActive = openFilter === c.filter;
-
-          return (
-            <button
-              key={c.filter}
-              ref={(el) => { buttonRefs.current[c.filter] = el; }}
-              onClick={() => {
-                if (!isActive) {
-                  const rect = buttonRefs.current[c.filter]?.getBoundingClientRect();
-                  if (rect) setPanelTop(rect.top);
-                }
-                setOpenFilter(isActive ? null : c.filter);
-              }}
-              className={`flex flex-col items-center justify-center h-10 w-10 rounded-xl text-sm font-bold transition-all cursor-pointer ${c.color} ${
-                isActive ? `${c.bg} ring-2 ring-current` : "hover:bg-white/10"
-              }`}
-              title={`${c.label}: ${count}`}
-            >
-              {count}
-              <span className="text-[6px] font-medium opacity-60 leading-none -mt-0.5">{c.label}</span>
-            </button>
-          );
-        })}
-      </div>
-
-      {/* Dropdown panel — fixed, escapes any clipping */}
-      {openFilter && activeCard && (
-          <div
-            data-status-panel
-            className="fixed w-[550px] max-h-[400px] bg-card rounded-xl border shadow-2xl flex flex-col overflow-hidden z-[100]"
-            style={{
-              top: `${panelTop}px`,
-              left: "5.5rem",
-              animation: "dropDown 150ms ease-out",
-            }}
+      <AnimatePresence>
+        {show && (
+          <motion.div
+            ref={railRef}
+            initial={{ opacity: 0, y: -8, scale: 0.95 }}
+            animate={{ opacity: 1, y: 0, scale: 1 }}
+            exit={{ opacity: 0, y: -8, scale: 0.95 }}
+            transition={{ type: "spring", stiffness: 340, damping: 28 }}
+            onMouseEnter={() => setPinned(true)}
+            onMouseLeave={() => { setPinned(false); setHoveredScope(null); }}
+            style={{ top: railTop, left: railLeft }}
+            className={[
+              "fixed z-40",
+              "flex items-center gap-1 rounded-full px-2 py-1.5",
+              "bg-gradient-to-b from-white/15 to-white/5 dark:from-white/[0.08] dark:to-white/[0.02]",
+              "backdrop-blur-2xl backdrop-saturate-150",
+              "ring-1 ring-black/5 dark:ring-white/10",
+              "shadow-[inset_0_1px_0_0_rgba(255,255,255,0.15),0_4px_24px_-6px_rgba(0,0,0,0.3),0_1px_2px_0_rgba(0,0,0,0.1)]",
+            ].join(" ")}
           >
-            <div className="flex items-center justify-between px-4 py-3 border-b border-border bg-muted/30">
-              <div className="flex items-center gap-2">
-                <span className={`h-2 w-2 rounded-full ${activeCard.dot}`} />
-                <span className={`text-sm font-semibold ${activeCard.color}`}>{activeCard.label}</span>
-                <span className="text-xs text-muted-foreground bg-muted px-2 py-0.5 rounded-full">
-                  {dropdownMetrics.length} KPI{dropdownMetrics.length !== 1 ? "s" : ""}
-                </span>
-              </div>
-            </div>
-            <div className="grid grid-cols-[1fr_90px_80px_70px] gap-2 px-4 py-2 bg-muted/20 border-b border-border text-[10px] font-semibold text-muted-foreground uppercase tracking-wider">
-              <span>KPI</span>
-              <span className="text-right">Actual</span>
-              <span className="text-right">Target</span>
-              <span className="text-center">Owner</span>
-            </div>
-            <div className="overflow-y-auto flex-1">
-              {dropdownMetrics.map((m) => (
-                <div key={m.name} className="grid grid-cols-[1fr_90px_80px_70px] gap-2 px-4 py-2.5 items-center border-b border-border/30 hover:bg-muted/10 transition-colors last:border-0">
-                  <div className="min-w-0">
-                    <p className="text-sm font-medium text-foreground truncate">{m.name}</p>
-                    {dept ? null : <p className="text-[10px] text-muted-foreground">{m.department}</p>}
-                  </div>
-                  <span className="text-sm font-semibold text-foreground text-right font-mono">{String(m.monthlyActual)}</span>
-                  <span className="text-xs text-muted-foreground text-right font-mono">{String(m.monthlyTarget)}</span>
-                  <span className="text-[10px] text-muted-foreground text-center truncate">{m.owner?.split(" ")[0] || "—"}</span>
-                </div>
-              ))}
+            <span className="text-[10px] font-semibold text-muted-foreground uppercase tracking-wider pl-1 pr-1">
+              {hoveredScope === "global" ? "All KPIs" : hoveredScope}
+            </span>
+            {statusCards.map((c) => {
+              const count = counts[c.filter === "onTrack" ? "onTrack" : c.filter === "offTrack" ? "offTrack" : c.filter];
+              const isActive = openFilter === c.filter;
+
+              return (
+                <button
+                  key={c.filter}
+                  ref={(el) => { buttonRefs.current[c.filter] = el; }}
+                  onClick={() => {
+                    if (!isActive) {
+                      const rect = buttonRefs.current[c.filter]?.getBoundingClientRect();
+                      if (rect) {
+                        setPanelLeft(rect.left);
+                        setPanelTop(rect.bottom + 8);
+                      }
+                    }
+                    setOpenFilter(isActive ? null : c.filter);
+                  }}
+                  className={`flex items-center gap-1.5 px-2.5 h-8 rounded-full text-xs font-semibold transition-all cursor-pointer ${c.color} ${
+                    isActive ? `${c.bg} ring-1 ring-current/30` : "hover:bg-black/5 dark:hover:bg-white/10"
+                  }`}
+                  title={`${c.label}: ${count}`}
+                >
+                  <span className="font-bold">{count}</span>
+                  <span className="text-[10px] font-medium opacity-70">{c.label}</span>
+                </button>
+              );
+            })}
+          </motion.div>
+        )}
+      </AnimatePresence>
+
+      {/* Dropdown panel — drops down from the rail */}
+      {openFilter && activeCard && (
+        <div
+          data-status-panel
+          className="fixed w-[550px] max-h-[400px] bg-card rounded-xl border shadow-2xl flex flex-col overflow-hidden z-[100]"
+          style={{
+            top: `${panelTop}px`,
+            left: `${panelLeft}px`,
+            animation: "dropDown 150ms ease-out",
+          }}
+        >
+          <div className="flex items-center justify-between px-4 py-3 border-b border-border bg-muted/30">
+            <div className="flex items-center gap-2">
+              <span className={`h-2 w-2 rounded-full ${activeCard.dot}`} />
+              <span className={`text-sm font-semibold ${activeCard.color}`}>{activeCard.label}</span>
+              <span className="text-xs text-muted-foreground bg-muted px-2 py-0.5 rounded-full">
+                {dropdownMetrics.length} KPI{dropdownMetrics.length !== 1 ? "s" : ""}
+              </span>
             </div>
           </div>
+          <div className="grid grid-cols-[1fr_90px_80px_70px] gap-2 px-4 py-2 bg-muted/20 border-b border-border text-[10px] font-semibold text-muted-foreground uppercase tracking-wider">
+            <span>KPI</span>
+            <span className="text-right">Actual</span>
+            <span className="text-right">Target</span>
+            <span className="text-center">Owner</span>
+          </div>
+          <div className="overflow-y-auto flex-1">
+            {dropdownMetrics.map((m) => (
+              <div key={m.name} className="grid grid-cols-[1fr_90px_80px_70px] gap-2 px-4 py-2.5 items-center border-b border-border/30 hover:bg-muted/10 transition-colors last:border-0">
+                <div className="min-w-0">
+                  <p className="text-sm font-medium text-foreground truncate">{m.name}</p>
+                  {hoveredScope && hoveredScope !== "global" ? null : <p className="text-[10px] text-muted-foreground">{m.department}</p>}
+                </div>
+                <span className="text-sm font-semibold text-foreground text-right font-mono">{String(m.monthlyActual)}</span>
+                <span className="text-xs text-muted-foreground text-right font-mono">{String(m.monthlyTarget)}</span>
+                <span className="text-[10px] text-muted-foreground text-center truncate">{m.owner?.split(" ")[0] || "—"}</span>
+              </div>
+            ))}
+          </div>
+        </div>
       )}
     </>
   );

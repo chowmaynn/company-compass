@@ -154,11 +154,14 @@ export function useFocusBoard(weekStartOverride?: string) {
   );
 
   const editFocus = useCallback(
-    async (id: string, title: string) => {
+    async (id: string, updates: { title?: string; initiativeId?: string | null }) => {
+      const dbUpdates: Partial<Pick<FocusItem, "title" | "quarterly_initiative_id">> = {};
+      if (updates.title !== undefined) dbUpdates.title = updates.title;
+      if (updates.initiativeId !== undefined) dbUpdates.quarterly_initiative_id = updates.initiativeId;
       queryClient.setQueryData<FocusItem[]>(["focus-board", weekStart], (old) =>
-        old?.map((f) => f.id === id ? { ...f, title } : f)
+        old?.map((f) => f.id === id ? { ...f, ...dbUpdates } : f)
       );
-      await updateFocusItem(id, { title });
+      await updateFocusItem(id, dbUpdates);
     },
     [weekStart, queryClient]
   );

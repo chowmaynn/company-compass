@@ -123,6 +123,70 @@
 
   body {
     @apply bg-background text-foreground font-sans antialiased;
+    position: relative;
+    min-height: 100vh;
+  }
+
+  /* Metallic gradient sheen — two off-center radial highlights layered over the
+     base background. Fixed-position + pointer-events:none so it doesn't affect
+     layout or interaction. GPU-composited via transform: translateZ(0). */
+  body::before {
+    content: "";
+    position: fixed;
+    /* Slightly larger than viewport so we can translate it without exposing edges */
+    inset: -10%;
+    pointer-events: none;
+    z-index: 0;
+    background:
+      linear-gradient(
+        var(--gradient-angle, 115deg),
+        transparent 25%,
+        hsl(var(--foreground) / calc(0.04 * var(--gradient-intensity, 1))) 40%,
+        hsl(var(--foreground) / calc(0.10 * var(--gradient-intensity, 1))) 50%,
+        hsl(var(--foreground) / calc(0.04 * var(--gradient-intensity, 1))) 60%,
+        transparent 75%
+      ),
+      radial-gradient(ellipse 100% 100% at 50% 50%, transparent 20%, rgba(0, 0, 0, 0.4) 100%);
+    animation: gradient-drift 24s ease-in-out infinite;
+    transform: translateZ(0);
+    will-change: transform;
+  }
+
+  /* Register CSS variables for animation (modern browsers).
+     This lets us animate the angle and intensity smoothly. */
+  @property --gradient-angle {
+    syntax: "<angle>";
+    inherits: true;
+    initial-value: 115deg;
+  }
+  @property --gradient-intensity {
+    syntax: "<number>";
+    inherits: true;
+    initial-value: 1;
+  }
+
+  @keyframes gradient-drift {
+    0%, 100% {
+      --gradient-angle: 105deg;
+      --gradient-intensity: 0.8;
+      transform: translate3d(-2%, -1%, 0);
+    }
+    50% {
+      --gradient-angle: 125deg;
+      --gradient-intensity: 1.2;
+      transform: translate3d(2%, 1%, 0);
+    }
+  }
+
+  /* Respect reduced-motion preference */
+  @media (prefers-reduced-motion: reduce) {
+    body::before { animation: none; }
+  }
+
+  /* Ensure app content sits above the gradient layer */
+  #root {
+    position: relative;
+    z-index: 1;
   }
 
 }

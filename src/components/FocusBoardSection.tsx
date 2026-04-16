@@ -106,7 +106,7 @@ function shiftWeek(weekStart: string, delta: number): string {
   return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
 }
 
-export function FocusBoardSection() {
+export function FocusBoardSection({ excludeCurrentUser = false }: { excludeCurrentUser?: boolean } = {}) {
   const { user, isAdmin } = useAuth();
   const [selectedWeek, setSelectedWeek] = useState<string>(getCurrentWeekStart());
 
@@ -197,6 +197,7 @@ export function FocusBoardSection() {
   const grouped = useMemo(() => {
     const map = new Map<string, { email: string; userId: string; items: FocusItem[] }>();
     for (const f of filteredFoci) {
+      if (excludeCurrentUser && f.user_id === userId) continue;
       if (!map.has(f.user_id)) {
         map.set(f.user_id, { email: f.user_email, userId: f.user_id, items: [] });
       }
@@ -209,7 +210,7 @@ export function FocusBoardSection() {
       return a.email.localeCompare(b.email);
     });
     return groups;
-  }, [filteredFoci, userId]);
+  }, [filteredFoci, userId, excludeCurrentUser]);
 
   // Group initiatives by north star
   const initiativesByNorthStar = useMemo(() => {
@@ -816,10 +817,10 @@ export function FocusBoardSection() {
                                 value={editingFocusTitle}
                                 onChange={(e) => setEditingFocusTitle(e.target.value)}
                                 onKeyDown={(e) => {
-                                  if (e.key === "Enter") { editFocus(item.id, editingFocusTitle); setEditingFocusId(null); }
+                                  if (e.key === "Enter") { editFocus(item.id, { title: editingFocusTitle }); setEditingFocusId(null); }
                                   if (e.key === "Escape") setEditingFocusId(null);
                                 }}
-                                onBlur={() => { editFocus(item.id, editingFocusTitle); setEditingFocusId(null); }}
+                                onBlur={() => { editFocus(item.id, { title: editingFocusTitle }); setEditingFocusId(null); }}
                                 className="text-sm bg-transparent outline-none border-b border-primary flex-1"
                               />
                             ) : (

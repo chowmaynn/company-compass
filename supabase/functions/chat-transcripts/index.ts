@@ -1,7 +1,8 @@
 // Supabase Edge Function: Chat with Transcripts (RAG)
 // Receives a user question + conversation history,
-// embeds the question, retrieves top-N relevant transcript chunks,
-// and streams an answer back from OpenAI's chat API.
+// embeds the question (OpenAI — to match stored chunk embeddings),
+// retrieves top-N relevant transcript chunks,
+// and streams an answer back from Anthropic's Messages API.
 //
 // POST body: { messages: [{role, content}], meeting_type?: string }
 
@@ -9,12 +10,14 @@ import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 
 const SUPABASE_URL = Deno.env.get("SUPABASE_URL")!;
 const SUPABASE_SERVICE_ROLE_KEY = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
-const OPENAI_API_KEY = Deno.env.get("OPENAI_API_KEY")!;
+const OPENAI_API_KEY = Deno.env.get("OPENAI_API_KEY")!;       // for embeddings only
+const ANTHROPIC_API_KEY = Deno.env.get("ANTHROPIC_KEY")!;     // for chat completion
 
 const supabase = createClient(SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY);
 
 const EMBED_MODEL = "text-embedding-3-small";
-const CHAT_MODEL = "gpt-4o"; // Higher quality for comprehensive summaries
+const CHAT_MODEL = "claude-sonnet-4-5"; // Anthropic Claude Sonnet 4.5 — high quality for comprehensive summaries
+const ANTHROPIC_MAX_TOKENS = 4096;
 const MATCH_COUNT = 12;
 
 const CORS_HEADERS = {
@@ -179,6 +182,13 @@ Write 1–3 paragraphs on product updates: feature releases, beta tests, system 
 ## Other Topics & Decisions
 A short paragraph or two covering cross-department discussions, decisions made, action items, or notable items not fitting elsewhere.
 
+## Core Takeaways & Next Steps
+A synthesis section in two short paragraphs.
+
+**First paragraph — Core Takeaways:** Step back and identify the 2–4 most important themes or signals from this meeting. What patterns connect the department updates? Where is the team winning, where are they stuck, and what shifts in priority showed up? Be specific and analytical, not just a recap.
+
+**Second paragraph — Next Steps Forward:** Recommend concrete next steps for the team to consider this week and next. **You are explicitly encouraged to suggest steps that were NOT discussed in the meeting** if they follow logically from what was shared (e.g. if Sales mentioned a low show rate, suggest a specific experiment to fix it; if Content shipped a video that performed poorly, suggest a follow-up test). Frame these as suggestions: "Worth considering...", "One option would be...", "The team might want to...". Don't fabricate facts — base every suggestion on something actually said in the sources.
+
 Style notes:
 - Write in flowing paragraphs, not bullet lists. Bullets are only acceptable for genuinely list-like content (e.g. a list of action items in the closing section).
 - Quote people directly when their words are notable (e.g., Casey said "...").
@@ -228,30 +238,32 @@ Deno.serve(async (req) => {
       chunks = mergeChunks(recentChunks, semanticChunks);
     }
 
-    // 3. Build conversation for OpenAI: system prompt with context + history
+    // 3. Build conversation for Anthropic: system prompt is separate; messages are only user/assistant
     const systemPrompt = buildSystemPrompt(chunks);
-    const openaiMessages = [
-      { role: "system", content: systemPrompt },
-      ...messages,
-    ];
+    const anthropicMessages = messages
+      .filter((m) => m.role === "user" || m.role === "assistant")
+      .map((m) => ({ role: m.role, content: m.content }));
 
-    // 4. Call OpenAI with streaming
-    const openaiRes = await fetch("https://api.openai.com/v1/chat/completions", {
+    // 4. Call Anthropic Messages API with streaming
+    const anthropicRes = await fetch("https://api.anthropic.com/v1/messages", {
       method: "POST",
       headers: {
-        Authorization: `Bearer ${OPENAI_API_KEY}`,
+        "x-api-key": ANTHROPIC_API_KEY,
+        "anthropic-version": "2023-06-01",
         "Content-Type": "application/json",
       },
       body: JSON.stringify({
         model: CHAT_MODEL,
-        messages: openaiMessages,
+        max_tokens: ANTHROPIC_MAX_TOKENS,
+        system: systemPrompt,
+        messages: anthropicMessages,
         stream: true,
       }),
     });
 
-    if (!openaiRes.ok) {
-      const errText = await openaiRes.text();
-      throw new Error(`OpenAI ${openaiRes.status}: ${errText}`);
+    if (!anthropicRes.ok) {
+      const errText = await anthropicRes.text();
+      throw new Error(`Anthropic ${anthropicRes.status}: ${errText}`);
     }
 
     // 5. Stream response back, prefixed with sources
@@ -265,8 +277,8 @@ Deno.serve(async (req) => {
         );
         controller.enqueue(encoder.encode(`__SOURCES__${JSON.stringify(sortedChunks)}\n`));
 
-        // Then forward the OpenAI SSE stream — extract text deltas
-        const reader = openaiRes.body!.getReader();
+        // Then forward Anthropic's SSE stream — extract text_delta events
+        const reader = anthropicRes.body!.getReader();
         const decoder = new TextDecoder();
         let buffer = "";
         try {
@@ -280,11 +292,16 @@ Deno.serve(async (req) => {
               const trimmed = line.trim();
               if (!trimmed.startsWith("data:")) continue;
               const payload = trimmed.slice(5).trim();
-              if (payload === "[DONE]") continue;
+              if (!payload) continue;
               try {
                 const parsed = JSON.parse(payload);
-                const delta = parsed.choices?.[0]?.delta?.content;
-                if (delta) controller.enqueue(encoder.encode(delta));
+                // Anthropic emits: content_block_delta → { delta: { type: "text_delta", text: "..." } }
+                if (parsed.type === "content_block_delta" && parsed.delta?.type === "text_delta") {
+                  const text = parsed.delta.text as string | undefined;
+                  if (text) controller.enqueue(encoder.encode(text));
+                }
+                // Ignore other events: message_start, content_block_start, content_block_stop,
+                // message_delta, message_stop, ping, error.
               } catch { /* skip malformed */ }
             }
           }
