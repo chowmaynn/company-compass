@@ -553,7 +553,8 @@ export default function Dashboard() {
 
 function WelcomeHeader() {
   const { user } = useAuth();
-  const name = user?.user_metadata?.display_name || user?.user_metadata?.full_name || user?.email?.split("@")[0];
+  const raw = user?.user_metadata?.display_name || user?.user_metadata?.full_name || user?.email?.split("@")[0] || "";
+  const name = raw.charAt(0).toUpperCase() + raw.slice(1);
 
   return (
     <h1 className="text-2xl font-bold text-foreground">
