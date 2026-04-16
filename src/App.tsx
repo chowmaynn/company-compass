@@ -11,6 +11,7 @@ import DepartmentPage from "./pages/DepartmentPage";
 import Login from "./pages/Login";
 import ResetPassword from "./pages/ResetPassword";
 import OAuthCallback from "./pages/OAuthCallback.tsx";
+import HRPage from "./pages/HRPage";
 import NotFound from "./pages/NotFound";
 import { Loader2 } from "lucide-react";
 
@@ -55,6 +56,7 @@ const App = () => (
               <Route path="/" element={<Dashboard />} />
               <Route path="/scorecard" element={<Scorecard />} />
               <Route path="/departments/:slug" element={<DepartmentPage />} />
+              <Route path="/hr" element={<HRPage />} />
             </Route>
             <Route path="*" element={<NotFound />} />
           </Routes>

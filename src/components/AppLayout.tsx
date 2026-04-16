@@ -5,7 +5,7 @@ import { Outlet, useLocation, Link } from "react-router-dom";
 import { isAuthorized, getAuthUrl, clearTokens } from "@/lib/youtube-auth";
 import {
   LogIn, LogOut, Sun, Moon, Compass, ChevronDown,
-  LayoutDashboard, ClipboardList, DollarSign, Video, Megaphone, Phone, Users,
+  LayoutDashboard, ClipboardList, DollarSign, Video, Megaphone, Phone, Users, Building2,
 } from "lucide-react";
 import { useState, useEffect, useRef, useMemo, createContext, useContext } from "react";
 import { useScorecard } from "@/hooks/use-scorecard";
@@ -102,6 +102,7 @@ const navItems = [
   { title: "Marketing", url: "/departments/marketing", icon: Megaphone },
   { title: "Sales", url: "/departments/sales", icon: Phone },
   { title: "Product", url: "/departments/product", icon: Users },
+  { title: "HR", url: "/hr", icon: Building2 },
 ];
 
 
