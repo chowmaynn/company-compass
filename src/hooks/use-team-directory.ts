@@ -118,21 +118,61 @@ function geocodeEmployee(displayName: string, location: string | null): [number,
 // ── Fetch ────────────────────────────────────────────────────
 
 async function fetchDirectory(): Promise<TeamMember[]> {
-  const res = await fetch("/api/bamboohr/employees/directory");
-  if (!res.ok) return [];
-  const data = await res.json();
-  if (!data?.employees || !Array.isArray(data.employees)) return [];
+  // Use the custom report endpoint to get address fields (city, state, country)
+  // that the directory endpoint doesn't include. Single POST, all employees.
+  const res = await fetch("/api/bamboohr/reports/custom?format=JSON", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({
+      title: "Team Directory with Locations",
+      fields: [
+        "firstName", "lastName", "displayName", "preferredName",
+        "department", "jobTitle", "location",
+        "city", "state", "country",
+      ],
+    }),
+  });
 
-  return data.employees.map((e: any) => ({
-    id: String(e.id ?? ""),
-    firstName: e.firstName ?? e.preferredName ?? "",
-    lastName: e.lastName ?? "",
-    displayName: e.displayName ?? `${e.firstName ?? ""} ${e.lastName ?? ""}`.trim(),
-    department: e.department ?? null,
-    location: e.location ?? null,
-    jobTitle: e.jobTitle ?? null,
-    photoUrl: e.photoUrl ?? null,
-  }));
+  if (!res.ok) {
+    // Fallback to the basic directory endpoint if custom report fails
+    console.warn("[use-team-directory] Custom report failed, falling back to directory");
+    const dirRes = await fetch("/api/bamboohr/employees/directory");
+    if (!dirRes.ok) return [];
+    const dirData = await dirRes.json();
+    if (!dirData?.employees) return [];
+    return dirData.employees.map((e: any) => ({
+      id: String(e.id ?? ""),
+      firstName: e.firstName ?? e.preferredName ?? "",
+      lastName: e.lastName ?? "",
+      displayName: e.displayName ?? `${e.firstName ?? ""} ${e.lastName ?? ""}`.trim(),
+      department: e.department ?? null,
+      location: e.location ?? null,
+      jobTitle: e.jobTitle ?? null,
+      photoUrl: null,
+    }));
+  }
+
+  const data = await res.json();
+  const employees = data?.employees ?? [];
+
+  return employees.map((e: any) => {
+    // Build the best location string: prefer city > location dropdown > country
+    const city = e.city || null;
+    const country = e.country || null;
+    const locationDropdown = e.location || null;
+    const bestLocation = city || locationDropdown || country;
+
+    return {
+      id: String(e.id ?? ""),
+      firstName: e.firstName ?? e.preferredName ?? "",
+      lastName: e.lastName ?? "",
+      displayName: e.displayName ?? `${e.firstName ?? ""} ${e.lastName ?? ""}`.trim(),
+      department: e.department ?? null,
+      location: bestLocation,
+      jobTitle: e.jobTitle ?? null,
+      photoUrl: null,
+    };
+  });
 }
 
 // ── Hook ─────────────────────────────────────────────────────

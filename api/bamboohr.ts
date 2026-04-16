@@ -18,13 +18,21 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
   const apiKey = process.env.BAMBOOHR_API_KEY!;
   const auth = Buffer.from(`${apiKey}:x`).toString("base64");
 
-  const response = await fetch(url, {
+  const fetchOptions: RequestInit = {
     method: req.method || "GET",
     headers: {
       Authorization: `Basic ${auth}`,
       Accept: "application/json",
+      "Content-Type": "application/json",
     },
-  });
+  };
+
+  // Forward request body for POST/PUT/PATCH
+  if (req.body && req.method && ["POST", "PUT", "PATCH"].includes(req.method)) {
+    fetchOptions.body = typeof req.body === "string" ? req.body : JSON.stringify(req.body);
+  }
+
+  const response = await fetch(url, fetchOptions);
 
   const data = await response.text();
   res.status(response.status).setHeader("Content-Type", "application/json").send(data);
