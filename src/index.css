@@ -55,7 +55,7 @@
 
     --border: 0 0% 88%;
     --input: 0 0% 88%;
-    --ring: 327 100% 60%;
+    --ring: 0 0% 30%;
 
     --radius: 0.75rem;
 
@@ -103,7 +103,7 @@
     --destructive-foreground: 0 0% 100%;
     --border: 240 4% 46% / 0.35;
     --input: 0 0% 20%;
-    --ring: 327 100% 60%;
+    --ring: 0 0% 70%;
     --status-green: 160 100% 36%;
     --status-yellow: 38 92% 50%;
     --status-red: 0 100% 62%;

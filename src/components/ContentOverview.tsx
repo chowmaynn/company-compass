@@ -81,10 +81,10 @@ export function ContentOverview() {
 
         <button
           onClick={() => setShowOutliersOnly(!showOutliersOnly)}
-          className={`inline-flex items-center gap-1.5 px-3 py-2 rounded-md text-sm font-medium border transition-colors ${
+          className={`inline-flex items-center gap-1.5 px-3 py-2 rounded-full text-sm font-medium transition-colors ${
             showOutliersOnly
-              ? "bg-amber-500/10 border-amber-500/30 text-amber-600 dark:text-amber-400"
-              : "border-input text-muted-foreground hover:text-foreground hover:bg-accent"
+              ? "bg-amber-500/10 ring-1 ring-amber-500/30 text-amber-600 dark:text-amber-400"
+              : "ring-1 ring-black/15 dark:ring-white/10 text-muted-foreground hover:text-foreground"
           }`}
         >
           <Star className="h-3.5 w-3.5" />
@@ -93,10 +93,10 @@ export function ContentOverview() {
 
         <button
           onClick={() => setShowComments(!showComments)}
-          className={`inline-flex items-center gap-1.5 px-3 py-2 rounded-md text-sm font-medium border transition-colors ${
+          className={`inline-flex items-center gap-1.5 px-3 py-2 rounded-full text-sm font-medium transition-colors ${
             showComments
-              ? "bg-blue-500/10 border-blue-500/30 text-blue-600 dark:text-blue-400"
-              : "border-input text-muted-foreground hover:text-foreground hover:bg-accent"
+              ? "bg-blue-500/10 ring-1 ring-blue-500/30 text-blue-600 dark:text-blue-400"
+              : "ring-1 ring-black/15 dark:ring-white/10 text-muted-foreground hover:text-foreground"
           }`}
         >
           <MessageSquareText className="h-3.5 w-3.5" />
