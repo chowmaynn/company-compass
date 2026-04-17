@@ -412,17 +412,22 @@ function FinancialOverview({ convert, symbol }: { convert: (v: number) => number
       {/* ── Month Selector ──────────────────────────────────── */}
       {months.length > 0 && (
         <div className="flex items-center justify-end mb-4">
-          <div className="relative inline-flex items-center gap-2 bg-muted rounded-lg px-4 py-2 cursor-pointer hover:bg-muted/80 transition-colors">
+          <div className={[
+            "relative inline-flex items-center gap-2 rounded-full px-4 py-2 cursor-pointer",
+            "bg-gradient-to-b from-black/[0.04] to-black/[0.02] dark:from-white/[0.06] dark:to-white/[0.02]",
+            "backdrop-blur-xl ring-1 ring-black/15 dark:ring-white/10",
+            "shadow-[inset_0_1px_0_0_rgba(0,0,0,0.04)] dark:shadow-[inset_0_1px_0_0_rgba(255,255,255,0.08)]",
+          ].join(" ")}>
             <select
               value={activeMonth}
               onChange={(e) => setSelectedMonth(e.target.value)}
-              className="appearance-none bg-transparent text-sm font-semibold text-foreground cursor-pointer focus:outline-none pr-5"
+              className="appearance-none bg-transparent text-sm font-medium text-foreground cursor-pointer focus:outline-none pr-5"
             >
               {months.map((m) => (
                 <option key={m} value={m}>{fmtMonth(m)}</option>
               ))}
             </select>
-            <ChevronDown className="absolute right-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground pointer-events-none" />
+            <ChevronDown className="absolute right-3 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-muted-foreground pointer-events-none" />
           </div>
         </div>
       )}
