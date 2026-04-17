@@ -52,19 +52,22 @@ export default function Scorecard() {
   return (
     <div className="p-6 space-y-6 max-w-[1440px] mx-auto">
       <div className="flex items-center justify-between">
-        <div>
-          <div className="relative">
-            <select
-              value={selectedMonth}
-              onChange={(e) => setSelectedMonth(e.target.value)}
-              className="appearance-none bg-transparent text-sm text-muted-foreground font-medium pr-6 cursor-pointer hover:text-foreground transition-colors focus:outline-none"
-            >
-              {availableMonths.map((m) => (
-                <option key={m} value={m}>{formatMonth(m)}</option>
-              ))}
-            </select>
-            <ChevronDown className="absolute right-0 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-muted-foreground pointer-events-none" />
-          </div>
+        <div className={[
+          "relative inline-flex items-center gap-2 rounded-full px-4 py-2 cursor-pointer",
+          "bg-gradient-to-b from-black/[0.04] to-black/[0.02] dark:from-white/[0.06] dark:to-white/[0.02]",
+          "backdrop-blur-xl ring-1 ring-black/15 dark:ring-white/10",
+          "shadow-[inset_0_1px_0_0_rgba(0,0,0,0.04)] dark:shadow-[inset_0_1px_0_0_rgba(255,255,255,0.08)]",
+        ].join(" ")}>
+          <select
+            value={selectedMonth}
+            onChange={(e) => setSelectedMonth(e.target.value)}
+            className="appearance-none bg-transparent text-sm font-medium text-foreground cursor-pointer focus:outline-none pr-5"
+          >
+            {availableMonths.map((m) => (
+              <option key={m} value={m}>{formatMonth(m)}</option>
+            ))}
+          </select>
+          <ChevronDown className="absolute right-3 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-muted-foreground pointer-events-none" />
         </div>
       </div>
 
