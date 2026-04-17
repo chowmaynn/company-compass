@@ -14,9 +14,10 @@ const Card = React.forwardRef<HTMLDivElement, React.HTMLAttributes<HTMLDivElemen
   return (
     <div
       className={cn(
-        "rounded-[21px] shadow-[0_8px_32px_-8px_rgba(0,0,0,0.5),0_2px_8px_-2px_rgba(0,0,0,0.3)]",
+        "rounded-[21px]",
+        "shadow-[0_8px_32px_-8px_rgba(0,0,0,0.15),0_2px_8px_-2px_rgba(0,0,0,0.08)] dark:shadow-[0_8px_32px_-8px_rgba(0,0,0,0.5),0_2px_8px_-2px_rgba(0,0,0,0.3)]",
         // Outer frame: subtle highlight at top, fades to nothing — gives the bevel/glass-edge feel
-        "bg-gradient-to-b from-white/[0.12] via-white/[0.05] via-50% to-white/[0.02]",
+        "bg-gradient-to-b from-black/[0.04] via-black/[0.02] via-50% to-black/[0.01] dark:from-white/[0.12] dark:via-white/[0.05] dark:to-white/[0.02]",
         layoutClasses.join(" "),
       )}
       style={{ padding: glassPadding ?? "1px" }}

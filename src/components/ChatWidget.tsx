@@ -173,19 +173,19 @@ export function ChatWidget() {
             "rounded-2xl flex flex-col overflow-hidden",
             "bg-gradient-to-b from-card/80 to-card/60 dark:from-card/70 dark:to-card/50",
             "backdrop-blur-2xl backdrop-saturate-150",
-            "ring-1 ring-black/5 dark:ring-white/10",
+            "ring-1 ring-black/15 dark:ring-white/10",
             "shadow-[inset_0_1px_0_0_rgba(255,255,255,0.08),0_24px_48px_-12px_rgba(0,0,0,0.4)]",
           ].join(" ")}
         >
           {/* Header */}
-          <div className="flex items-center justify-between px-4 py-3 border-b border-white/5">
+          <div className="flex items-center justify-between px-4 py-3 border-b border-black/10 dark:border-white/5">
             <div className="flex items-center gap-2">
               <Sparkles className="h-4 w-4 text-muted-foreground" />
               <h2 className="text-sm font-semibold text-foreground">Ask</h2>
               <select
                 value={meetingType ?? ""}
                 onChange={(e) => setMeetingType(e.target.value || null)}
-                className="text-[10px] bg-transparent border border-white/10 rounded px-1.5 py-0.5 text-muted-foreground ml-1"
+                className="text-[10px] bg-transparent border border-black/10 dark:border-white/10 rounded px-1.5 py-0.5 text-muted-foreground ml-1"
               >
                 <option value="">All</option>
                 <option value="standup">Standups</option>
@@ -222,7 +222,7 @@ export function ChatWidget() {
                     <button
                       key={q}
                       onClick={() => sendMessage(q)}
-                      className="text-xs px-3 py-2 rounded-md bg-white/[0.04] hover:bg-white/[0.08] ring-1 ring-white/5 text-muted-foreground hover:text-foreground transition-colors text-left"
+                      className="text-xs px-3 py-2 rounded-md bg-black/[0.03] hover:bg-black/[0.06] dark:bg-white/[0.04] dark:hover:bg-white/[0.08] ring-1 ring-black/10 dark:ring-white/5 text-muted-foreground hover:text-foreground transition-colors text-left"
                     >
                       {q}
                     </button>
@@ -251,13 +251,13 @@ export function ChatWidget() {
           </div>
 
           {/* Input */}
-          <div className="border-t border-white/5 p-3 flex items-center gap-2">
+          <div className="border-t border-black/10 dark:border-white/5 p-3 flex items-center gap-2">
             <Input
               value={input}
               onChange={(e) => setInput(e.target.value)}
               placeholder="Ask anything about our meetings..."
               disabled={loading}
-              className="text-sm bg-white/[0.04] border-white/10 focus-visible:ring-white/20"
+              className="text-sm bg-black/[0.03] dark:bg-white/[0.04] border-black/10 dark:border-white/10 focus-visible:ring-black/20 dark:focus-visible:ring-white/20"
               onKeyDown={(e) => {
                 if (e.key === "Enter" && !e.shiftKey) {
                   e.preventDefault();
@@ -270,7 +270,7 @@ export function ChatWidget() {
               disabled={loading || !input.trim()}
               className={[
                 "h-9 w-9 rounded-md flex items-center justify-center shrink-0 transition-colors",
-                "bg-white/[0.08] hover:bg-white/[0.15] ring-1 ring-white/10",
+                "bg-black/[0.06] hover:bg-black/[0.10] dark:bg-white/[0.08] dark:hover:bg-white/[0.15] ring-1 ring-black/10 dark:ring-white/10",
                 "text-foreground disabled:opacity-30 disabled:pointer-events-none",
               ].join(" ")}
               aria-label="Send"
@@ -293,8 +293,8 @@ function MessageBubble({ message, streaming }: { message: ChatMessage; streaming
         <div
           className={`rounded-lg px-3 py-2 text-[16px] ${
             isUser
-              ? "bg-white/[0.10] ring-1 ring-white/10 text-foreground"
-              : "bg-white/[0.04] ring-1 ring-white/5 text-foreground"
+              ? "bg-black/[0.06] dark:bg-white/[0.10] ring-1 ring-black/10 dark:ring-white/10 text-foreground"
+              : "bg-black/[0.03] dark:bg-white/[0.04] ring-1 ring-black/10 dark:ring-white/5 text-foreground"
           }`}
         >
           {isUser ? (

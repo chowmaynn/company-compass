@@ -140,9 +140,9 @@
     min-height: 100vh;
   }
 
-  /* Static radial vignette — never animates, lives on body so it doesn't share
-     a layer with the animated sheen above. */
-  body {
+  /* Static radial vignette — only in dark mode. In light mode the background
+     is naturally bright and needs no darkening at the edges. */
+  .dark body {
     background-image: radial-gradient(
       ellipse 100% 100% at 50% 50%,
       transparent 20%,

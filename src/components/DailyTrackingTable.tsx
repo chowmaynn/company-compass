@@ -37,7 +37,7 @@ export function DailyTrackingTable() {
   return (
     <div className="space-y-2">
       <p className="text-sm font-medium text-muted-foreground">Daily Tracking</p>
-      <div className="overflow-x-auto rounded-xl ring-1 ring-white/10 bg-gradient-to-b from-white/[0.04] to-white/[0.01] backdrop-blur-xl shadow-[inset_0_1px_0_0_rgba(255,255,255,0.06)]">
+      <div className="overflow-x-auto rounded-xl ring-1 ring-black/15 dark:ring-white/10 bg-gradient-to-b from-black/[0.03] to-black/[0.01] dark:from-white/[0.04] dark:to-white/[0.01] backdrop-blur-xl shadow-[inset_0_1px_0_0_rgba(0,0,0,0.04)] dark:shadow-[inset_0_1px_0_0_rgba(255,255,255,0.06)]">
           <table className="w-full text-sm">
             <thead>
               <tr className="border-b border-border bg-muted/50">

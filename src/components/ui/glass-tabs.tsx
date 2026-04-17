@@ -22,9 +22,9 @@ export function GlassTabs({ tabs, activeKey, onChange }: GlassTabsProps) {
     <div
       className={[
         "inline-flex items-center gap-0.5 rounded-full p-0.5",
-        "bg-gradient-to-b from-white/[0.06] to-white/[0.02] dark:from-white/[0.05] dark:to-white/[0.01]",
-        "backdrop-blur-xl ring-1 ring-black/5 dark:ring-white/10",
-        "shadow-[inset_0_1px_0_0_rgba(255,255,255,0.08)]",
+        "bg-gradient-to-b from-black/[0.04] to-black/[0.02] dark:from-white/[0.06] dark:to-white/[0.02]",
+        "backdrop-blur-xl ring-1 ring-black/15 dark:ring-white/10",
+        "shadow-[inset_0_1px_0_0_rgba(0,0,0,0.04)] dark:shadow-[inset_0_1px_0_0_rgba(255,255,255,0.08)]",
       ].join(" ")}
     >
       {tabs.map((tab) => (
@@ -33,7 +33,7 @@ export function GlassTabs({ tabs, activeKey, onChange }: GlassTabsProps) {
           onClick={() => onChange(tab.key)}
           className={`flex items-center gap-2 px-4 py-2 rounded-full text-sm font-medium transition-colors ${
             activeKey === tab.key
-              ? "bg-white/15 text-foreground"
+              ? "bg-black/[0.08] dark:bg-white/15 text-foreground shadow-sm"
               : "text-muted-foreground hover:text-foreground"
           }`}
         >

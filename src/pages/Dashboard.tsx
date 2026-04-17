@@ -1320,8 +1320,8 @@ function QuarterlyInitiativesCard({ activeId, onToggle }: { activeId: string | n
         onKeyDown={(e) => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); setOpen((o) => !o); } }}
         className={[
           "w-full flex items-center justify-between gap-3 p-4 rounded-xl text-left transition-all cursor-pointer",
-          "bg-gradient-to-b from-white/[0.06] to-white/[0.02] dark:from-white/[0.05] dark:to-white/[0.01]",
-          "backdrop-blur-xl ring-1 ring-black/5 dark:ring-white/10",
+          "bg-gradient-to-b from-black/[0.04] to-black/[0.02] dark:from-white/[0.06] dark:to-white/[0.02]",
+          "backdrop-blur-xl ring-1 ring-black/15 dark:ring-white/10",
           "shadow-[inset_0_1px_0_0_rgba(255,255,255,0.08),0_2px_12px_-4px_rgba(0,0,0,0.2)]",
           "hover:ring-white/20",
         ].join(" ")}
@@ -1685,8 +1685,8 @@ function TeamFocusCard({ filterInitId }: { filterInitId: string | null }) {
         onKeyDown={(e) => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); setOpen((o) => !o); } }}
         className={[
           "w-full flex items-center justify-between gap-3 p-4 rounded-xl text-left transition-all cursor-pointer",
-          "bg-gradient-to-b from-white/[0.06] to-white/[0.02] dark:from-white/[0.05] dark:to-white/[0.01]",
-          "backdrop-blur-xl ring-1 ring-black/5 dark:ring-white/10",
+          "bg-gradient-to-b from-black/[0.04] to-black/[0.02] dark:from-white/[0.06] dark:to-white/[0.02]",
+          "backdrop-blur-xl ring-1 ring-black/15 dark:ring-white/10",
           "shadow-[inset_0_1px_0_0_rgba(255,255,255,0.08),0_2px_12px_-4px_rgba(0,0,0,0.2)]",
           "hover:ring-white/20",
         ].join(" ")}
