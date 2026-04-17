@@ -13,6 +13,7 @@ import { Card, CardContent } from "@/components/ui/card";
 import { StatCard } from "@/components/StatCard";
 import { LoadingIndicator } from "@/components/LoadingIndicator";
 import { DashboardShell } from "@/components/DashboardShell";
+import { GlassTabs } from "@/components/ui/glass-tabs";
 import { DateRangePicker, presetToRange, type DateRangeValue } from "@/components/DateRangePicker";
 import { useCurrency } from "@/components/AppLayout";
 import { formatYearMonth } from "@/lib/dates";
@@ -109,23 +110,15 @@ export default function SubscriptionDashboard() {
   return (
     <>
     {/* ── Tabs ──────────────────────────────────────────────── */}
-    <div className="flex gap-1 border-b border-border mb-6">
-      {[
-        { key: "overview", label: "Overview" },
-        { key: "subscriptions", label: "Subscriptions" },
-      ].map(({ key, label }) => (
-        <button
-          key={key}
-          onClick={() => setActiveTab(key as typeof activeTab)}
-          className={`px-4 py-2 text-sm font-medium transition-colors border-b-2 -mb-px ${
-            activeTab === key
-              ? "border-primary text-primary"
-              : "border-transparent text-muted-foreground hover:text-foreground"
-          }`}
-        >
-          {label}
-        </button>
-      ))}
+    <div className="mb-6">
+      <GlassTabs
+        tabs={[
+          { key: "overview", label: "Overview" },
+          { key: "subscriptions", label: "Subscriptions" },
+        ]}
+        activeKey={activeTab}
+        onChange={(key) => setActiveTab(key as typeof activeTab)}
+      />
     </div>
 
     {/* ── Overview Tab ──────────────────────────────────────── */}

@@ -14,6 +14,7 @@ import { WebsiteChannelCard } from "@/components/WebsiteChannelCard";
 import { LoadingIndicator } from "@/components/LoadingIndicator";
 import { useCalendly } from "@/hooks/use-calendly";
 import { DateRangePicker as SharedDateRangePicker, type DateRangeValue } from "@/components/DateRangePicker";
+import { GlassTabs } from "@/components/ui/glass-tabs";
 
 // ── Date range helpers ───────────────────────────────────────────────────────
 
@@ -153,24 +154,14 @@ export default function MarketingDashboard() {
     <div className="p-6 max-w-7xl mx-auto space-y-6">
 
       {/* ══ Tabs ══════════════════════════════════════════════════════════ */}
-      <div className="flex gap-1 border-b border-border">
-        {[
+      <GlassTabs
+        tabs={[
           { key: "overview", label: "Overview" },
           { key: "booking-tracker", label: "Booking KPI Tracker" },
-        ].map(({ key, label }) => (
-          <button
-            key={key}
-            onClick={() => setActiveTab(key as typeof activeTab)}
-            className={`px-4 py-2 text-sm font-medium transition-colors border-b-2 -mb-px ${
-              activeTab === key
-                ? "border-primary text-primary"
-                : "border-transparent text-muted-foreground hover:text-foreground"
-            }`}
-          >
-            {label}
-          </button>
-        ))}
-      </div>
+        ]}
+        activeKey={activeTab}
+        onChange={(key) => setActiveTab(key as typeof activeTab)}
+      />
 
       {/* ══ Booking KPI Tracker ═══════════════════════════════════════════ */}
       {activeTab === "booking-tracker" && <BookingKPITracker />}

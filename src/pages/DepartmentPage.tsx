@@ -15,6 +15,7 @@ import { CompetitorsDashboard } from "@/components/CompetitorsDashboard";
 import { ContentOverview } from "@/components/ContentOverview";
 import { SalesTrackingPage } from "@/components/SalesTrackingPage";
 import { LayoutDashboard, BarChart3, Shield, Trophy, HeadphonesIcon, DollarSign, Swords, Megaphone } from "lucide-react";
+import { GlassTabs } from "@/components/ui/glass-tabs";
 
 const slugToDepartment: Record<string, Department> = {
   "finance": "Finance",
@@ -108,25 +109,15 @@ function DepartmentPageInner() {
 
       {/* ── Tab Toggle ────────────────────────────────────── */}
       {!isMarketing && !isFinance && !isSales && (
-        <div className="inline-flex items-center gap-0.5 rounded-full p-0.5 bg-gradient-to-b from-white/[0.06] to-white/[0.02] dark:from-white/[0.05] dark:to-white/[0.01] backdrop-blur-xl ring-1 ring-black/5 dark:ring-white/10 shadow-[inset_0_1px_0_0_rgba(255,255,255,0.08)]">
-          {(isProduct ? productTabs : isContent ? contentTabs : tabs).map((tab) => {
-            const Icon = tab.icon;
-            return (
-              <button
-                key={tab.id}
-                onClick={() => setActiveTab(tab.id)}
-                className={`flex items-center gap-2 px-4 py-2 rounded-full text-sm font-medium transition-colors ${
-                  activeTab === tab.id
-                    ? "bg-white/15 text-foreground"
-                    : "text-muted-foreground hover:text-foreground"
-                }`}
-              >
-                <Icon className="h-4 w-4" />
-                {tab.label}
-              </button>
-            );
-          })}
-        </div>
+        <GlassTabs
+          tabs={(isProduct ? productTabs : isContent ? contentTabs : tabs).map((t) => ({
+            key: t.id,
+            label: t.label,
+            icon: <t.icon className="h-4 w-4" />,
+          }))}
+          activeKey={activeTab}
+          onChange={(key) => setActiveTab(key as Tab)}
+        />
       )}
 
       {/* ── Tab Content ───────────────────────────────────── */}
