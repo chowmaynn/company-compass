@@ -375,19 +375,19 @@ function NavPill({ title, url, icon: Icon, isActive, counts, metrics, isHovered,
             {showCounts && counts && (
               <>
                 <span className="flex items-center gap-2 text-[11px] font-semibold">
-                  <span className="text-red-400">
+                  <span className="text-red-600 dark:text-red-400">
                     {counts.offTrack} <span className="font-medium">Off Track</span>
                   </span>
                   <span className="text-muted-foreground/50">·</span>
-                  <span className="text-amber-300">
+                  <span className="text-amber-600 dark:text-amber-300">
                     {counts.behind} <span className="font-medium">Behind</span>
                   </span>
                   <span className="text-muted-foreground/50">·</span>
-                  <span className="text-emerald-400">
+                  <span className="text-emerald-600 dark:text-emerald-400">
                     {counts.onTrack} <span className="font-medium">On Track</span>
                   </span>
                   <span className="text-muted-foreground/50">·</span>
-                  <span className="text-sky-400">
+                  <span className="text-sky-600 dark:text-sky-400">
                     {counts.ahead} <span className="font-medium">Ahead</span>
                   </span>
                 </span>
@@ -408,10 +408,10 @@ function NavPill({ title, url, icon: Icon, isActive, counts, metrics, isHovered,
 }
 
 const STATUS_GROUPS: { key: Metric["status"]; label: string; color: string; dot: string }[] = [
-  { key: "red", label: "Off Track", color: "text-red-400", dot: "bg-red-400" },
-  { key: "yellow", label: "Behind", color: "text-amber-300", dot: "bg-amber-300" },
-  { key: "green", label: "On Track", color: "text-emerald-400", dot: "bg-emerald-400" },
-  { key: "light-green", label: "Ahead", color: "text-sky-400", dot: "bg-sky-400" },
+  { key: "red", label: "Off Track", color: "text-red-600 dark:text-red-400", dot: "bg-red-500" },
+  { key: "yellow", label: "Behind", color: "text-amber-600 dark:text-amber-300", dot: "bg-amber-500" },
+  { key: "green", label: "On Track", color: "text-emerald-600 dark:text-emerald-400", dot: "bg-emerald-500" },
+  { key: "light-green", label: "Ahead", color: "text-sky-600 dark:text-sky-400", dot: "bg-sky-500" },
 ];
 
 function MetricDropdown({ metrics, rect }: { metrics: Metric[]; rect: DOMRect }) {
