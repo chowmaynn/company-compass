@@ -121,7 +121,7 @@ function SpeedometerCard({
           )}
           {pct !== null && (
             <span className={`text-xs font-mono font-semibold mt-0.5 ${
-              pct >= 80 ? "text-emerald-400" : pct >= 50 ? "text-amber-300" : "text-red-400"
+              pct >= 80 ? "text-emerald-600 dark:text-emerald-400" : pct >= 50 ? "text-amber-600 dark:text-amber-300" : "text-red-600 dark:text-red-400"
             }`}>
               {Math.round(pct)}%
             </span>
@@ -879,7 +879,7 @@ function NorthStarsCard() {
             }}
           />
           <div className="flex items-center gap-3 pt-1">
-            <button onClick={handleAdd} disabled={!newTitle.trim()} className="text-xs font-medium text-amber-400 hover:text-amber-300 disabled:opacity-30 disabled:pointer-events-none transition-colors">Add</button>
+            <button onClick={handleAdd} disabled={!newTitle.trim()} className="text-xs font-medium text-amber-400 hover:text-amber-600 dark:text-amber-300 disabled:opacity-30 disabled:pointer-events-none transition-colors">Add</button>
             <button onClick={() => { setShowAdd(false); setNewTitle(""); setNewDesc(""); }} className="text-xs text-muted-foreground hover:text-foreground transition-colors">Cancel</button>
           </div>
         </div>
@@ -966,7 +966,7 @@ function NorthStarsCard() {
                           }}
                         />
                         <div className="flex gap-3 pt-0.5">
-                          <button onClick={saveEdit} className="text-[10px] font-medium text-amber-400 hover:text-amber-300">Save</button>
+                          <button onClick={saveEdit} className="text-[10px] font-medium text-amber-400 hover:text-amber-600 dark:text-amber-300">Save</button>
                           <button onClick={() => setEditingId(null)} className="text-[10px] text-muted-foreground hover:text-foreground">Cancel</button>
                         </div>
                       </div>
@@ -1079,9 +1079,9 @@ function StatusSelect({
   }, [open]);
 
   const statusStyle = (s: string) =>
-    s === "On-Track" ? "text-emerald-400 bg-emerald-500/10"
-      : s === "Behind" ? "text-amber-300 bg-amber-500/10"
-      : s === "Accomplished" ? "text-blue-400 bg-blue-500/10"
+    s === "On-Track" ? "text-emerald-600 dark:text-emerald-400 bg-emerald-500/10"
+      : s === "Behind" ? "text-amber-600 dark:text-amber-300 bg-amber-500/10"
+      : s === "Accomplished" ? "text-blue-600 dark:text-blue-400 bg-blue-500/10"
       : "text-red-400 bg-red-500/10";
 
   const options: InitiativeStatus[] = ["Not Started", "On-Track", "Behind", "Accomplished"];
@@ -1186,9 +1186,9 @@ function QuarterlyInitiativesCard({ activeId, onToggle }: { activeId: string | n
   if (loading) return null;
 
   const statusStyle = (s: string) =>
-    s === "On-Track" ? "text-emerald-400 bg-emerald-500/10"
-      : s === "Behind" ? "text-amber-300 bg-amber-500/10"
-      : s === "Accomplished" ? "text-blue-400 bg-blue-500/10"
+    s === "On-Track" ? "text-emerald-600 dark:text-emerald-400 bg-emerald-500/10"
+      : s === "Behind" ? "text-amber-600 dark:text-amber-300 bg-amber-500/10"
+      : s === "Accomplished" ? "text-blue-600 dark:text-blue-400 bg-blue-500/10"
       : "text-red-400 bg-red-500/10";
 
   const statusDot = (s: string) =>
@@ -1337,10 +1337,10 @@ function QuarterlyInitiativesCard({ activeId, onToggle }: { activeId: string | n
             <p className="text-[11px] text-muted-foreground flex items-center gap-2">
               {(() => {
                 const segments: React.ReactNode[] = [];
-                if (counts.offTrack > 0) segments.push(<span key="off" className="text-red-400">{counts.offTrack} Off Track</span>);
-                if (counts.behind > 0) segments.push(<span key="beh" className="text-amber-300">{counts.behind} Behind</span>);
-                if (counts.onTrack > 0) segments.push(<span key="on" className="text-emerald-400">{counts.onTrack} On Track</span>);
-                if (counts.accomplished > 0) segments.push(<span key="acc" className="text-blue-400">{counts.accomplished} Done</span>);
+                if (counts.offTrack > 0) segments.push(<span key="off" className="text-red-600 dark:text-red-400">{counts.offTrack} Off Track</span>);
+                if (counts.behind > 0) segments.push(<span key="beh" className="text-amber-600 dark:text-amber-300">{counts.behind} Behind</span>);
+                if (counts.onTrack > 0) segments.push(<span key="on" className="text-emerald-600 dark:text-emerald-400">{counts.onTrack} On Track</span>);
+                if (counts.accomplished > 0) segments.push(<span key="acc" className="text-blue-600 dark:text-blue-400">{counts.accomplished} Done</span>);
                 if (segments.length === 0) return <span>No initiatives yet</span>;
                 return segments.flatMap((seg, idx) =>
                   idx === 0 ? [seg] : [<span key={`sep-${idx}`} className="text-muted-foreground/40">·</span>, seg]
