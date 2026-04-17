@@ -747,9 +747,9 @@ function FunnelCard({ stage, emphasized }: { stage: Stage; emphasized?: boolean 
     <div
       className={[
         "relative rounded-lg px-4 py-5 transition-all",
-        "bg-gradient-to-b from-black/40 to-black/60",
-        "ring-1 ring-white/10",
-        "shadow-[inset_0_1px_0_0_rgba(255,255,255,0.05),0_2px_12px_-4px_rgba(0,0,0,0.4)]",
+        "bg-gradient-to-b from-black/[0.04] to-black/[0.08] dark:from-black/40 dark:to-black/60",
+        "ring-1 ring-black/15 dark:ring-white/10",
+        "shadow-[inset_0_1px_0_0_rgba(0,0,0,0.04),0_2px_12px_-4px_rgba(0,0,0,0.1)] dark:shadow-[inset_0_1px_0_0_rgba(255,255,255,0.05),0_2px_12px_-4px_rgba(0,0,0,0.4)]",
         isPlaceholder && "opacity-50",
       ].filter(Boolean).join(" ")}
     >
@@ -773,7 +773,7 @@ function FunnelCard({ stage, emphasized }: { stage: Stage; emphasized?: boolean 
       </div>
 
       {/* Level meter — horizontal track + gradient fill + glowing knob (or shimmer when loading) */}
-      <div className={`relative h-2 rounded-full bg-white/5 ring-1 ring-black/40 ${isLoading ? "overflow-hidden" : "overflow-visible"}`}>
+      <div className={`relative h-2 rounded-full bg-black/[0.06] dark:bg-white/5 ring-1 ring-black/15 dark:ring-black/40 ${isLoading ? "overflow-hidden" : "overflow-visible"}`}>
         {/* Loading shimmer */}
         {isLoading && (
           <div
@@ -795,7 +795,7 @@ function FunnelCard({ stage, emphasized }: { stage: Stage; emphasized?: boolean 
         {/* Knob at the actual position */}
         {!isPlaceholder && !isLoading && hasTarget && (
           <div
-            className={`absolute top-1/2 -translate-y-1/2 -translate-x-1/2 h-3 w-3 rounded-full ${knobBg} ring-2 ring-black/40`}
+            className={`absolute top-1/2 -translate-y-1/2 -translate-x-1/2 h-3 w-3 rounded-full ${knobBg} ring-2 ring-black/20 dark:ring-black/40`}
             style={{
               left: `${pct}%`,
               boxShadow: `0 0 0 2px rgba(255,255,255,0.15)`,
@@ -822,9 +822,9 @@ function FunnelLevel({ widthClass, children }: { widthClass: string; children: R
       <div
         className={[
           "rounded-xl px-3 py-3",
-          "bg-gradient-to-b from-white/[0.03] to-white/[0.01] dark:from-white/[0.025] dark:to-white/[0.005]",
-          "backdrop-blur-xl ring-1 ring-white/5",
-          "shadow-[inset_0_1px_0_0_rgba(255,255,255,0.05)]",
+          "bg-gradient-to-b from-black/[0.03] to-black/[0.01] dark:from-white/[0.03] dark:to-white/[0.01]",
+          "backdrop-blur-xl ring-1 ring-black/10 dark:ring-white/5",
+          "shadow-[inset_0_1px_0_0_rgba(0,0,0,0.03)] dark:shadow-[inset_0_1px_0_0_rgba(255,255,255,0.05)]",
         ].join(" ")}
       >
         {children}
