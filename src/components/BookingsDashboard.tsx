@@ -65,7 +65,7 @@ export function BookingsDashboard({ from, to, showRate }: {
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-5">
 
         {/* Daily trend */}
-        <Card className="card-shadow">
+        <Card className="">
           <CardContent className="p-6">
             <p className="text-xs font-semibold text-muted-foreground uppercase tracking-widest mb-5">Daily Trend</p>
             {(() => {
@@ -99,7 +99,7 @@ export function BookingsDashboard({ from, to, showRate }: {
         </Card>
 
         {/* Qualified by source */}
-        <Card className="card-shadow">
+        <Card className="">
           <CardContent className="p-6">
             <p className="text-xs font-semibold text-muted-foreground uppercase tracking-widest mb-5">Qualified by Source</p>
             {isLoading ? (

@@ -15,12 +15,13 @@ const departmentIcons: Record<Department, React.ElementType> = {
   "Product": Users,
 };
 
-const departmentColors: Record<Department, string> = {
-  "Finance": "from-primary/20 to-transparent border-primary/30",
-  Content: "from-primary/20 to-transparent border-primary/30",
-  Marketing: "from-primary/20 to-transparent border-primary/30",
-  Sales: "from-primary/20 to-transparent border-primary/30",
-  "Product": "from-primary/20 to-transparent border-primary/30",
+// Glass-style header — matches Dashboard card aesthetic
+const _departmentColors: Record<Department, string> = {
+  "Finance": "",
+  Content: "",
+  Marketing: "",
+  Sales: "",
+  "Product": "",
 };
 
 interface DepartmentSectionProps {
@@ -35,7 +36,7 @@ interface DepartmentSectionProps {
 
 export function DepartmentSection({ department, metrics, onMetricChange, showCharts, readOnlyMetrics, needsAuth, month }: DepartmentSectionProps) {
   const Icon = departmentIcons[department];
-  const colorClass = departmentColors[department];
+  void _departmentColors; // kept for reference
   const { currency, rate } = useCurrency();
   const { canEdit } = useAuth();
   const isFinance = department === "Finance";
@@ -50,7 +51,7 @@ export function DepartmentSection({ department, metrics, onMetricChange, showCha
 
   return (
     <div className="space-y-4">
-      <div className={`flex items-center gap-3 rounded-lg border bg-gradient-to-r p-4 ${colorClass}`}>
+      <div className="flex items-center gap-3 rounded-xl p-4 bg-gradient-to-b from-white/[0.06] to-white/[0.02] dark:from-white/[0.05] dark:to-white/[0.01] backdrop-blur-xl ring-1 ring-black/5 dark:ring-white/10 shadow-[inset_0_1px_0_0_rgba(255,255,255,0.08),0_2px_12px_-4px_rgba(0,0,0,0.2)]">
         <Icon className="h-5 w-5 text-foreground" />
         <h2 className="text-lg font-bold tracking-tight text-foreground">{department}</h2>
         <div className="ml-auto flex items-center gap-2">

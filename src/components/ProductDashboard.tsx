@@ -281,7 +281,7 @@ export function ProductDashboard() {
     <div className="space-y-5">
 
       {/* ── NPS Card ─────────────────────────────────────────── */}
-      <Card className="card-shadow">
+      <Card className="">
         <CardContent className="p-5">
           <div className="flex items-center gap-2 mb-5">
             <div className="h-8 w-8 rounded-lg bg-amber-100 text-amber-600 flex items-center justify-center">
@@ -415,7 +415,7 @@ export function ProductDashboard() {
       </Card>
 
       {/* ── Community Card ───────────────────────────────────── */}
-      <Card className="card-shadow">
+      <Card className="">
         <CardContent className="p-5">
           <div className="flex items-center justify-between mb-5">
             <div className="flex items-center gap-2">

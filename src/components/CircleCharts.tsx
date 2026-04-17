@@ -20,7 +20,7 @@ import { GRID, TICK, TOOLTIP_STYLE } from "@/lib/chart-theme";
 
 function ChartCard({ title, sub, children }: { title: string; sub?: string; children: React.ReactNode }) {
   return (
-    <Card className="card-shadow">
+    <Card className="">
       <CardContent className="p-5">
         <div className="mb-4">
           <h3 className="text-sm font-semibold text-foreground">{title}</h3>

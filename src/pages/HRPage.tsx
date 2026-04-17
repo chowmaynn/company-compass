@@ -6,7 +6,6 @@ import { LoadingIndicator } from "@/components/LoadingIndicator";
 export default function HRPage() {
   const { pins: directoryPins, loading } = useTeamDirectory();
 
-  // Map directory pins to the globe's TeamPin shape
   const globePins: TeamPin[] = useMemo(
     () =>
       directoryPins.map((p) => ({
@@ -21,8 +20,14 @@ export default function HRPage() {
 
   return (
     <div className="h-[calc(100vh-4rem)] w-full overflow-hidden relative">
+      {/* Centered heading overlay */}
+      <div className="absolute inset-0 flex flex-col items-center justify-center z-10 pointer-events-none">
+        <h1 className="text-4xl font-bold text-foreground uppercase tracking-widest">Coming Soon</h1>
+        <p className="text-sm text-muted-foreground mt-2">HR page buildout</p>
+      </div>
+
       {loading && (
-        <div className="absolute inset-0 flex items-center justify-center z-10">
+        <div className="absolute inset-0 flex items-center justify-center z-20">
           <LoadingIndicator size={32} className="text-muted-foreground" />
         </div>
       )}

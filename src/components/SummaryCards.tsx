@@ -65,7 +65,7 @@ export function SummaryCards({ metrics, onCardClick }: SummaryCardsProps) {
         <div
           key={card.label}
           onClick={() => onCardClick?.(card.filter)}
-          className={`rounded-xl border border-border bg-card p-5 card-shadow transition-all ${card.border} ${onCardClick ? "cursor-pointer" : ""}`}
+          className={`rounded-xl p-5 transition-all bg-gradient-to-b from-white/[0.06] to-white/[0.02] dark:from-white/[0.05] dark:to-white/[0.01] backdrop-blur-xl ring-1 ring-black/5 dark:ring-white/10 shadow-[inset_0_1px_0_0_rgba(255,255,255,0.08),0_2px_12px_-4px_rgba(0,0,0,0.2)] ${card.border} ${onCardClick ? "cursor-pointer" : ""}`}
         >
           <div className="flex items-center justify-between">
             <p className="text-sm font-medium text-muted-foreground">{card.label}</p>
