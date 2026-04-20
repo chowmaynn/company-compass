@@ -104,19 +104,28 @@ export function useFocusBoard(weekStartOverride?: string) {
   });
 
   // ── Carry-over logic (only for current week) ────────────
+  // Idempotent: re-fetches from DB (bypasses React Query cache) before creating
+  // to prevent duplicates on page refresh or React StrictMode double-mount.
   useEffect(() => {
     if (!isCurrentWeek || !userId || !fociQuery.data || carryOverDone.current) return;
     carryOverDone.current = true;
 
-    const myItems = fociQuery.data.filter((f) => f.user_id === userId);
-    if (myItems.length > 0) return; // Already have items this week
-
     (async () => {
+      // Fresh DB check — don't rely on possibly-stale React Query cache
+      const freshItems = await fetchFociForWeek(weekStart);
+      const myItems = freshItems.filter((f) => f.user_id === userId);
+      if (myItems.length > 0) return; // Already have items this week (from previous carry-over or manual add)
+
       const previous = await fetchIncompletePreviousFoci(weekStart, userId);
       if (previous.length === 0) return;
 
+      // Double-check: ensure none of these have already been carried over
+      const alreadyCarried = new Set(myItems.filter((f) => f.carried_over_from).map((f) => f.carried_over_from));
+      const toCarry = previous.filter((item) => !alreadyCarried.has(item.id));
+      if (toCarry.length === 0) return;
+
       await Promise.all(
-        previous.map((item) =>
+        toCarry.map((item) =>
           createFocusItem({
             user_id: userId,
             user_email: userEmail,
