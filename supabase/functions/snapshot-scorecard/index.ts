@@ -296,6 +296,44 @@ Deno.serve(async (req) => {
 
   allLogs.push(...kitLogs, ...notionLogs, ...bitlyLogs);
 
+  // ── Aggregate monthly totals ─────────────────────────────────
+  // Sum w1–w4 + catchup into monthly_actual for all metrics written by this function.
+  // This keeps the scorecard's "Monthly" column up to date automatically.
+  const snapshotMetrics = [
+    "Videos posted last week",
+    "Videos in the backlog",
+    "Emails Sent",
+    "Email Clicks",
+    "Clicks: YouTube > Skool",
+    "Clicks: YouTube > Accelerator",
+    "Clicks: Skool > Accelerator",
+    "Clicks: Webinar",
+  ];
+
+  for (const metric of snapshotMetrics) {
+    try {
+      const { data: row } = await supabase
+        .from("scorecard")
+        .select("catchup_actual, w1_actual, w2_actual, w3_actual, w4_actual")
+        .eq("metric", metric)
+        .eq("month", CURRENT_MONTH)
+        .single();
+
+      if (row) {
+        const parse = (v: string | null) => {
+          if (!v || v === "—" || v === "") return 0;
+          const n = parseFloat(v.replace(/[,$%]/g, ""));
+          return isNaN(n) ? 0 : n;
+        };
+        const total = parse(row.catchup_actual) + parse(row.w1_actual) + parse(row.w2_actual) + parse(row.w3_actual) + parse(row.w4_actual);
+        const ok = await writeMetric(metric, "monthly_actual", String(total));
+        allLogs.push(`${metric} monthly_actual = ${total} (${ok ? "ok" : "FAIL"})`);
+      }
+    } catch (err) {
+      allLogs.push(`${metric} monthly aggregate error: ${err}`);
+    }
+  }
+
   const result = {
     week: weekNum,
     column,
