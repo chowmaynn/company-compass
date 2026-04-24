@@ -1542,6 +1542,7 @@ function shiftWeek(weekStart: string, delta: number): string {
 const TEAM_LOCATIONS = [
   { name: "Adam",     city: "Orlando",  tz: "America/New_York" },
   { name: "Nicholay", city: "Bali",     tz: "Asia/Makassar" },
+  { name: "Liam",     city: "Bali",     tz: "Asia/Makassar" },
   { name: "Casey",    city: "Auckland", tz: "Pacific/Auckland" },
   { name: "Josh",     city: "Auckland", tz: "Pacific/Auckland" },
   { name: "Lana",     city: "Auckland", tz: "Pacific/Auckland" },
