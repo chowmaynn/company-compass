@@ -54,6 +54,12 @@ export function getCurrentQuarter(): string {
 
 // ── Hook ─────────────────────────────────────────────────────
 
+// Module-level lock: useFocusBoard mounts from multiple components at once.
+// Without a shared lock, each instance's per-instance ref guard fires its own
+// carry-over concurrently, racing the fresh-DB check and creating duplicates.
+// Keyed by `${userId}:${weekStart}` so different users/weeks don't block each other.
+const carryOverLocks = new Map<string, Promise<void>>();
+
 export function useFocusBoard(weekStartOverride?: string) {
   const { user } = useAuth();
   const queryClient = useQueryClient();
@@ -110,17 +116,22 @@ export function useFocusBoard(weekStartOverride?: string) {
     if (!isCurrentWeek || !userId || !fociQuery.data || carryOverDone.current) return;
     carryOverDone.current = true;
 
-    (async () => {
-      // Fresh DB check — don't rely on possibly-stale React Query cache
+    const lockKey = `${userId}:${weekStart}`;
+    const existing = carryOverLocks.get(lockKey);
+    if (existing) {
+      existing.then(() => queryClient.invalidateQueries({ queryKey: ["focus-board", weekStart] }));
+      return;
+    }
+
+    const run = (async () => {
       const freshItems = await fetchFociForWeek(weekStart);
       const myItems = freshItems.filter((f) => f.user_id === userId);
-      if (myItems.length > 0) return; // Already have items this week (from previous carry-over or manual add)
+      if (myItems.length > 0) return;
 
       const previous = await fetchIncompletePreviousFoci(weekStart, userId);
       if (previous.length === 0) return;
 
-      // Double-check: ensure none of these have already been carried over
-      const alreadyCarried = new Set(myItems.filter((f) => f.carried_over_from).map((f) => f.carried_over_from));
+      const alreadyCarried = new Set(freshItems.filter((f) => f.carried_over_from).map((f) => f.carried_over_from));
       const toCarry = previous.filter((item) => !alreadyCarried.has(item.id));
       if (toCarry.length === 0) return;
 
@@ -139,7 +150,9 @@ export function useFocusBoard(weekStartOverride?: string) {
 
       queryClient.invalidateQueries({ queryKey: ["focus-board", weekStart] });
     })();
-  }, [userId, fociQuery.data, weekStart, userEmail, queryClient]);
+
+    carryOverLocks.set(lockKey, run);
+  }, [userId, fociQuery.data, weekStart, isCurrentWeek, userEmail, queryClient]);
 
   // ── Focus Item Mutations ────────────────────────────────
 
