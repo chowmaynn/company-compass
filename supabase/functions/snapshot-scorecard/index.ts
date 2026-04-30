@@ -321,8 +321,11 @@ async function snapshotTallyNps(weekIndex: number, column: string): Promise<stri
       return logs;
     }
 
+    // Snapshot semantics: cumulative all-time NPS as of Sunday 23:59 NZ of the
+    // snapshot week. Each weekly column is a historical photograph of the
+    // all-time score frozen at week-end — matches what the Product page shows
+    // when no date range is selected, just with a cutoff.
     const wc = WEEK_CONFIGS[weekIndex];
-    const start = new Date(wc.start);
     const end = new Date(wc.end);
 
     for (const form of npsForms) {
@@ -335,7 +338,7 @@ async function snapshotTallyNps(weekIndex: number, column: string): Promise<stri
       let promoters = 0, detractors = 0, scored = 0;
       for (const s of submissions) {
         const d = new Date(s.submittedAt);
-        if (d < start || d >= end) continue;
+        if (d >= end) continue;
         const score = detectNpsScore(s);
         if (score === null) continue;
         scored++;
@@ -350,7 +353,7 @@ async function snapshotTallyNps(weekIndex: number, column: string): Promise<stri
 
       const nps = parseFloat(((promoters - detractors) / scored * 100).toFixed(1));
       const ok = await writeMetric(metric, column, String(nps));
-      logs.push(`${metric} → ${column} = ${nps} (${scored} responses, ${ok ? "ok" : "FAIL"})`);
+      logs.push(`${metric} → ${column} = ${nps} (${scored} cumulative responses, ${ok ? "ok" : "FAIL"})`);
     }
   } catch (err) {
     logs.push(`Tally NPS error: ${err}`);
