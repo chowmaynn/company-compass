@@ -374,7 +374,9 @@ export function useScorecard(month: string = DEFAULT_MONTH) {
       let updated = m;
       const source = API_METRIC_MAP[m.name];
 
-      // NPS: fill current and past weeks + catch-up with the all-time NPS score
+      // NPS: only overlay the live score into the active week (and catch-up).
+      // Past weeks read their frozen w{N}_actual snapshot from Supabase — written
+      // by the snapshot-scorecard edge function, same pattern as Bitly/Kit/Notion.
       if (m.name === "NPS Score - 2 months" || m.name === "NPS Score - 6 Months") {
         const field = m.name.includes("2") ? "2 months" : "6 months";
         const match = tallyNps.results.find((r) =>
@@ -382,13 +384,12 @@ export function useScorecard(month: string = DEFAULT_MONTH) {
         );
         if (match && !match.loading) {
           const score = match.score;
-          const newWeeks = [...m.weeks];
-          // Fill weeks up to and including current week (or all weeks for past months)
-          const maxWeek = isCurrentMonth ? Math.min(cwi, 3) : 3;
-          for (let w = 0; w <= maxWeek; w++) {
-            newWeeks[w] = { ...newWeeks[w], actual: score };
+          if (shouldOverlayWeek) {
+            updated = { ...m, weeks: [...m.weeks] };
+            updated.weeks[cwi] = { ...updated.weeks[cwi], actual: score };
+          } else if (isCatchUp) {
+            updated = { ...m, catchUp: { ...m.catchUp, actual: score } };
           }
-          updated = { ...m, weeks: newWeeks, catchUp: { ...m.catchUp, actual: score } };
         }
       }
 

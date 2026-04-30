@@ -11,6 +11,7 @@ const KIT_API_KEY = Deno.env.get("KIT_API_KEY")!;
 const NOTION_API_KEY = Deno.env.get("NOTION_API_KEY")!;
 const NOTION_CONTENT_DB = Deno.env.get("NOTION_CONTENT_DB")!;
 const BITLY_TOKEN = Deno.env.get("BITLY_TOKEN")!;
+const TALLY_TOKEN = Deno.env.get("TALLY_TOKEN")!;
 
 const supabase = createClient(SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY);
 
@@ -26,12 +27,12 @@ function getCurrentMonth(): string {
   return `${nzNow.getUTCFullYear()}-${String(nzNow.getUTCMonth() + 1).padStart(2, "0")}`;
 }
 
-/** Generate Monday-aligned week boundaries for the current month in NZ time */
-function generateWeekConfigs() {
+/** Generate Monday-aligned week boundaries for the given YYYY-MM in NZ time */
+function generateWeekConfigsFor(yyyyMm: string) {
   const offset = nzOffsetHours();
-  const nzNow = new Date(Date.now() + offset * 3600000);
-  const year = nzNow.getUTCFullYear();
-  const month = nzNow.getUTCMonth();
+  const [yStr, mStr] = yyyyMm.split("-");
+  const year = parseInt(yStr, 10);
+  const month = parseInt(mStr, 10) - 1;
 
   const firstOfMonth = new Date(Date.UTC(year, month, 1));
   const dow = firstOfMonth.getUTCDay();
@@ -55,8 +56,9 @@ function generateWeekConfigs() {
   return configs;
 }
 
-const WEEK_CONFIGS = generateWeekConfigs();
-const CURRENT_MONTH = getCurrentMonth();
+// Mutable so the handler can override for backfill of historical months.
+let WEEK_CONFIGS = generateWeekConfigsFor(getCurrentMonth());
+let CURRENT_MONTH = getCurrentMonth();
 
 function getCompletedWeekIndex(): number {
   const now = new Date();
@@ -270,10 +272,111 @@ async function snapshotBitly(weekIndex: number, column: string): Promise<string[
   return logs;
 }
 
+// --- Tally API: NPS Score (per-week snapshot) ---
+interface TallyResponse { questionId: string; answer: unknown }
+interface TallySubmission { id: string; submittedAt: string; responses: TallyResponse[] }
+
+async function tallyFetch<T>(path: string): Promise<T | null> {
+  const res = await fetch(`https://api.tally.so${path}`, {
+    headers: { Authorization: `Bearer ${TALLY_TOKEN}`, Accept: "application/json" },
+  });
+  if (!res.ok) return null;
+  return res.json();
+}
+
+async function fetchAllTallySubmissions(formId: string): Promise<TallySubmission[]> {
+  const all: TallySubmission[] = [];
+  let page = 1;
+  while (true) {
+    const data = await tallyFetch<{ hasMore: boolean; submissions: TallySubmission[] }>(
+      `/forms/${formId}/submissions?page=${page}&limit=100`
+    );
+    if (!data) break;
+    all.push(...data.submissions);
+    if (!data.hasMore) break;
+    page++;
+  }
+  return all;
+}
+
+function detectNpsScore(s: TallySubmission): number | null {
+  for (const r of s.responses) {
+    const v = Number(r.answer);
+    if (!isNaN(v) && v >= 0 && v <= 10) return v;
+  }
+  return null;
+}
+
+async function snapshotTallyNps(weekIndex: number, column: string): Promise<string[]> {
+  const logs: string[] = [];
+  try {
+    const formsData = await tallyFetch<{ items: { id: string; name: string }[] }>(`/forms?page=1&limit=100`);
+    if (!formsData) {
+      logs.push("Tally forms fetch failed");
+      return logs;
+    }
+    const npsForms = formsData.items.filter((f) => f.name.toLowerCase().includes("nps score tracking"));
+    if (npsForms.length === 0) {
+      logs.push("No NPS Score Tracking forms found");
+      return logs;
+    }
+
+    const wc = WEEK_CONFIGS[weekIndex];
+    const start = new Date(wc.start);
+    const end = new Date(wc.end);
+
+    for (const form of npsForms) {
+      const isTwo = form.name.toLowerCase().includes("2 months");
+      const isSix = form.name.toLowerCase().includes("6 months");
+      if (!isTwo && !isSix) continue;
+      const metric = isTwo ? "NPS Score - 2 months" : "NPS Score - 6 Months";
+
+      const submissions = await fetchAllTallySubmissions(form.id);
+      let promoters = 0, detractors = 0, scored = 0;
+      for (const s of submissions) {
+        const d = new Date(s.submittedAt);
+        if (d < start || d >= end) continue;
+        const score = detectNpsScore(s);
+        if (score === null) continue;
+        scored++;
+        if (score >= 9) promoters++;
+        else if (score <= 6) detractors++;
+      }
+
+      if (scored === 0) {
+        logs.push(`${metric} → ${column}: 0 responses, skipped`);
+        continue;
+      }
+
+      const nps = parseFloat(((promoters - detractors) / scored * 100).toFixed(1));
+      const ok = await writeMetric(metric, column, String(nps));
+      logs.push(`${metric} → ${column} = ${nps} (${scored} responses, ${ok ? "ok" : "FAIL"})`);
+    }
+  } catch (err) {
+    logs.push(`Tally NPS error: ${err}`);
+  }
+  return logs;
+}
+
 // --- Main handler ---
 Deno.serve(async (req) => {
-  // Allow manual trigger via POST or cron trigger
-  const completedIdx = getCompletedWeekIndex();
+  // Backfill / manual override: POST { month: "YYYY-MM", weekIndex: 0..3 }
+  // overrides CURRENT_MONTH and the auto-detected completed week so the same
+  // function can backfill historical weeks.
+  let overrideMonth: string | null = null;
+  let overrideWeekIdx: number | null = null;
+  if (req.method === "POST") {
+    try {
+      const body = await req.json();
+      if (typeof body?.month === "string" && /^\d{4}-\d{2}$/.test(body.month)) overrideMonth = body.month;
+      if (typeof body?.weekIndex === "number" && body.weekIndex >= 0 && body.weekIndex < 4) overrideWeekIdx = body.weekIndex;
+    } catch {
+      // no body — fall through to cron behaviour
+    }
+  }
+
+  const completedIdx = overrideWeekIdx ?? getCompletedWeekIndex();
+  const targetMonth = overrideMonth ?? CURRENT_MONTH;
 
   if (completedIdx < 0 || completedIdx >= 4) {
     return new Response(JSON.stringify({ message: "No completed week to snapshot" }), {
@@ -282,19 +385,27 @@ Deno.serve(async (req) => {
     });
   }
 
+  // When backfilling a different month, override the module-level WEEK_CONFIGS
+  // and CURRENT_MONTH that the snapshot* helpers and writeMetric read.
+  if (overrideMonth) {
+    CURRENT_MONTH = targetMonth;
+    WEEK_CONFIGS = generateWeekConfigsFor(targetMonth);
+  }
+
   const weekNum = completedIdx + 1;
   const column = `w${weekNum}_actual`;
-  console.log(`[Snapshot] Snapshotting week ${weekNum} (${column})`);
+  console.log(`[Snapshot] Snapshotting ${targetMonth} week ${weekNum} (${column})`);
 
   const allLogs: string[] = [];
 
-  const [kitLogs, notionLogs, bitlyLogs] = await Promise.all([
+  const [kitLogs, notionLogs, bitlyLogs, npsLogs] = await Promise.all([
     snapshotKit(completedIdx, column),
     snapshotNotion(completedIdx, column),
     snapshotBitly(completedIdx, column),
+    snapshotTallyNps(completedIdx, column),
   ]);
 
-  allLogs.push(...kitLogs, ...notionLogs, ...bitlyLogs);
+  allLogs.push(...kitLogs, ...notionLogs, ...bitlyLogs, ...npsLogs);
 
   // ── Aggregate monthly totals ─────────────────────────────────
   // Sum w1–w4 + catchup into monthly_actual for all metrics written by this function.

@@ -375,6 +375,13 @@ deno_version = 2
 # function still enforces apikey and uses SUPABASE_SERVICE_ROLE_KEY internally.
 verify_jwt = false
 
+[functions.snapshot-scorecard]
+# Disable JWT verification — Supabase auth tokens are ES256-signed (new format)
+# but the edge runtime's built-in verifier only supports HS256/RS256. Same
+# rationale as chat-transcripts. Invoked by pg_cron and by the nps-backfill
+# script with the service role key in the apikey header.
+verify_jwt = false
+
 [functions.fireflies-webhook]
 # Disable JWT verification — Fireflies sends webhook POSTs with no apikey or
 # Authorization header. The function is idempotent (only upserts known meetings)
