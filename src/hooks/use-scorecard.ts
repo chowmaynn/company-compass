@@ -127,12 +127,10 @@ type ApiSource = {
 const API_METRIC_MAP: Record<string, ApiSource> = {
   "Videos posted last week":              { hook: "notion",    field: "weeklyPublished" },
   "Videos in the backlog":                { hook: "notion",    field: "backlogCount" },
-  "Website Views":                        { hook: "ga",        field: "weeklyViews" },
-  "Skool Joins":                          { hook: "skoolJoins", field: "weeklyJoins" },
+  // Marketing: fully manual entry — no live overlay
+  // (Website Views, Skool Joins, Website Booking Rate, Skool Booking Rate,
+  //  Total Bookings, Email Bookings, Skool Bookings, Website Bookings)
   // Bitly clicks are written to scorecard by the bitly-daily edge function — no live overlay needed
-  // Total Bookings, Email Bookings: manual entry
-  "Website Booking Rate":                 { hook: "computed",  field: "websiteBookingRate" },
-  "Skool Booking Rate":                   { hook: "computed",  field: "skoolBookingRate" },
   // Sales metrics from sales_tracking table
   "Closing Calls Booked":                 { hook: "salesTracking", field: "calls_booked" },
   "Closing Call Show Rate":               { hook: "salesTracking", field: "show_rate" },
