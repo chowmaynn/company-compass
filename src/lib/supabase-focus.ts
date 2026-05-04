@@ -280,6 +280,9 @@ export async function updateQuarterlyInitiative(
     headers: { ...headers, Prefer: "return=minimal" },
     body: JSON.stringify({ ...updates, updated_at: new Date().toISOString() }),
   });
+  if (!res.ok) {
+    console.error("updateQuarterlyInitiative failed:", res.status, await res.text());
+  }
   return res.ok;
 }
 
