@@ -355,9 +355,7 @@ export function useScorecard(month: string = DEFAULT_MONTH) {
     };
 
     // Metrics that should show average instead of sum
-    const averagedMetrics = new Set(["Videos in the backlog", "Skool Booking Rate", "Closing Call Show Rate", "Closing Call Close Rate", "NPS Score - 2 months", "NPS Score - 6 Months"]);
-    // Metrics where monthly is computed from totals (not averaged weekly percentages)
-    const ratioMetrics = new Set(["Website Booking Rate"]);
+    const averagedMetrics = new Set(["Videos in the backlog", "Skool Booking Rate", "Website Booking Rate", "Closing Call Show Rate", "Closing Call Close Rate", "NPS Score - 2 months", "NPS Score - 6 Months"]);
     // Metrics where monthly is manually entered (don't auto-calculate)
     const manualMonthlyMetrics = new Set<string>([]);
     // Metrics where monthly comes from a dedicated full-range query (not sum of weeks)
@@ -464,21 +462,6 @@ export function useScorecard(month: string = DEFAULT_MONTH) {
               updated.monthlyActual = match.score;
             }
           }
-        } else if (ratioMetrics.has(m.name)) {
-          // Ratio metrics: compute from total numerator / total denominator
-          if (m.name === "Website Booking Rate") {
-            // Sum website views from week actuals + catch-up
-            const viewsMetric = supabaseMetrics.find((sm) => sm.name === "Website Views");
-            const viewWeekVals = viewsMetric ? viewsMetric.weeks.map((w) => parseWeekVal(w.actual)).filter((v): v is number => v !== null) : [];
-            const viewCatchUp = viewsMetric ? parseWeekVal(viewsMetric.catchUp.actual) : null;
-            const totalViews = viewWeekVals.reduce((a, b) => a + b, 0) + (viewCatchUp ?? 0);
-            const websiteEvent = salesMetrics.salesEventBreakdown.find((e) => e.name === "Website");
-            const totalBookings = websiteEvent?.qualified ?? 0;
-            if (totalViews > 0 && totalBookings > 0) {
-              if (updated === m) updated = { ...m };
-              updated.monthlyActual = `${((totalBookings / totalViews) * 100).toFixed(2)}%`;
-            }
-          }
         } else {
           const weekVals = updated.weeks
             .map((w) => parseWeekVal(w.actual))
@@ -513,18 +496,34 @@ export function useScorecard(month: string = DEFAULT_MONTH) {
     });
   }, [supabaseMetrics, kit, notion, ga.weeklyViews, ga.monthlyViews, salesTracking, intercom.inboxTotal, tallyNps.results, skoolJoins.weeklyJoins, skoolJoins.catchUpJoins, salesMetrics.salesEventBreakdown, salesMetrics.cube, salesMetrics.dates, monthConfigs, isCurrentMonth]);
 
-  // Auto-calculate statuses from the last completed period
+  // Auto-calculate statuses.
+  // For past/completed months: compare cumulative monthly actual vs monthly target —
+  // that's what the user is mentally comparing, and it's robust to W4 having a
+  // small absorbed-remainder target that makes a single week look "ahead" when
+  // the month is actually behind.
+  // For the current month: still use the last completed week's actual vs that
+  // week's projection so the badge tracks live pace, not a partial monthly sum.
   const metricsWithStatus = useMemo(() => {
     const completedIdx = isCurrentMonth ? getCompletedWeekIndex(monthConfigs) : monthConfigs.length - 1;
     return metrics.map((m) => {
       const inverted = invertedMetrics.has(m.name);
       let newStatus: StatusColor | null = null;
 
-      if (completedIdx >= 0) {
-        // Use the most recently completed week
+      if (!isCurrentMonth) {
+        // Past month: use monthly actual vs monthly target
+        newStatus = calculateStatus(
+          [{ actual: m.monthlyActual, projection: m.monthlyTarget }],
+          inverted
+        );
+        // Fallback to last week if monthly values aren't parseable
+        if (newStatus === null) {
+          newStatus = calculateStatus([m.weeks[completedIdx]], inverted);
+        }
+      } else if (completedIdx >= 0) {
+        // Current month, mid-flight: use the most recently completed week
         newStatus = calculateStatus([m.weeks[completedIdx]], inverted);
       } else {
-        // No weeks completed yet — use catch-up (covers both during catch-up and during W1)
+        // Current month, before W1 ends — use catch-up
         newStatus = calculateStatus(
           [{ actual: m.catchUp.actual, projection: m.catchUp.projection }],
           inverted
@@ -536,7 +535,7 @@ export function useScorecard(month: string = DEFAULT_MONTH) {
       }
       return m;
     });
-  }, [metrics]);
+  }, [metrics, isCurrentMonth, monthConfigs]);
 
   // Update a metric field locally + persist to Supabase
   const updateMetric = useCallback(
