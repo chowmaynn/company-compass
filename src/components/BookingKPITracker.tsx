@@ -291,8 +291,10 @@ async function upsertTracker(month: string, type: string, metric: string | null,
   const metricVal = metric ?? "__none__";
   const dayVal = dayDate ?? "1970-01-01";
 
-  // Try update first, then insert if no match
-  const filter = `month=eq.${month}&type=eq.${type}&metric=eq.${metricVal}&day_date=eq.${dayVal}`;
+  // encodeURIComponent every interpolated value — metric names like
+  // "Skool Booking %" contain a raw %, which PostgREST tries to decode as
+  // percent-escapes and 500s on. Same defensive treatment for the others.
+  const filter = `month=eq.${encodeURIComponent(month)}&type=eq.${encodeURIComponent(type)}&metric=eq.${encodeURIComponent(metricVal)}&day_date=eq.${encodeURIComponent(dayVal)}`;
   const body: Record<string, unknown> = {
     value, social_urls: socialUrls, updated_at: new Date().toISOString(),
   };
@@ -548,7 +550,7 @@ export function BookingKPITracker() {
       upsertTracker(mm, "note", null, iso, note, null);
     } else {
       // Delete the row when clearing
-      fetch(`${COMPASS_URL}/rest/v1/booking_tracker?month=eq.${mm}&type=eq.note&metric=eq.__none__&day_date=eq.${iso}`, {
+      fetch(`${COMPASS_URL}/rest/v1/booking_tracker?month=eq.${encodeURIComponent(mm)}&type=eq.note&metric=eq.__none__&day_date=eq.${encodeURIComponent(iso)}`, {
         method: "DELETE",
         headers: { apikey: COMPASS_KEY, Authorization: `Bearer ${COMPASS_KEY}` },
       });
