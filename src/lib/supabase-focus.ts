@@ -275,15 +275,25 @@ export async function updateQuarterlyInitiative(
   updates: Partial<Pick<QuarterlyInitiative, "title" | "department" | "north_star_id" | "status" | "due_date" | "owner" | "stakeholders">>
 ): Promise<boolean> {
   const headers = await getSupabaseHeaders();
+  // return=representation so we can tell the difference between
+  // "row updated" (array with the row) and "RLS silently filtered the WHERE
+  // clause to 0 rows" (empty array, status 200). With return=minimal both
+  // look like 204 success.
   const res = await fetch(`${SUPABASE_URL}/rest/v1/quarterly_initiatives?id=eq.${id}`, {
     method: "PATCH",
-    headers: { ...headers, Prefer: "return=minimal" },
+    headers: { ...headers, Prefer: "return=representation" },
     body: JSON.stringify({ ...updates, updated_at: new Date().toISOString() }),
   });
   if (!res.ok) {
     console.error("updateQuarterlyInitiative failed:", res.status, await res.text());
+    return false;
   }
-  return res.ok;
+  const rows = await res.json();
+  if (Array.isArray(rows) && rows.length === 0) {
+    console.error("updateQuarterlyInitiative: 0 rows updated — RLS likely blocked the write for id", id);
+    return false;
+  }
+  return true;
 }
 
 export async function deleteQuarterlyInitiative(id: string): Promise<boolean> {
