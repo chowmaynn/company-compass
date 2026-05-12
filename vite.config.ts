@@ -176,6 +176,21 @@ export default defineConfig(({ mode }) => {
             "Authorization": `Bearer ${env.SKOOL_SUPABASE_ANON_KEY}`,
           },
         },
+        // Booking Sheet (Apps Script) — production uses /api/booking-sheet.ts
+        // serverless function. This dev proxy mirrors that so the same client
+        // code works in `vite dev`.
+        "/api/booking-sheet": {
+          target: "https://script.google.com",
+          changeOrigin: true,
+          followRedirects: true,
+          rewrite: () => {
+            const url = env.BOOKING_SHEET_URL || env.VITE_BOOKING_SHEET_URL || "";
+            const token = env.BOOKING_SHEET_TOKEN || env.VITE_BOOKING_SHEET_TOKEN || "";
+            // Strip the origin to get just the path portion
+            const path = url.replace(/^https?:\/\/[^/]+/, "");
+            return `${path}?token=${encodeURIComponent(token)}`;
+          },
+        },
       },
     },
     plugins: [
