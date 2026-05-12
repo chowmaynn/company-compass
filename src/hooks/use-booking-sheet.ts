@@ -1,7 +1,9 @@
 import { useQuery } from "@tanstack/react-query";
 
-const URL = import.meta.env.VITE_BOOKING_SHEET_URL as string | undefined;
-const TOKEN = import.meta.env.VITE_BOOKING_SHEET_TOKEN as string | undefined;
+// Booking sheet is fetched via a same-origin serverless proxy (`/api/booking-sheet`)
+// so the browser doesn't hit script.google.com directly — Apps Script doesn't
+// send CORS headers, and this also keeps the token off the client bundle.
+const PROXY = "/api/booking-sheet";
 
 interface SheetRow {
   Date: string;
@@ -52,8 +54,7 @@ const DQ_COL = "DQ'd";                // → casey_cancelled (country disqualifi
 const CANCEL_COL = "Cancellations";   // → invitee_cancelled
 
 async function fetchSheet(): Promise<SheetRow[]> {
-  if (!URL || !TOKEN) return [];
-  const res = await fetch(`${URL}?token=${encodeURIComponent(TOKEN)}`);
+  const res = await fetch(PROXY);
   if (!res.ok) throw new Error(`Sheet ${res.status}`);
   const data = await res.json();
   if (data?.error) throw new Error(`Sheet error: ${data.error}`);
@@ -98,7 +99,6 @@ export function useBookingSheet() {
     queryKey: ["booking-sheet"],
     queryFn: fetchSheet,
     staleTime: 5 * 60 * 1000,
-    enabled: Boolean(URL && TOKEN),
   });
 
   const { cube, overall } = buildCube(query.data ?? []);
@@ -107,6 +107,9 @@ export function useBookingSheet() {
     overall,
     isLoading: query.isLoading,
     isError: query.isError,
-    enabled: Boolean(URL && TOKEN),
+    // Only overlay sheet data once we have rows back. Loading/errored states
+    // fall through to whatever Supabase has, so we never wipe a date with
+    // empty data.
+    enabled: !query.isLoading && !query.isError && (query.data?.length ?? 0) > 0,
   };
 }
