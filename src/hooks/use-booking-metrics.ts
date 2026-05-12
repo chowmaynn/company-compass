@@ -1,5 +1,6 @@
 import { useQuery } from "@tanstack/react-query";
 import { PUBLIC_SALES_EVENTS } from "@/lib/constants";
+import { useBookingSheet } from "@/hooks/use-booking-sheet";
 
 const BASE = "/api/supabase";
 
@@ -68,15 +69,64 @@ const FOLLOWUP_EVENTS = [
   "AAA Accelerator Follow-up (Richard Mach)",
 ];
 
-export function useSupabaseMetrics(from: string, to: string) {
+/**
+ * Booking metrics for a date range.
+ *
+ * Source-level booking counts (Website, Email, Welcome Email, Skool Setter /
+ * Classroom / Post, Google, Masterclass, Phone) come from the Booking Google
+ * Sheet via the Apps Script web app — see {@link useBookingSheet}.
+ *
+ * Cancellations, OVERALL funnel rates (show / no-show / cancellation), and
+ * follow-up breakdowns are still derived from Calendly data in Supabase,
+ * because the sheet doesn't track those.
+ */
+export function useBookingMetrics(from: string, to: string) {
   const query = useQuery({
-    queryKey: ["supabase", "metrics", from, to],
+    queryKey: ["booking-metrics", from, to],
     queryFn: () => fetchDynamicMetrics(from, to),
     staleTime: 5 * 60 * 1000,
   });
 
+  const sheet = useBookingSheet();
+  const useSheet = sheet.enabled;
+
   const rows: RawMetricRow[] = query.data ?? [];
   const cube = buildCube(rows);
+
+  // Overlay sheet bookings on top of the Supabase cube. We only touch
+  // source_* categories within the requested date range — OVERALL and
+  // event_* rows are untouched, so funnel rates and follow-up breakdowns
+  // still reflect Supabase.
+  if (useSheet) {
+    const fromDate = from.substring(0, 10);
+    const toDate = to.substring(0, 10);
+    const inRange = (d: string) => d >= fromDate && d <= toDate;
+
+    for (const date of Object.keys(cube)) {
+      if (!inRange(date)) continue;
+      for (const cat of Object.keys(cube[date])) {
+        if (cat.startsWith("source_")) delete cube[date][cat];
+      }
+    }
+    for (const [date, sources] of Object.entries(sheet.cube)) {
+      if (!inRange(date)) continue;
+      if (!cube[date]) cube[date] = {};
+      for (const [cat, vals] of Object.entries(sources)) {
+        cube[date][cat] = { ...vals } as Record<string, number>;
+      }
+    }
+
+    // OVERALL cancellation overrides — only applied for dates where the
+    // sheet provides them. Sheet is silent ⇒ Supabase value wins.
+    for (const [date, vals] of Object.entries(sheet.overall)) {
+      if (!inRange(date)) continue;
+      if (!cube[date]) cube[date] = {};
+      if (!cube[date][OVERALL]) cube[date][OVERALL] = {};
+      if (vals.casey_cancelled !== undefined) cube[date][OVERALL].casey_cancelled = vals.casey_cancelled;
+      if (vals.invitee_cancelled !== undefined) cube[date][OVERALL].invitee_cancelled = vals.invitee_cancelled;
+    }
+  }
+
   const dates = Object.keys(cube).sort();
 
   // ── Source-level bookings (qualified = total_bookings - casey_cancelled) ───
@@ -93,6 +143,7 @@ export function useSupabaseMetrics(from: string, to: string) {
     "source_masterclass": "Masterclass",
     "source_google": "Google",
     "source_aios lp": "AIOS LP",
+    "source_phone": "Phone",
   };
 
   const sourceQualified: Record<string, number> = {};

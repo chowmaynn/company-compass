@@ -1,4 +1,4 @@
-import { useSupabaseMetrics } from "@/hooks/use-supabase-metrics";
+import { useBookingMetrics } from "@/hooks/use-booking-metrics";
 import { Card, CardContent } from "@/components/ui/card";
 import { AlertCircle, Loader2 } from "lucide-react";
 import { LoadingIndicator } from "@/components/LoadingIndicator";
@@ -19,7 +19,7 @@ export function BookingsDashboard({ from, to, showRate }: {
     noShowRate, cancellationRate,
     dailyBookings, salesEventBreakdown,
     isLoading, isError,
-  } = useSupabaseMetrics(from, to);
+  } = useBookingMetrics(from, to);
 
   if (isError) {
     return (

@@ -8,7 +8,7 @@ import { useGoogleAnalytics } from "@/hooks/use-google-analytics";
 import { useSalesTracking } from "@/hooks/use-sales-tracking";
 import { useIntercom } from "@/hooks/use-intercom";
 import { useTallyNps } from "@/hooks/use-tally-nps";
-import { useSupabaseMetrics } from "@/hooks/use-supabase-metrics";
+import { useBookingMetrics } from "@/hooks/use-booking-metrics";
 import { useSkoolJoins, type SkoolJoinsData } from "@/hooks/use-skool-joins";
 
 // Define display order for metrics within each department
@@ -152,7 +152,7 @@ function resolveApiValue(
     notion: ReturnType<typeof useNotion>;
     ga: { weeklyViews: (number | "—")[] };
     salesTracking: { weekly: import("@/hooks/use-sales-tracking").WeekMetrics[]; monthly: import("@/hooks/use-sales-tracking").WeekMetrics | null; catchUp: import("@/hooks/use-sales-tracking").WeekMetrics | null };
-    salesMetrics: ReturnType<typeof useSupabaseMetrics>;
+    salesMetrics: ReturnType<typeof useBookingMetrics>;
     intercom: ReturnType<typeof useIntercom>;
     tallyNps: ReturnType<typeof useTallyNps>;
     skoolJoins: SkoolJoinsData;
@@ -299,7 +299,7 @@ export function useScorecard(month: string = DEFAULT_MONTH) {
   const [mYear, mMonth] = month.split("-").map(Number);
   const sbFrom = useMemo(() => new Date(mYear, mMonth - 1, 1).toISOString(), [mYear, mMonth]);
   const sbTo = useMemo(() => new Date(mYear, mMonth, 0, 23, 59, 59).toISOString(), [mYear, mMonth]);
-  const salesMetrics = useSupabaseMetrics(sbFrom, sbTo);
+  const salesMetrics = useBookingMetrics(sbFrom, sbTo);
 
   // Load from Supabase
   useEffect(() => {

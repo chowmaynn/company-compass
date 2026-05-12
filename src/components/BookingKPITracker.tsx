@@ -3,8 +3,8 @@ import { ChevronLeft, ChevronRight, StickyNote, X, Play, Mail, MessageCircle } f
 import { type VideoItem } from "@/lib/youtube";
 import { fetchBroadcastsInRange, type BroadcastItem } from "@/lib/kit";
 import { fetchDailyActiveUsers } from "@/lib/google-analytics";
-import { useSupabaseMetrics } from "@/hooks/use-supabase-metrics";
-import { useSkoolJoinsByDate } from "@/hooks/use-skool-joins";
+import { useBookingMetrics } from "@/hooks/use-booking-metrics";
+import { useSkoolJoinsByRange } from "@/hooks/use-skool-joins";
 import { LoadingIndicator } from "@/components/LoadingIndicator";
 
 // ─── Note Popover ─────────────────────────────────────────────────────────────
@@ -350,10 +350,19 @@ export function BookingKPITracker() {
   const monthStr = `${year}-${String(month + 1).padStart(2, "0")}`;
   const supabaseFrom = useMemo(() => new Date(Date.UTC(year, month, 1)).toISOString(), [year, month]);
   const supabaseTo = useMemo(() => new Date(Date.UTC(year, month + 1, 0, 23, 59, 59)).toISOString(), [year, month]);
-  const bookingData = useSupabaseMetrics(supabaseFrom, supabaseTo);
+  const bookingData = useBookingMetrics(supabaseFrom, supabaseTo);
 
-  // Skool joins per NZ day (shared hook — same data used on marketing overview)
-  const { joinsByDate: skoolJoinsByDate, loading: skoolLoading } = useSkoolJoinsByDate(year, month);
+  // Skool joins per NZ day for the displayed month (shared hook with marketing overview)
+  const skoolMonthStart = useMemo(() => {
+    const mm = String(month + 1).padStart(2, "0");
+    return `${year}-${mm}-01`;
+  }, [year, month]);
+  const skoolMonthEnd = useMemo(() => {
+    const mm = String(month + 1).padStart(2, "0");
+    const last = new Date(year, month + 1, 0).getDate();
+    return `${year}-${mm}-${String(last).padStart(2, "0")}`;
+  }, [year, month]);
+  const { joinsByDate: skoolJoinsByDate, loading: skoolLoading } = useSkoolJoinsByRange(skoolMonthStart, skoolMonthEnd);
 
   // Fetch GA4 active users per day for the displayed month
   const [ga4ActiveByDate, setGa4ActiveByDate] = useState<Record<string, number>>({});
@@ -374,7 +383,7 @@ export function BookingKPITracker() {
     "QF Calls Booked": { type: "allSources" },
     "Skool Joins": { type: "skoolJoins" as const },
     "Skool Bookings DM Setter": { type: "source", sources: ["source_skool setter"] },
-    "Skool Bookings Post": { type: "event", events: ["AAA Accelerator Business Call (Skool P)"] },
+    "Skool Bookings Post": { type: "source", sources: ["source_skool post"] },
     "Skool Bookings Classroom": { type: "source", sources: ["source_skool classroom"] },
     "Email Bookings": { type: "source", sources: ["source_email general"] },
     "Welcome Sequence Email Bookings": { type: "source", sources: ["source_email welcome"] },

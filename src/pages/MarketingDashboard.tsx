@@ -5,11 +5,11 @@ import {
   Tooltip, ResponsiveContainer, Cell, PieChart, Pie, LabelList,
 } from "recharts";
 import { Loader2, Mail, BookOpen } from "lucide-react";
-import { useSupabaseMetrics } from "@/hooks/use-supabase-metrics";
+import { useBookingMetrics } from "@/hooks/use-booking-metrics";
 import { useKitMarketing } from "@/hooks/use-kit-marketing";
 import { useGoogleAnalytics } from "@/hooks/use-google-analytics";
 import { useSkoolScorecard } from "@/hooks/use-skool-scorecard";
-import { useSkoolJoinsByDate, sumJoinsInRange } from "@/hooks/use-skool-joins";
+import { useSkoolJoinsByRange, sumJoinsInRange } from "@/hooks/use-skool-joins";
 import { WebsiteChannelCard } from "@/components/WebsiteChannelCard";
 import { LoadingIndicator } from "@/components/LoadingIndicator";
 import { useCalendly } from "@/hooks/use-calendly";
@@ -105,18 +105,17 @@ export default function MarketingDashboard() {
 
   // Skool scorecard metrics
   const skoolScorecard = useSkoolScorecard();
-  // Skool joins — use the same shared daily data as the KPI tracker
-  const skoolMonth = skoolRange.startDate ? new Date(skoolRange.startDate + "T12:00:00") : new Date();
-  const skoolJoinsDaily = useSkoolJoinsByDate(skoolMonth.getFullYear(), skoolMonth.getMonth());
+  // Skool joins — spans every month the picker covers
+  const skoolJoinsDaily = useSkoolJoinsByRange(skoolRange.startDate, skoolRange.endDate);
   const skoolJoinsTotal = useMemo(() => {
     if (skoolJoinsDaily.loading || !skoolRange.startDate || !skoolRange.endDate) return null;
     return sumJoinsInRange(skoolJoinsDaily.joinsByDate, skoolRange.startDate, skoolRange.endDate);
   }, [skoolJoinsDaily.joinsByDate, skoolJoinsDaily.loading, skoolRange.startDate, skoolRange.endDate]);
 
   // Data — each section uses its own date range
-  const supabase = useSupabaseMetrics(range.start, range.end);
-  const emailSupabase = useSupabaseMetrics(emailRange.start, emailRange.end);
-  const skoolSupabase = useSupabaseMetrics(skoolRange.start, skoolRange.end);
+  const supabase = useBookingMetrics(range.start, range.end);
+  const emailSupabase = useBookingMetrics(emailRange.start, emailRange.end);
+  const skoolSupabase = useBookingMetrics(skoolRange.start, skoolRange.end);
   const kit = useKitMarketing(emailRange.startDate, emailRange.endDate);
   const ga = useGoogleAnalytics();
   const gaAuthed = true; // Service account handles auth — always available
@@ -359,11 +358,12 @@ export default function MarketingDashboard() {
                 <div className="bg-muted/30 rounded-lg p-3">
                   <p className="text-xs text-muted-foreground uppercase tracking-wider font-medium mb-1">Booking Rate</p>
                   <p className="text-xl font-bold text-foreground">
-                    {skoolScorecard.loading ? <LoadingIndicator /> : skoolScorecard.bookingRate ?? "—"}
+                    {skoolSupabase.isLoading || skoolJoinsDaily.loading
+                      ? <LoadingIndicator />
+                      : skoolJoinsTotal && skoolJoinsTotal > 0
+                        ? `${((skoolBookings.total / skoolJoinsTotal) * 100).toFixed(2)}%`
+                        : "—"}
                   </p>
-                  {skoolScorecard.bookingRateMonth && (
-                    <p className="text-[10px] text-muted-foreground mt-0.5">{skoolScorecard.bookingRateMonth}</p>
-                  )}
                 </div>
                 <div className="bg-muted/30 rounded-lg p-3">
                   <p className="text-xs text-muted-foreground uppercase tracking-wider font-medium mb-1">Skool Joins</p>

@@ -1,4 +1,5 @@
-import { useState, useEffect, useMemo, useRef } from "react";
+import { useMemo } from "react";
+import { useQueries } from "@tanstack/react-query";
 import { generateWeekConfigs, getCurrentNZMonth, getCatchUpRange } from "@/data/scorecardData";
 import { toNZDate } from "@/lib/dates";
 
@@ -24,93 +25,122 @@ function nzDayToUtc(dateStr: string, offsetMs: number): string {
   return new Date(d.getTime() - offsetMs).toISOString();
 }
 
-// ── Core: daily Skool joins for a month ─────────────────────
+// ── Per-month fetcher ───────────────────────────────────────
 
 /**
- * Fetches Skool joins per NZ day for a given month.
- * Returns a map of YYYY-MM-DD → count, with NZ-aligned boundaries and bucketing.
- * Cached across month switches so re-renders don't re-fetch.
+ * Fetch Skool joins for a single (year, month). Returns a map of
+ * NZ-day YYYY-MM-DD → count for dates within that month only.
+ *
+ * Fetches in 2-day chunks with NZ-aligned UTC boundaries — Airtable returns
+ * UTC timestamps, but we want NZ-day buckets.
  */
-export function useSkoolJoinsByDate(year: number, month: number): {
+async function fetchSkoolJoinsForMonth(year: number, month: number): Promise<Record<string, number>> {
+  const now = new Date();
+  const mm = String(month + 1).padStart(2, "0");
+  const nzOffsetMs = getNZOffsetMs(year, month);
+  const result: Record<string, number> = {};
+  const daysInMo = new Date(year, month + 1, 0).getDate();
+  const isCurrentMo = year === now.getFullYear() && month === now.getMonth();
+  const maxDay = isCurrentMo ? now.getDate() : daysInMo;
+
+  const CHUNK_DAYS = 2;
+  for (let startDay = 1; startDay <= maxDay; startDay += CHUNK_DAYS) {
+    const endDay = Math.min(startDay + CHUNK_DAYS, maxDay + 1);
+    const chunkStartDate = `${year}-${mm}-${String(startDay).padStart(2, "0")}`;
+    const chunkEndDate = endDay > daysInMo
+      ? (month === 11 ? `${year + 1}-01-01` : `${year}-${String(month + 2).padStart(2, "0")}-01`)
+      : `${year}-${mm}-${String(endDay).padStart(2, "0")}`;
+    const chunkStart = nzDayToUtc(chunkStartDate, nzOffsetMs);
+    const chunkEnd = nzDayToUtc(chunkEndDate, nzOffsetMs);
+    try {
+      const res = await fetch(
+        `${SKOOL_BASE}/rest/v1/${TABLE}?select=${COL}&${PID}=eq.${PROJECT_ID}&${COL}=gte.${chunkStart}&${COL}=lt.${chunkEnd}&limit=2000`
+      );
+      if (res.ok) {
+        const rows: { "Created At": string }[] = await res.json();
+        for (const row of rows) {
+          const date = toNZDate(row["Created At"] ?? "");
+          if (date && date.startsWith(`${year}-${mm}`)) {
+            result[date] = (result[date] || 0) + 1;
+          }
+        }
+      }
+    } catch {}
+    await new Promise((r) => setTimeout(r, 200));
+  }
+  return result;
+}
+
+// ── Months spanned by a date range ──────────────────────────
+
+interface MonthKey { year: number; month: number }
+
+function enumerateMonths(startISO: string, endISO: string): MonthKey[] {
+  if (!startISO || !endISO) return [];
+  const start = startISO.substring(0, 10);
+  const end = endISO.substring(0, 10);
+  if (end < start) return [];
+  const [sy, sm] = start.split("-").map(Number);
+  const [ey, em] = end.split("-").map(Number);
+  const out: MonthKey[] = [];
+  let y = sy, m = sm; // 1-indexed
+  while (y < ey || (y === ey && m <= em)) {
+    out.push({ year: y, month: m - 1 });
+    m++;
+    if (m > 12) { m = 1; y++; }
+  }
+  return out;
+}
+
+// ── Range-based hook (canonical) ────────────────────────────
+
+/**
+ * Skool joins per NZ day across an arbitrary date range. Returns a merged
+ * day→count map and a loading flag. Past months are cached indefinitely via
+ * React Query; the current month re-fetches every 5 minutes.
+ *
+ * Pass `startDate`/`endDate` as NZ YYYY-MM-DD strings (or full ISO — only the
+ * date portion is used). Empty strings mean "not ready yet" — no fetches fire
+ * and the result is an empty map.
+ */
+export function useSkoolJoinsByRange(startDate: string, endDate: string): {
   joinsByDate: Record<string, number>;
   loading: boolean;
 } {
-  const cache = useRef<Record<string, Record<string, number>>>({});
-  const [joinsByDate, setJoinsByDate] = useState<Record<string, number>>({});
-  const [loading, setLoading] = useState(true);
+  const months = useMemo(() => enumerateMonths(startDate, endDate), [startDate, endDate]);
+  const now = new Date();
+  const currentY = now.getFullYear();
+  const currentM = now.getMonth();
 
-  useEffect(() => {
-    let cancelled = false;
-    const now = new Date();
-    const mm = String(month + 1).padStart(2, "0");
-    const cacheKey = `${year}-${mm}`;
+  const queries = useQueries({
+    queries: months.map(({ year, month }) => {
+      const isCurrent = year === currentY && month === currentM;
+      const isFuture = year > currentY || (year === currentY && month > currentM);
+      return {
+        queryKey: ["skool-joins", year, month],
+        queryFn: () => fetchSkoolJoinsForMonth(year, month),
+        // Past months never change → cache forever. Current month → 5 min.
+        staleTime: isCurrent ? 5 * 60 * 1000 : Infinity,
+        gcTime: Infinity,
+        enabled: !isFuture,
+      };
+    }),
+  });
 
-    // Use in-memory cache if available
-    if (cache.current[cacheKey] && Object.keys(cache.current[cacheKey]).length > 0) {
-      setJoinsByDate(cache.current[cacheKey]);
-      setLoading(false);
-      // Past months: don't refetch
-      const currentMonth = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, "0")}`;
-      if (cacheKey !== currentMonth) return;
-    } else {
-      setJoinsByDate({});
-      setLoading(true);
+  const joinsByDate = useMemo(() => {
+    const merged: Record<string, number> = {};
+    for (const q of queries) {
+      if (q.data) Object.assign(merged, q.data);
     }
+    return merged;
+  }, [queries]);
 
-    const nzOffsetMs = getNZOffsetMs(year, month);
-
-    async function fetchMonth() {
-      const result: Record<string, number> = {};
-      const daysInMo = new Date(year, month + 1, 0).getDate();
-      const isCurrentMo = year === now.getFullYear() && month === now.getMonth();
-      const maxDay = isCurrentMo ? now.getDate() : daysInMo;
-
-      // Fetch in 2-day chunks with NZ-aligned UTC boundaries
-      const CHUNK_DAYS = 2;
-      for (let startDay = 1; startDay <= maxDay; startDay += CHUNK_DAYS) {
-        if (cancelled) break;
-        const endDay = Math.min(startDay + CHUNK_DAYS, maxDay + 1);
-        const chunkStartDate = `${year}-${mm}-${String(startDay).padStart(2, "0")}`;
-        const chunkEndDate = endDay > daysInMo
-          ? (month === 11 ? `${year + 1}-01-01` : `${year}-${String(month + 2).padStart(2, "0")}-01`)
-          : `${year}-${mm}-${String(endDay).padStart(2, "0")}`;
-        const chunkStart = nzDayToUtc(chunkStartDate, nzOffsetMs);
-        const chunkEnd = nzDayToUtc(chunkEndDate, nzOffsetMs);
-        try {
-          const res = await fetch(
-            `${SKOOL_BASE}/rest/v1/${TABLE}?select=${COL}&${PID}=eq.${PROJECT_ID}&${COL}=gte.${chunkStart}&${COL}=lt.${chunkEnd}&limit=2000`
-          );
-          if (res.ok) {
-            const rows: { "Created At": string }[] = await res.json();
-            for (const row of rows) {
-              // Bucket by NZ date
-              const date = toNZDate(row["Created At"] ?? "");
-              if (date && date.startsWith(`${year}-${mm}`)) {
-                result[date] = (result[date] || 0) + 1;
-              }
-            }
-          }
-        } catch {}
-        await new Promise((r) => setTimeout(r, 200));
-      }
-
-      if (!cancelled) {
-        if (Object.keys(result).length > 0) {
-          cache.current[cacheKey] = result;
-          setJoinsByDate(result);
-        }
-        setLoading(false);
-      }
-    }
-
-    fetchMonth();
-    return () => { cancelled = true; };
-  }, [year, month]);
+  const loading = queries.length > 0 && queries.some((q) => q.isLoading);
 
   return { joinsByDate, loading };
 }
 
-// ── Derived: sum joins over a NZ date range ─────────────────
+// ── Sum helper (unchanged signature) ────────────────────────
 
 /**
  * Sum Skool joins from a daily map over a date range (inclusive).
@@ -128,7 +158,7 @@ export function sumJoinsInRange(
   return total;
 }
 
-// ── Scorecard hook (weekly breakdown) ───────────────────────
+// ── Scorecard hook (weekly breakdown, current month) ────────
 
 export interface SkoolJoinsData {
   weeklyJoins: (number | "—")[];
@@ -140,7 +170,9 @@ export function useSkoolJoins(): SkoolJoinsData {
   const now = new Date();
   const currentMonth = getCurrentNZMonth();
   const [y, m] = currentMonth.split("-").map(Number);
-  const { joinsByDate, loading } = useSkoolJoinsByDate(y, m - 1); // month is 0-indexed
+  const monthStart = `${currentMonth}-01`;
+  const monthEnd = `${y}-${String(m).padStart(2, "0")}-${String(new Date(y, m, 0).getDate()).padStart(2, "0")}`;
+  const { joinsByDate, loading } = useSkoolJoinsByRange(monthStart, monthEnd);
 
   const weekConfigs = useMemo(() => generateWeekConfigs(currentMonth), [currentMonth]);
   const catchUp = useMemo(() => getCatchUpRange(currentMonth), [currentMonth]);

@@ -1,7 +1,7 @@
 import { useMemo } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { fetchVariantVisitors } from "@/lib/google-analytics";
-import { useSupabaseMetrics } from "@/hooks/use-supabase-metrics";
+import { useBookingMetrics } from "@/hooks/use-booking-metrics";
 
 export interface VariantData {
   visitors: number;
@@ -40,7 +40,7 @@ export function useWebsiteABTest(startDate: string, endDate: string, startISO?: 
   // Bookings from Casey's Supabase (uses ISO strings for consistency with other sections)
   const safeStartISO = startISO || (startDate ? new Date(startDate).toISOString() : new Date().toISOString());
   const safeEndISO = endISO || (endDate ? new Date(endDate + "T23:59:59").toISOString() : new Date().toISOString());
-  const supabase = useSupabaseMetrics(safeStartISO, safeEndISO);
+  const supabase = useBookingMetrics(safeStartISO, safeEndISO);
 
   // GA4 visitor counts per variant
   const visitorMap = useMemo(() => {

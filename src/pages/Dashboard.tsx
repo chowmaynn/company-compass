@@ -5,14 +5,14 @@ import { useScorecard } from "@/hooks/use-scorecard";
 import { useCurrency, useSelectedMonth } from "@/components/AppLayout";
 import { fetchRevenueHistory, fetchFinancialSummary, type ScorecardRow } from "@/lib/supabase-scorecard";
 import { fetchSalesTracking, fetchSalesTrackingRange } from "@/lib/supabase-sales";
-import { useSupabaseMetrics } from "@/hooks/use-supabase-metrics";
+import { useBookingMetrics } from "@/hooks/use-booking-metrics";
 import { toNZDate } from "@/lib/dates";
 import { fetchQuarterlySettings, upsertQuarterlySettings, fetchAllQuarters, type InitiativeStatus } from "@/lib/supabase-focus";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { useAuth } from "@/hooks/use-auth";
 import { useFinanceOverview } from "@/hooks/use-finance-overview";
 import { useKitMarketing } from "@/hooks/use-kit-marketing";
-import { useSkoolJoinsByDate, sumJoinsInRange } from "@/hooks/use-skool-joins";
+import { useSkoolJoinsByRange, sumJoinsInRange } from "@/hooks/use-skool-joins";
 import { fetchVideoCountInRange } from "@/hooks/use-channel-videos";
 import { useWhosOut } from "@/hooks/use-whos-out";
 import { fetchPageSessions } from "@/lib/google-analytics";
@@ -280,7 +280,7 @@ export default function Dashboard() {
   }, [range.startDate, range.endDate]);
 
   // Bookings (qualified) for the selected range
-  const dailyBookings = useSupabaseMetrics(
+  const dailyBookings = useBookingMetrics(
     range.start || (toNZDate(new Date()) + "T00:00:00Z"),
     range.end   || (toNZDate(new Date()) + "T23:59:59Z"),
   );
@@ -293,12 +293,8 @@ export default function Dashboard() {
     [kit.broadcasts.length, kit.loading, range.startDate]
   );
 
-  // Skool joins → Supabase (same shared data the marketing page uses)
-  const skoolMonth = useMemo(() => {
-    const d = range.startDate ? new Date(range.startDate + "T12:00:00") : new Date();
-    return { year: d.getFullYear(), month: d.getMonth() };
-  }, [range.startDate]);
-  const skoolJoinsDaily = useSkoolJoinsByDate(skoolMonth.year, skoolMonth.month);
+  // Skool joins → Airtable (spans every month the picker covers)
+  const skoolJoinsDaily = useSkoolJoinsByRange(range.startDate, range.endDate);
   const skoolJoinsValue = useMemo(() => {
     if (skoolJoinsDaily.loading || !range.startDate || !range.endDate) return null;
     return sumJoinsInRange(skoolJoinsDaily.joinsByDate, range.startDate, range.endDate);
