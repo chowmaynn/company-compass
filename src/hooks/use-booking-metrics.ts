@@ -88,16 +88,17 @@ export function useBookingMetrics(from: string, to: string) {
   });
 
   const sheet = useBookingSheet();
-  const useSheet = sheet.enabled;
 
   const rows: RawMetricRow[] = query.data ?? [];
   const cube = buildCube(rows);
 
-  // Overlay sheet bookings on top of the Supabase cube. We only touch
-  // source_* categories within the requested date range — OVERALL and
-  // event_* rows are untouched, so funnel rates and follow-up breakdowns
-  // still reflect Supabase.
-  if (useSheet) {
+  // The sheet is the source of truth for booking counts. We always wipe
+  // every source_* row in the requested date range and replace with sheet
+  // data — if the sheet fails to load, totals show 0 (visible failure)
+  // rather than silently falling back to stale Supabase numbers.
+  // OVERALL and event_* rows stay from Supabase (cancellations,
+  // follow-ups, show-rate context) until the sheet has those columns.
+  {
     const fromDate = from.substring(0, 10);
     const toDate = to.substring(0, 10);
     const inRange = (d: string) => d >= fromDate && d <= toDate;
@@ -117,7 +118,8 @@ export function useBookingMetrics(from: string, to: string) {
     }
 
     // OVERALL cancellation overrides — only applied for dates where the
-    // sheet provides them. Sheet is silent ⇒ Supabase value wins.
+    // sheet provides them. Sheet silent ⇒ Supabase value wins (until the
+    // sheet's DQ'd / Cancellations columns are populated).
     for (const [date, vals] of Object.entries(sheet.overall)) {
       if (!inRange(date)) continue;
       if (!cube[date]) cube[date] = {};

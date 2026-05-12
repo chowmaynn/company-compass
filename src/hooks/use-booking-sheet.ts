@@ -107,9 +107,5 @@ export function useBookingSheet() {
     overall,
     isLoading: query.isLoading,
     isError: query.isError,
-    // Only overlay sheet data once we have rows back. Loading/errored states
-    // fall through to whatever Supabase has, so we never wipe a date with
-    // empty data.
-    enabled: !query.isLoading && !query.isError && (query.data?.length ?? 0) > 0,
   };
 }
