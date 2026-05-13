@@ -20,7 +20,7 @@ import { formatYearMonth, toNZDate } from "@/lib/dates";
 import { fmtCurrency } from "@/lib/formatNumber";
 import { GRID, TICK, TOOLTIP_STYLE as CHART_TOOLTIP } from "@/lib/chart-theme";
 import { BreakdownStatCard } from "@/components/finance/BreakdownStatCard";
-import { useXeroPL } from "@/lib/xero";
+import { useXeroPL, useXeroPLTrend } from "@/lib/xero";
 import { useTeamDirectory } from "@/hooks/use-team-directory";
 
 // Headcount on the Morningside team is excluded from the rev/employee
@@ -47,27 +47,23 @@ export default function SubscriptionDashboard() {
   const { convert, symbol, label: currencyLabel } = useCurrency();
   const cfmt = (n: number) => fmtCurrency(convert(n), symbol);
 
+  // Shared date range — used by BOTH tabs. Defaults to "This Month".
   const [dateRange, setDateRange] = useState<DateRangeValue>(() => {
-    const { startDate, endDate } = presetToRange("TW");
-    return {
-      start: startDate + "T00:00:00Z",
-      end: endDate + "T23:59:59Z",
-      startDate,
-      endDate,
-    };
+    const { startDate, endDate } = presetToRange("MTD");
+    return { start: startDate + "T00:00:00Z", end: endDate + "T23:59:59Z", startDate, endDate };
   });
-  // Round to day boundaries so query keys are stable across remounts
   const startTs = useMemo(() => {
     if (!dateRange.startDate) return Math.floor(new Date(new Date().getFullYear(), new Date().getMonth(), 1).getTime() / 1000);
-    const d = new Date(dateRange.startDate + "T00:00:00");
-    return Math.floor(d.getTime() / 1000);
+    return Math.floor(new Date(dateRange.startDate + "T00:00:00").getTime() / 1000);
   }, [dateRange.startDate]);
   const endTs = useMemo(() => {
     if (!dateRange.endDate) return Math.floor(new Date(new Date().getFullYear(), new Date().getMonth() + 1, 0, 23, 59, 59).getTime() / 1000);
-    const d = new Date(dateRange.endDate + "T23:59:59");
-    return Math.floor(d.getTime() / 1000);
+    return Math.floor(new Date(dateRange.endDate + "T23:59:59").getTime() / 1000);
   }, [dateRange.endDate]);
   const { transactions, failedPayments, cancellationRequests, stripeOverview, loading, stripeLoading, error } = useFinance(startTs, endTs);
+
+  // Overview tab is month-driven — pick the month containing the range's end date.
+  const activeMonth = useMemo(() => dateRange.endDate?.slice(0, 7) ?? "", [dateRange.endDate]);
 
   // ── Airtable-derived stats ─────────────────────────────────────────────────
 
@@ -116,8 +112,8 @@ export default function SubscriptionDashboard() {
 
   return (
     <>
-    {/* ── Tabs ──────────────────────────────────────────────── */}
-    <div className="mb-6">
+    {/* ── Tab + Date range row (shared by both tabs) ──────────── */}
+    <div className="flex items-center justify-between gap-3 mb-6 flex-wrap">
       <GlassTabs
         tabs={[
           { key: "overview", label: "Overview" },
@@ -126,21 +122,19 @@ export default function SubscriptionDashboard() {
         activeKey={activeTab}
         onChange={(key) => setActiveTab(key as typeof activeTab)}
       />
+      <div className="flex items-center gap-2 ml-auto">
+        {stripeLoading && <RefreshCw className="h-3.5 w-3.5 text-muted-foreground animate-spin" />}
+        <DateRangePicker defaultPreset="MTD" onChange={setDateRange} />
+      </div>
     </div>
 
     {/* ── Overview Tab ──────────────────────────────────────── */}
     {activeTab === "overview" && (
-      <FinancialOverview convert={convert} symbol={symbol} />
+      <FinancialOverview convert={convert} symbol={symbol} activeMonth={activeMonth} />
     )}
 
     {/* ── Subscriptions Tab ─────────────────────────────────── */}
     {activeTab === "subscriptions" && <>
-
-    {/* ── Date range filter */}
-    <div className="flex items-center justify-end gap-2 mb-6">
-      <DateRangePicker onChange={setDateRange} />
-      {stripeLoading && <RefreshCw className="h-3.5 w-3.5 text-muted-foreground animate-spin" />}
-    </div>
 
     <DashboardShell loading={loading} error={error} loadingMessage="Loading finance data\u2026">
     <div className="space-y-6">
@@ -391,22 +385,24 @@ function fmtMonth(m: string): string {
   return `${names[parseInt(mo)]} ${y.slice(2)}`;
 }
 
-function FinancialOverview({ convert, symbol }: { convert: (v: number) => number; symbol: string }) {
+function FinancialOverview({
+  convert,
+  symbol,
+  activeMonth,
+}: {
+  convert: (v: number) => number;
+  symbol: string;
+  activeMonth: string;
+}) {
   const { data, loading } = useFinanceOverview();
-  const [selectedMonth, setSelectedMonth] = useState<string>("");
+  const selected = useMemo(() => data.find((d) => d.month === activeMonth) ?? data[0], [data, activeMonth]);
 
-  // Available months — always include the current NZ month at the top so the
-  // dropdown reflects "live" data even before any row exists in finance_overview.
-  // This also auto-rolls when the calendar flips over in NZ time on next render.
+  // Months for the trend chart — current NZ month always first, then historical.
   const months = useMemo(() => {
-    const currentNZMonth = toNZDate(new Date()).slice(0, 7); // "YYYY-MM"
+    const currentNZMonth = toNZDate(new Date()).slice(0, 7);
     const fromData = data.map((d) => d.month);
     return fromData.includes(currentNZMonth) ? fromData : [currentNZMonth, ...fromData];
   }, [data]);
-
-  // Default to latest month
-  const activeMonth = selectedMonth || months[0] || "";
-  const selected = useMemo(() => data.find((d) => d.month === activeMonth) ?? data[0], [data, activeMonth]);
 
   // Live Xero P&L for the selected month (shared by KPI cards + XeroPL card)
   const { data: xeroPL, loading: xeroLoading, error: xeroError } = useXeroPL(activeMonth);
@@ -418,43 +414,33 @@ function FinancialOverview({ convert, symbol }: { convert: (v: number) => number
     ? xeroPL.totalIncome / operatingHeadcount
     : null;
 
-  // Chart data — sorted oldest first
-  const chartData = useMemo(() =>
-    [...data].reverse().map((d) => ({
-      month: fmtMonth(d.month),
-      revenue: d.revenue ?? 0,
-      cogs: d.cogs ?? 0,
-      revPerEmployee: d.revenue_per_employee ?? 0,
-      grossMargin: d.gross_margin_pct ?? 0,
-    })),
-    [data]
+  // Xero P&L trend — single API call for all months (uses Xero's periods param)
+  const trendMonths = useMemo(() => [...months].reverse(), [months]);
+  const { data: xeroTrend, loading: xeroTrendLoading } = useXeroPLTrend(
+    months[0] ?? "",          // newest month = endMonth
+    trendMonths.length,        // count
   );
+
+  // Map Xero trend → chart points. Fall back to useFinanceOverview values for
+  // rev/employee + grossMargin (which still come from finance_overview).
+  const chartData = useMemo(() => {
+    const byMonth = new Map(xeroTrend.map((p) => [p.month, p]));
+    const fallback = new Map(data.map((d) => [d.month, d]));
+    return trendMonths.map((m) => {
+      const xp = byMonth.get(m);
+      const fb = fallback.get(m);
+      return {
+        month: fmtMonth(m),
+        revenue: xp?.totalIncome ?? fb?.revenue ?? 0,
+        expenses: xp?.totalExpenses ?? 0,
+        revPerEmployee: fb?.revenue_per_employee ?? 0,
+        grossMargin: fb?.gross_margin_pct ?? 0,
+      };
+    });
+  }, [trendMonths, xeroTrend, data]);
 
   return (
     <div className="space-y-6 mb-6">
-      {/* ── Month Selector ──────────────────────────────────── */}
-      {months.length > 0 && (
-        <div className="flex items-center justify-end mb-4">
-          <div className={[
-            "relative inline-flex items-center gap-2 rounded-full px-4 py-2 cursor-pointer",
-            "bg-gradient-to-b from-black/[0.04] to-black/[0.02] dark:from-white/[0.06] dark:to-white/[0.02]",
-            "backdrop-blur-xl ring-1 ring-black/15 dark:ring-white/10",
-            "shadow-[inset_0_1px_0_0_rgba(0,0,0,0.04)] dark:shadow-[inset_0_1px_0_0_rgba(255,255,255,0.08)]",
-          ].join(" ")}>
-            <select
-              value={activeMonth}
-              onChange={(e) => setSelectedMonth(e.target.value)}
-              className="appearance-none bg-transparent text-sm font-medium text-foreground cursor-pointer focus:outline-none pr-5"
-            >
-              {months.map((m) => (
-                <option key={m} value={m}>{fmtMonth(m)}</option>
-              ))}
-            </select>
-            <ChevronDown className="absolute right-3 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-muted-foreground pointer-events-none" />
-          </div>
-        </div>
-      )}
-
       {/* ── KPI Cards (Xero-powered) ──────────────────────────── */}
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
         <BreakdownStatCard
@@ -502,9 +488,9 @@ function FinancialOverview({ convert, symbol }: { convert: (v: number) => number
       {/* ── Revenue, CoGs & Rev/Employee Chart ─────────────────────── */}
       <Card className="border-border/50">
         <CardContent className="p-5">
-          <h3 className="text-sm font-semibold text-foreground mb-1">Revenue & Cost of Goods</h3>
-          <p className="text-xs text-muted-foreground mb-4">Monthly trend</p>
-          {loading ? (
+          <h3 className="text-sm font-semibold text-foreground mb-1">Revenue & Expenses</h3>
+          <p className="text-xs text-muted-foreground mb-4">Monthly trend · live from Xero</p>
+          {xeroTrendLoading && xeroTrend.length === 0 ? (
             <div className="flex items-center justify-center py-16"><LoadingIndicator /></div>
           ) : (
             <ResponsiveContainer width="100%" height={240}>
@@ -521,7 +507,7 @@ function FinancialOverview({ convert, symbol }: { convert: (v: number) => number
                 <Tooltip contentStyle={CHART_TOOLTIP} formatter={(v: number, name: string) => [`$${compact(v)}`, name]} />
                 <Legend wrapperStyle={{ fontSize: 11 }} />
                 <Area type="monotone" dataKey="revenue" name="Revenue" stroke="#10b981" strokeWidth={2} fill="url(#revGrad)" dot={false} activeDot={{ r: 4, fill: "#10b981" }} />
-                <Bar dataKey="cogs" name="Cost of Goods" fill="#f59e0b" radius={[3, 3, 0, 0]} barSize={20} opacity={0.7} />
+                <Bar dataKey="expenses" name="Expenses" fill="#f59e0b" radius={[3, 3, 0, 0]} barSize={20} opacity={0.7} />
               </ComposedChart>
             </ResponsiveContainer>
           )}
