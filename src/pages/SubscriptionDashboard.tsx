@@ -27,6 +27,26 @@ import { useTeamDirectory } from "@/hooks/use-team-directory";
 // calculation — they're not part of the core operating team for this metric.
 const MORNINGSIDE_TEAM_SIZE = 8;
 
+/** Human label for a date range — either a single month, or "Mar 13 – May 13". */
+function rangeLabel(fromDate: string, toDate: string): string {
+  if (!fromDate || !toDate) return "";
+  const fm = fromDate.match(/^(\d{4})-(\d{2})-(\d{2})$/);
+  const tm = toDate.match(/^(\d{4})-(\d{2})-(\d{2})$/);
+  if (!fm || !tm) return "";
+  const names = ["Jan","Feb","Mar","Apr","May","Jun","Jul","Aug","Sep","Oct","Nov","Dec"];
+  // If both endpoints fall in the same month AND span the whole month, show "May 26".
+  const isFirstOfMonth = fm[3] === "01";
+  const lastDayOfFromMonth = new Date(Date.UTC(Number(fm[1]), Number(fm[2]), 0)).getUTCDate();
+  const sameMonth = fm[1] === tm[1] && fm[2] === tm[2];
+  if (sameMonth && isFirstOfMonth && Number(tm[3]) >= lastDayOfFromMonth) {
+    return `${names[Number(fm[2]) - 1]} ${fm[1].slice(2)}`;
+  }
+  // Otherwise show a range.
+  const fStr = `${names[Number(fm[2]) - 1]} ${Number(fm[3])}`;
+  const tStr = `${names[Number(tm[2]) - 1]} ${Number(tm[3])}`;
+  return `${fStr} – ${tStr}`;
+}
+
 // ── Helpers ───────────────────────────────────────────────────────────────────
 
 function getYearMonth(dateStr: string): string {
@@ -124,13 +144,22 @@ export default function SubscriptionDashboard() {
       />
       <div className="flex items-center gap-2 ml-auto">
         {stripeLoading && <RefreshCw className="h-3.5 w-3.5 text-muted-foreground animate-spin" />}
-        <DateRangePicker defaultPreset="MTD" onChange={setDateRange} />
+        <DateRangePicker
+          defaultPreset="MTD"
+          onChange={setDateRange}
+          monthOnly={activeTab === "overview"}
+        />
       </div>
     </div>
 
     {/* ── Overview Tab ──────────────────────────────────────── */}
     {activeTab === "overview" && (
-      <FinancialOverview convert={convert} symbol={symbol} activeMonth={activeMonth} />
+      <FinancialOverview
+        convert={convert}
+        symbol={symbol}
+        fromDate={dateRange.startDate}
+        toDate={dateRange.endDate}
+      />
     )}
 
     {/* ── Subscriptions Tab ─────────────────────────────────── */}
@@ -388,13 +417,18 @@ function fmtMonth(m: string): string {
 function FinancialOverview({
   convert,
   symbol,
-  activeMonth,
+  fromDate,
+  toDate,
 }: {
   convert: (v: number) => number;
   symbol: string;
-  activeMonth: string;
+  fromDate: string;
+  toDate: string;
 }) {
   const { data, loading } = useFinanceOverview();
+  // The "active month" used for fallback lookups in useFinanceOverview only —
+  // KPI cards now pull live Xero data for the *actual* range below.
+  const activeMonth = useMemo(() => toDate.slice(0, 7), [toDate]);
   const selected = useMemo(() => data.find((d) => d.month === activeMonth) ?? data[0], [data, activeMonth]);
 
   // Months for the trend chart — current NZ month always first, then historical.
@@ -404,8 +438,8 @@ function FinancialOverview({
     return fromData.includes(currentNZMonth) ? fromData : [currentNZMonth, ...fromData];
   }, [data]);
 
-  // Live Xero P&L for the selected month (shared by KPI cards + XeroPL card)
-  const { data: xeroPL, loading: xeroLoading, error: xeroError } = useXeroPL(activeMonth);
+  // Live Xero P&L aggregated over the selected date range (any preset).
+  const { data: xeroPL, loading: xeroLoading, error: xeroError } = useXeroPL(fromDate, toDate);
 
   // BambooHR headcount → operating-team count (excludes Morningside)
   const { members: bambooMembers } = useTeamDirectory();
@@ -446,7 +480,7 @@ function FinancialOverview({
         <BreakdownStatCard
           label="Revenue"
           value={xeroLoading ? <LoadingIndicator /> : xeroPL ? `${symbol}${compact(convert(xeroPL.totalIncome))}` : "—"}
-          sub={activeMonth ? fmtMonth(activeMonth) : ""}
+          sub={rangeLabel(fromDate, toDate)}
           icon={DollarSign}
           accent="text-emerald-600"
           bg="bg-emerald-50 dark:bg-emerald-950/40"

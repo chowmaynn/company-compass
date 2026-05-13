@@ -288,29 +288,29 @@ export function useXeroPLTrend(endMonth: string, count: number) {
 }
 
 /**
- * Live Xero P&L for a given month (YYYY-MM). Single source of truth — used by
- * both the KPI cards and the detailed P&L card so we don't double-fetch.
+ * Live Xero P&L for an arbitrary date range. Used by the KPI cards so they
+ * reflect whatever preset (This Month / Last Month / 3 Months / Custom) is
+ * active. Xero will aggregate the range into a single P&L report.
  */
-export function useXeroPL(month: string) {
+export function useXeroPL(fromDate: string, toDate: string) {
   const [data, setData] = useState<PLSummary | null>(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
-    const range = monthToRange(month);
-    if (!range) {
+    if (!fromDate || !toDate) {
       setData(null);
       return;
     }
     let cancelled = false;
     setLoading(true);
     setError(null);
-    fetchProfitAndLoss(range.from, range.to)
+    fetchProfitAndLoss(fromDate, toDate)
       .then((r) => { if (!cancelled) setData(r); })
       .catch((e) => { if (!cancelled) setError(e.message); })
       .finally(() => { if (!cancelled) setLoading(false); });
     return () => { cancelled = true; };
-  }, [month]);
+  }, [fromDate, toDate]);
 
   return { data, loading, error };
 }
