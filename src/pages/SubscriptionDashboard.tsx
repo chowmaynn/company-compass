@@ -16,9 +16,16 @@ import { DashboardShell } from "@/components/DashboardShell";
 import { GlassTabs } from "@/components/ui/glass-tabs";
 import { DateRangePicker, presetToRange, type DateRangeValue } from "@/components/DateRangePicker";
 import { useCurrency } from "@/components/AppLayout";
-import { formatYearMonth } from "@/lib/dates";
+import { formatYearMonth, toNZDate } from "@/lib/dates";
 import { fmtCurrency } from "@/lib/formatNumber";
 import { GRID, TICK, TOOLTIP_STYLE as CHART_TOOLTIP } from "@/lib/chart-theme";
+import { BreakdownStatCard } from "@/components/finance/BreakdownStatCard";
+import { useXeroPL } from "@/lib/xero";
+import { useTeamDirectory } from "@/hooks/use-team-directory";
+
+// Headcount on the Morningside team is excluded from the rev/employee
+// calculation — they're not part of the core operating team for this metric.
+const MORNINGSIDE_TEAM_SIZE = 8;
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
 
@@ -388,12 +395,28 @@ function FinancialOverview({ convert, symbol }: { convert: (v: number) => number
   const { data, loading } = useFinanceOverview();
   const [selectedMonth, setSelectedMonth] = useState<string>("");
 
-  // Available months from data
-  const months = useMemo(() => data.map((d) => d.month), [data]);
+  // Available months — always include the current NZ month at the top so the
+  // dropdown reflects "live" data even before any row exists in finance_overview.
+  // This also auto-rolls when the calendar flips over in NZ time on next render.
+  const months = useMemo(() => {
+    const currentNZMonth = toNZDate(new Date()).slice(0, 7); // "YYYY-MM"
+    const fromData = data.map((d) => d.month);
+    return fromData.includes(currentNZMonth) ? fromData : [currentNZMonth, ...fromData];
+  }, [data]);
 
   // Default to latest month
   const activeMonth = selectedMonth || months[0] || "";
   const selected = useMemo(() => data.find((d) => d.month === activeMonth) ?? data[0], [data, activeMonth]);
+
+  // Live Xero P&L for the selected month (shared by KPI cards + XeroPL card)
+  const { data: xeroPL, loading: xeroLoading, error: xeroError } = useXeroPL(activeMonth);
+
+  // BambooHR headcount → operating-team count (excludes Morningside)
+  const { members: bambooMembers } = useTeamDirectory();
+  const operatingHeadcount = Math.max(0, bambooMembers.length - MORNINGSIDE_TEAM_SIZE);
+  const revenuePerEmployee = xeroPL && operatingHeadcount > 0
+    ? xeroPL.totalIncome / operatingHeadcount
+    : null;
 
   // Chart data — sorted oldest first
   const chartData = useMemo(() =>
@@ -432,41 +455,49 @@ function FinancialOverview({ convert, symbol }: { convert: (v: number) => number
         </div>
       )}
 
-      {/* ── KPI Cards ─────────────────────────────────────────── */}
+      {/* ── KPI Cards (Xero-powered) ──────────────────────────── */}
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
-        <StatCard
+        <BreakdownStatCard
           label="Revenue"
-          value={loading ? <LoadingIndicator /> : selected?.revenue != null ? `${symbol}${compact(convert(selected.revenue))}` : "—"}
-          sub={selected ? fmtMonth(selected.month) : ""}
+          value={xeroLoading ? <LoadingIndicator /> : xeroPL ? `${symbol}${compact(convert(xeroPL.totalIncome))}` : "—"}
+          sub={activeMonth ? fmtMonth(activeMonth) : ""}
           icon={DollarSign}
           accent="text-emerald-600"
           bg="bg-emerald-50 dark:bg-emerald-950/40"
+          lines={xeroPL?.income ?? []}
+          format={(n) => `${symbol}${convert(n).toLocaleString(undefined, { maximumFractionDigits: 0 })}`}
         />
-        <StatCard
-          label="Cost of Goods"
-          value={loading ? <LoadingIndicator /> : selected?.cogs != null ? `${symbol}${compact(convert(selected.cogs))}` : "—"}
-          sub={selected?.cogs != null && selected?.revenue ? `${((selected.cogs / selected.revenue) * 100).toFixed(1)}% of revenue` : ""}
+        <BreakdownStatCard
+          label="Expenses"
+          value={xeroLoading ? <LoadingIndicator /> : xeroPL ? `${symbol}${compact(convert(xeroPL.totalExpenses))}` : "—"}
+          sub={xeroPL && xeroPL.totalIncome ? `${((xeroPL.totalExpenses / xeroPL.totalIncome) * 100).toFixed(1)}% of revenue` : ""}
           icon={BarChart3}
           accent="text-amber-600"
           bg="bg-amber-50 dark:bg-amber-950/40"
+          lines={xeroPL?.expenses ?? []}
+          format={(n) => `${symbol}${convert(n).toLocaleString(undefined, { maximumFractionDigits: 0 })}`}
         />
         <StatCard
-          label="Gross Margin"
-          value={loading ? <LoadingIndicator /> : selected?.gross_margin_pct != null ? `${selected.gross_margin_pct.toFixed(1)}%` : "—"}
-          sub={selected?.gross_margin_pct != null && selected.gross_margin_pct >= 85 ? "Healthy" : selected?.gross_margin_pct != null && selected.gross_margin_pct >= 70 ? "Moderate" : "Low"}
+          label="Net Profit"
+          value={xeroLoading ? <LoadingIndicator /> : xeroPL ? `${symbol}${compact(convert(xeroPL.netProfit))}` : "—"}
+          sub={xeroPL && xeroPL.totalIncome ? `${((xeroPL.netProfit / xeroPL.totalIncome) * 100).toFixed(1)}% margin` : ""}
           icon={TrendingUp}
-          accent={selected?.gross_margin_pct != null && selected.gross_margin_pct >= 85 ? "text-emerald-600" : selected?.gross_margin_pct != null && selected.gross_margin_pct >= 70 ? "text-amber-600" : "text-red-600"}
-          bg={selected?.gross_margin_pct != null && selected.gross_margin_pct >= 85 ? "bg-emerald-50 dark:bg-emerald-950/40" : selected?.gross_margin_pct != null && selected.gross_margin_pct >= 70 ? "bg-amber-50 dark:bg-amber-950/40" : "bg-red-50 dark:bg-red-950/40"}
+          accent={xeroPL && xeroPL.netProfit >= 0 ? "text-emerald-600" : "text-red-600"}
+          bg={xeroPL && xeroPL.netProfit >= 0 ? "bg-emerald-50 dark:bg-emerald-950/40" : "bg-red-50 dark:bg-red-950/40"}
         />
         <StatCard
           label="Revenue / Employee"
-          value={loading ? <LoadingIndicator /> : selected?.revenue_per_employee != null ? `${symbol}${compact(convert(selected.revenue_per_employee))}` : "—"}
-          sub={selected?.headcount != null ? `${selected.headcount} employees` : ""}
+          value={xeroLoading ? <LoadingIndicator /> : revenuePerEmployee != null ? `${symbol}${compact(convert(revenuePerEmployee))}` : "—"}
+          sub={operatingHeadcount > 0 ? `${operatingHeadcount} employees (excl. Morningside)` : ""}
           icon={Users}
           accent="text-blue-600"
           bg="bg-blue-50 dark:bg-blue-950/40"
         />
       </div>
+
+      {xeroError && (
+        <p className="text-xs text-red-600">Xero P&L: {xeroError}</p>
+      )}
 
       {/* ── Revenue, CoGs & Rev/Employee Chart ─────────────────────── */}
       <Card className="border-border/50">
