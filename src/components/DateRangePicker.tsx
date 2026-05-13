@@ -1,4 +1,5 @@
 import { useState, useEffect, useRef, useMemo } from "react";
+import { createPortal } from "react-dom";
 import { ChevronDown } from "lucide-react";
 import { Calendar } from "@/components/ui/calendar";
 import type { DateRange } from "react-day-picker";
@@ -6,7 +7,7 @@ import { toNZDate } from "@/lib/dates";
 
 // ── Types ────────────────────────────────────────────────────
 
-export type Preset = "today" | "yesterday" | "MTD" | "TW" | "LM" | "3m" | "custom";
+export type Preset = "today" | "yesterday" | "MTD" | "TW" | "LW" | "LM" | "3m" | "6m" | "12m" | "custom" | "pastMonth";
 
 export interface DateRangeValue {
   /** ISO string (local midnight → UTC) for Supabase queries */
@@ -60,6 +61,15 @@ function currentWeekRange(): { startDate: string; endDate: string } {
   return { startDate, endDate: today };
 }
 
+/** Returns last week (Sun–Sat) in NZ. */
+function lastWeekRange(): { startDate: string; endDate: string } {
+  const today = nzToday();
+  const dow = dayOfWeek(today); // 0=Sun
+  const lastSat = addDays(today, -dow - 1);
+  const lastSun = addDays(lastSat, -6);
+  return { startDate: lastSun, endDate: lastSat };
+}
+
 /** Returns first day of the current NZ month, and today. */
 function currentMonthRange(): { startDate: string; endDate: string } {
   const today = nzToday();
@@ -78,13 +88,18 @@ function lastMonthRange(): { startDate: string; endDate: string } {
   return { startDate: fmt(prevY, prevM, 1), endDate: fmt(prevY, prevM, lastDay) };
 }
 
-/** Returns 3 months ago to today. */
-function threeMonthsRange(): { startDate: string; endDate: string } {
+/** Returns N months ago to today (NZ). */
+function nMonthsRange(n: number): { startDate: string; endDate: string } {
   const today = nzToday();
   const { y, m, d } = parts(today);
-  const startY = m <= 3 ? y - 1 : y;
-  const startM = ((m - 3 + 12 - 1) % 12) + 1;
-  return { startDate: fmt(startY, startM, d), endDate: today };
+  // Step the month back by n; wrap year as needed.
+  const totalMonths = y * 12 + (m - 1) - n;
+  const startY = Math.floor(totalMonths / 12);
+  const startM = (totalMonths % 12) + 1;
+  // Clamp day to the last day of the resulting month (e.g. May 31 - 1 month → Apr 30).
+  const lastDayOfStartMonth = new Date(Date.UTC(startY, startM, 0)).getUTCDate();
+  const startD = Math.min(d, lastDayOfStartMonth);
+  return { startDate: fmt(startY, startM, startD), endDate: today };
 }
 
 /** Convert preset → NZ date strings (single source of truth). */
@@ -99,8 +114,11 @@ export function presetToRange(preset: Exclude<Preset, "custom">): { startDate: s
   }
   if (preset === "MTD") return currentMonthRange();
   if (preset === "TW") return currentWeekRange();
+  if (preset === "LW") return lastWeekRange();
   if (preset === "LM") return lastMonthRange();
-  return threeMonthsRange();
+  if (preset === "6m") return nMonthsRange(6);
+  if (preset === "12m") return nMonthsRange(12);
+  return nMonthsRange(3);
 }
 
 /** Build the full DateRangeValue from NZ date strings. */
@@ -130,23 +148,82 @@ function fmtDateLabel(d: Date): string {
 interface Props {
   defaultPreset?: Preset;
   onChange: (range: DateRangeValue) => void;
+  /** When true, hide presets that don't make sense for monthly-granular data
+   *  (Today/Yesterday/This Week/Last Week). Use for views backed by Xero P&L. */
+  monthOnly?: boolean;
 }
 
-export function DateRangePicker({ defaultPreset = "TW", onChange }: Props) {
+/** Build a YYYY-MM-DD range covering the full given month (1st → last day). */
+function pastMonthRange(yyyymm: string): { startDate: string; endDate: string } | null {
+  const m = yyyymm.match(/^(\d{4})-(\d{2})$/);
+  if (!m) return null;
+  const year = Number(m[1]);
+  const month = Number(m[2]);
+  const lastDay = new Date(Date.UTC(year, month, 0)).getUTCDate();
+  return { startDate: fmt(year, month, 1), endDate: fmt(year, month, lastDay) };
+}
+
+/** "2026-04" → "Apr 26" */
+function pastMonthLabel(yyyymm: string): string {
+  const m = yyyymm.match(/^(\d{4})-(\d{2})$/);
+  if (!m) return yyyymm;
+  const names = ["Jan","Feb","Mar","Apr","May","Jun","Jul","Aug","Sep","Oct","Nov","Dec"];
+  return `${names[Number(m[2]) - 1]} ${m[1].slice(2)}`;
+}
+
+/** Generate the N most recent past months as YYYY-MM, excluding the current. */
+function recentPastMonths(count: number): string[] {
+  const today = nzToday();
+  const { y, m } = parts(today);
+  const out: string[] = [];
+  for (let i = 1; i <= count; i++) {
+    const totalMonths = y * 12 + (m - 1) - i;
+    const yy = Math.floor(totalMonths / 12);
+    const mm = (totalMonths % 12) + 1;
+    out.push(`${yy}-${String(mm).padStart(2, "0")}`);
+  }
+  return out;
+}
+
+export function DateRangePicker({ defaultPreset = "TW", onChange, monthOnly = false }: Props) {
   const [preset, setPreset] = useState<Preset>(defaultPreset);
   const [customRange, setCustomRange] = useState<DateRange | undefined>();
+  const [pickedMonth, setPickedMonth] = useState<string | null>(null);
   const [open, setOpen] = useState(false);
+  const [monthsOpen, setMonthsOpen] = useState(false);
+  const [monthsPopoverPos, setMonthsPopoverPos] = useState<{ top: number; right: number; width: number } | null>(null);
   const ref = useRef<HTMLDivElement>(null);
+  const thisMonthButtonRef = useRef<HTMLButtonElement>(null);
+  const pastMonths = useMemo(() => recentPastMonths(18), []);
 
-  // Close calendar on outside click
+  // Compute popover position relative to viewport whenever it opens.
   useEffect(() => {
-    if (!open) return;
+    if (!monthsOpen || !thisMonthButtonRef.current) return;
+    const rect = thisMonthButtonRef.current.getBoundingClientRect();
+    // Right-aligned with the button, same width as the button, just below it.
+    setMonthsPopoverPos({
+      top: rect.bottom + 8,
+      right: window.innerWidth - rect.right,
+      width: rect.width,
+    });
+  }, [monthsOpen]);
+
+  const monthsPopoverRef = useRef<HTMLDivElement>(null);
+  // Close popovers on outside click (counts portal-rendered popover too)
+  useEffect(() => {
+    if (!open && !monthsOpen) return;
     const handler = (e: MouseEvent) => {
-      if (ref.current && !ref.current.contains(e.target as Node)) setOpen(false);
+      const target = e.target as Node;
+      const insideRoot = ref.current?.contains(target);
+      const insidePopover = monthsPopoverRef.current?.contains(target);
+      if (!insideRoot && !insidePopover) {
+        setOpen(false);
+        setMonthsOpen(false);
+      }
     };
     document.addEventListener("mousedown", handler);
     return () => document.removeEventListener("mousedown", handler);
-  }, [open]);
+  }, [open, monthsOpen]);
 
   // Compute and emit range on any change — skip when custom is selected but no dates picked yet
   const range = useMemo(() => {
@@ -156,14 +233,19 @@ export function DateRangePicker({ defaultPreset = "TW", onChange }: Props) {
       }
       return null; // Don't emit until both dates are selected
     }
-    const { startDate, endDate } = presetToRange(preset as Exclude<Preset, "custom">);
+    if (preset === "pastMonth" && pickedMonth) {
+      const r = pastMonthRange(pickedMonth);
+      if (!r) return null;
+      return { start: r.startDate + "T00:00:00Z", end: r.endDate + "T23:59:59Z", ...r };
+    }
+    const { startDate, endDate } = presetToRange(preset as Exclude<Preset, "custom" | "pastMonth">);
     return {
       start: startDate + "T00:00:00Z",
       end: endDate + "T23:59:59Z",
       startDate,
       endDate,
     };
-  }, [preset, customRange]);
+  }, [preset, customRange, pickedMonth]);
 
   useEffect(() => {
     if (range) onChange(range);
@@ -177,22 +259,39 @@ export function DateRangePicker({ defaultPreset = "TW", onChange }: Props) {
     return "Custom range";
   }, [customRange]);
 
-  const presets: { id: Preset; label: string }[] = [
+  const allPresets: { id: Preset; label: string }[] = [
     { id: "today",     label: "Today" },
     { id: "yesterday", label: "Yesterday" },
     { id: "TW",        label: "This Week" },
-    { id: "MTD", label: "This Month" },
+    { id: "LW",        label: "Last Week" },
+    // "MTD" / "This Month" is rendered as a special button-with-dropdown below
     { id: "LM",  label: "Last Month" },
     { id: "3m",  label: "3 Months" },
+    { id: "6m",  label: "6 Months" },
+    { id: "12m", label: "12 Months" },
   ];
+  // In monthOnly mode, hide presets shorter than a month.
+  const presets = monthOnly
+    ? allPresets.filter((p) => ["LM", "3m", "6m", "12m"].includes(p.id))
+    : allPresets;
+
+  // When monthOnly mode is enabled while a hidden preset is active, reset to "This Month".
+  useEffect(() => {
+    if (!monthOnly) return;
+    const hiddenInMonthOnly: Preset[] = ["today", "yesterday", "TW", "LW", "custom"];
+    if (hiddenInMonthOnly.includes(preset)) setPreset("MTD");
+  }, [monthOnly, preset]);
+
+  const thisMonthActive = preset === "MTD" || preset === "pastMonth";
+  const thisMonthLabel = preset === "pastMonth" && pickedMonth ? pastMonthLabel(pickedMonth) : "This Month";
 
   return (
     <div className="relative" ref={ref}>
       <div className="flex items-center gap-0.5 bg-black/5 dark:bg-black/30 backdrop-blur-sm rounded-full p-1 ring-1 ring-black/10 dark:ring-white/10">
-        {presets.map((p) => (
+        {presets.filter((p) => ["today", "yesterday", "TW", "LW"].includes(p.id)).map((p) => (
           <button
             key={p.id}
-            onClick={() => { setPreset(p.id); setOpen(false); }}
+            onClick={() => { setPreset(p.id); setOpen(false); setMonthsOpen(false); }}
             className={`px-3 py-1.5 rounded-full text-[11px] font-medium transition-all ${
               preset === p.id
                 ? "bg-black/10 dark:bg-white/15 text-foreground shadow-sm ring-1 ring-black/10 dark:ring-white/20"
@@ -203,21 +302,100 @@ export function DateRangePicker({ defaultPreset = "TW", onChange }: Props) {
           </button>
         ))}
 
-        <button
-          onClick={() => { setPreset("custom"); setOpen((o) => !o); }}
-          className={`flex items-center gap-1 px-3 py-1.5 rounded-full text-[11px] font-medium transition-all ${
-            preset === "custom"
-              ? "bg-black/10 dark:bg-white/15 text-foreground shadow-sm ring-1 ring-black/10 dark:ring-white/20"
-              : "text-muted-foreground hover:text-foreground hover:bg-black/5 dark:hover:bg-white/5"
-          }`}
-        >
-          {preset === "custom" ? customLabel : "Custom"}
-          <ChevronDown className={`h-3 w-3 transition-transform ${open ? "rotate-180" : ""}`} />
-        </button>
+        {/* This Month — clickable preset + chevron opens past-months dropdown */}
+        <div className="relative">
+          <button
+            ref={thisMonthButtonRef}
+            onClick={() => {
+              // First click selects current month; subsequent click toggles dropdown
+              if (!thisMonthActive) {
+                setPreset("MTD");
+                setPickedMonth(null);
+                setOpen(false);
+              } else {
+                setMonthsOpen((o) => !o);
+              }
+            }}
+            className={`flex items-center gap-1 px-3 py-1.5 rounded-full text-[11px] font-medium transition-all ${
+              thisMonthActive
+                ? "bg-black/10 dark:bg-white/15 text-foreground shadow-sm ring-1 ring-black/10 dark:ring-white/20"
+                : "text-muted-foreground hover:text-foreground hover:bg-black/5 dark:hover:bg-white/5"
+            }`}
+          >
+            {thisMonthLabel}
+            <ChevronDown className={`h-3 w-3 transition-transform ${monthsOpen ? "rotate-180" : ""}`} />
+          </button>
+          {monthsOpen && monthsPopoverPos && createPortal(
+            <div
+              ref={monthsPopoverRef}
+              style={{
+                position: "fixed",
+                top: monthsPopoverPos.top,
+                right: monthsPopoverPos.right,
+                width: monthsPopoverPos.width,
+              }}
+              className="z-[9999] max-h-72 overflow-y-auto rounded-xl bg-white dark:bg-zinc-900 ring-1 ring-black/20 dark:ring-white/20 shadow-2xl py-1">
+              <button
+                type="button"
+                onClick={() => { setPreset("MTD"); setPickedMonth(null); setMonthsOpen(false); }}
+                className={`w-full text-center px-3 py-1.5 text-[11px] font-medium transition-colors ${
+                  preset === "MTD"
+                    ? "bg-black/[0.06] dark:bg-white/[0.08] text-foreground"
+                    : "text-foreground hover:bg-black/[0.04] dark:hover:bg-white/[0.06]"
+                }`}
+              >
+                This Month
+              </button>
+              {pastMonths.map((m) => (
+                <button
+                  key={m}
+                  type="button"
+                  onClick={() => { setPreset("pastMonth"); setPickedMonth(m); setMonthsOpen(false); }}
+                  className={`w-full text-center px-3 py-1.5 text-[11px] font-medium transition-colors ${
+                    preset === "pastMonth" && pickedMonth === m
+                      ? "bg-black/[0.06] dark:bg-white/[0.08] text-foreground"
+                      : "text-foreground hover:bg-black/[0.04] dark:hover:bg-white/[0.06]"
+                  }`}
+                >
+                  {pastMonthLabel(m)}
+                </button>
+              ))}
+            </div>,
+            document.body,
+          )}
+        </div>
+
+        {presets.filter((p) => ["LM", "3m", "6m", "12m"].includes(p.id)).map((p) => (
+          <button
+            key={p.id}
+            onClick={() => { setPreset(p.id); setOpen(false); setMonthsOpen(false); }}
+            className={`px-3 py-1.5 rounded-full text-[11px] font-medium transition-all ${
+              preset === p.id
+                ? "bg-black/10 dark:bg-white/15 text-foreground shadow-sm ring-1 ring-black/10 dark:ring-white/20"
+                : "text-muted-foreground hover:text-foreground hover:bg-black/5 dark:hover:bg-white/5"
+            }`}
+          >
+            {p.label}
+          </button>
+        ))}
+
+        {!monthOnly && (
+          <button
+            onClick={() => { setPreset("custom"); setOpen((o) => !o); }}
+            className={`flex items-center gap-1 px-3 py-1.5 rounded-full text-[11px] font-medium transition-all ${
+              preset === "custom"
+                ? "bg-black/10 dark:bg-white/15 text-foreground shadow-sm ring-1 ring-black/10 dark:ring-white/20"
+                : "text-muted-foreground hover:text-foreground hover:bg-black/5 dark:hover:bg-white/5"
+            }`}
+          >
+            {preset === "custom" ? customLabel : "Custom"}
+            <ChevronDown className={`h-3 w-3 transition-transform ${open ? "rotate-180" : ""}`} />
+          </button>
+        )}
       </div>
 
-      {open && (
-        <div className="absolute right-0 top-full mt-2 z-50 bg-card border border-border rounded-xl shadow-xl p-3">
+      {open && !monthOnly && (
+        <div className="absolute right-0 top-full mt-2 z-[100] bg-card border border-border rounded-xl shadow-xl p-3">
           <Calendar
             mode="range"
             selected={customRange}

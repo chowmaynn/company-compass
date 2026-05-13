@@ -30,14 +30,20 @@ Deno.serve(async (req) => {
   try {
     let fromDate: string | undefined;
     let toDate: string | undefined;
+    let periods: string | undefined;
+    let timeframe: string | undefined;
     if (req.method === "POST") {
       const body = await req.json().catch(() => ({}));
       fromDate = body.fromDate;
       toDate = body.toDate;
+      periods = body.periods != null ? String(body.periods) : undefined;
+      timeframe = body.timeframe;
     } else {
       const url = new URL(req.url);
       fromDate = url.searchParams.get("fromDate") ?? undefined;
       toDate = url.searchParams.get("toDate") ?? undefined;
+      periods = url.searchParams.get("periods") ?? undefined;
+      timeframe = url.searchParams.get("timeframe") ?? undefined;
     }
 
     if (!fromDate || !toDate) {
@@ -50,6 +56,8 @@ Deno.serve(async (req) => {
     const { access_token, tenant_id } = await getValidAccessToken(supabase);
 
     const params = new URLSearchParams({ fromDate, toDate });
+    if (periods) params.set("periods", periods);
+    if (timeframe) params.set("timeframe", timeframe);
     const res = await fetch(
       `https://api.xero.com/api.xro/2.0/Reports/ProfitAndLoss?${params}`,
       {
