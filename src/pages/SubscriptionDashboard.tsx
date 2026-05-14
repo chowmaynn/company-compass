@@ -487,24 +487,6 @@ function FinancialOverview({
           lines={xeroPL?.income ?? []}
           format={(n) => `${symbol}${convert(n).toLocaleString(undefined, { maximumFractionDigits: 0 })}`}
         />
-        <BreakdownStatCard
-          label="Expenses"
-          value={xeroLoading ? <LoadingIndicator /> : xeroPL ? `${symbol}${compact(convert(xeroPL.totalExpenses))}` : "—"}
-          sub={xeroPL && xeroPL.totalIncome ? `${((xeroPL.totalExpenses / xeroPL.totalIncome) * 100).toFixed(1)}% of revenue` : ""}
-          icon={BarChart3}
-          accent="text-amber-600"
-          bg="bg-amber-50 dark:bg-amber-950/40"
-          lines={xeroPL?.expenses ?? []}
-          format={(n) => `${symbol}${convert(n).toLocaleString(undefined, { maximumFractionDigits: 0 })}`}
-        />
-        <StatCard
-          label="Net Profit"
-          value={xeroLoading ? <LoadingIndicator /> : xeroPL ? `${symbol}${compact(convert(xeroPL.netProfit))}` : "—"}
-          sub={xeroPL && xeroPL.totalIncome ? `${((xeroPL.netProfit / xeroPL.totalIncome) * 100).toFixed(1)}% margin` : ""}
-          icon={TrendingUp}
-          accent={xeroPL && xeroPL.netProfit >= 0 ? "text-emerald-600" : "text-red-600"}
-          bg={xeroPL && xeroPL.netProfit >= 0 ? "bg-emerald-50 dark:bg-emerald-950/40" : "bg-red-50 dark:bg-red-950/40"}
-        />
         <StatCard
           label="Revenue / Employee"
           value={xeroLoading ? <LoadingIndicator /> : revenuePerEmployee != null ? `${symbol}${compact(convert(revenuePerEmployee))}` : "—"}
@@ -522,7 +504,7 @@ function FinancialOverview({
       {/* ── Revenue, CoGs & Rev/Employee Chart ─────────────────────── */}
       <Card className="border-border/50">
         <CardContent className="p-5">
-          <h3 className="text-sm font-semibold text-foreground mb-1">Revenue & Expenses</h3>
+          <h3 className="text-sm font-semibold text-foreground mb-1">Revenue</h3>
           <p className="text-xs text-muted-foreground mb-4">Monthly trend · live from Xero</p>
           {xeroTrendLoading && xeroTrend.length === 0 ? (
             <div className="flex items-center justify-center py-16"><LoadingIndicator /></div>
@@ -541,7 +523,6 @@ function FinancialOverview({
                 <Tooltip contentStyle={CHART_TOOLTIP} formatter={(v: number, name: string) => [`$${compact(v)}`, name]} />
                 <Legend wrapperStyle={{ fontSize: 11 }} />
                 <Area type="monotone" dataKey="revenue" name="Revenue" stroke="#10b981" strokeWidth={2} fill="url(#revGrad)" dot={false} activeDot={{ r: 4, fill: "#10b981" }} />
-                <Bar dataKey="expenses" name="Expenses" fill="#f59e0b" radius={[3, 3, 0, 0]} barSize={20} opacity={0.7} />
               </ComposedChart>
             </ResponsiveContainer>
           )}
